@@ -340,57 +340,69 @@ unsigned Sequencer::MLCD(InterfaceConnection *server, const std::string &id)
 unsigned Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
 {
 	bool done = true;
+	std::string channels;
+	int ic = -1;
 	int fromPriority;
 	int toPriority;
 	int immediately;
 
+	(*server) >> channels;
 	(*server) >> fromPriority;
 	(*server) >> toPriority;
 	(*server) >> immediately;
 
 	if (!server->good())
 	{
-		server->syntax_error(id) << "expecting <fromPriority> <toPriority> <immediately>" << end();
+		server->syntax_error(id) << "expecting <channels> <fromPriority> <toPriority> <immediately>" << end();
 		return V3_FATAL_SYNTAX;
 	}
 
-	log(log_debug, "sequencer") << "discarding molecules with " << fromPriority 
+	log(log_debug, "sequencer") << "discarding molecules for channel(s) " 
+		<< channels << " with " << fromPriority 
 		<< " <= priority <= " << toPriority << logend();
+
+	if (channels != "all")
+	{
+		ic = atoi(channels.c_str());
+	}
 
 	omni_mutex_lock lock(m_mutex);
 
 	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
-		for (ActivityIter ai(m_activity[i]); !ai.isDone(); ai.next())
+		if (ic == i || ic == -1)
 		{
-			Molecule *molecule = ai.current();
-
-			if (molecule->getMode() & Molecule::dont_interrupt)  
+			for (ActivityIter ai(m_activity[i]); !ai.isDone(); ai.next())
 			{
-				done = false;
-				continue;
-			}
+				Molecule *molecule = ai.current();
 
-			if (molecule->getPriority() >= fromPriority && molecule->getPriority() <= toPriority)
-			// if active, stop and send ack when stopped, else remove and send ack immediately
-			if (molecule->isActive() && immediately)
-			{
-				done = false;	
+				if (molecule->getMode() & Molecule::dont_interrupt)  
+				{
+					done = false;
+					continue;
+				}
 
-				molecule->setMode(Molecule::discard);
-				molecule->stop(this);
-				
-				log(log_debug, "sequencer") << "stopped molecule " 
-					<< molecule->getId() << logend();
+				if (molecule->getPriority() >= fromPriority && molecule->getPriority() <= toPriority)
+				// if active, stop and send ack when stopped, else remove and send ack immediately
+				if (molecule->isActive() && immediately)
+				{
+					done = false;	
 
-				checkCompleted();
-			}
-			else
-			{
-				log(log_debug, "sequencer") << "removing molecule "  
-					<< molecule->getId() << logend();
+					molecule->setMode(Molecule::discard);
+					molecule->stop(this);
+					
+					log(log_debug, "sequencer") << "stopped molecule " 
+						<< molecule->getId() << logend();
 
-				m_activity[i].remove(molecule);
+					checkCompleted();
+				}
+				else
+				{
+					log(log_debug, "sequencer") << "removing molecule "  
+						<< molecule->getId() << logend();
+
+					m_activity[i].remove(molecule);
+				}
 			}
 		}
 	}

@@ -6,9 +6,10 @@
 
 /* completion codes */
 #define V3_OK 200
-#define V3_ABORTED 201
-#define V3_SILENCE 202
-#define V3_TIMEOUT 203
+#define V3_SILENCE 201
+#define V3_TIMEOUT 202
+#define V3_ABORTED 203
+#define V3_DISCONNECTED 204
 
 /* warnings */
 #define V3_WARNING_EMPTY 400
@@ -26,7 +27,6 @@
 #define V3_ERROR_NUMBER_CHANGED 509
 #define V3_ERROR_UNREACHABLE 510
 #define V3_ERROR_REJECTED 511
-#define V3_ERROR_DISCONNECTED 512
 
 /* fatal errors */
 #define V3_FATAL_SYNTAX 600

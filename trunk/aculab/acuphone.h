@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.15 2004/01/12 21:48:06 lars Exp $
+	$Id$
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -173,7 +173,7 @@ protected:
 		virtual ~FileSample();
 
         virtual unsigned start(Media *phone);
-        virtual bool stop(Media *phone);
+        virtual bool stop(Media *phone, unsigned status = V3_ABORTED);
 		virtual unsigned submit(Media *phone);
 		// fills prosody buffers if space available, notifies about completion if done
 		virtual int process(Media *phone);
@@ -201,7 +201,7 @@ protected:
 		virtual ~RecordFileSample() {}
 
         virtual unsigned start(Media *phone);
-        virtual bool stop(Media *phone);
+        virtual bool stop(Media *phone, unsigned status = V3_ABORTED);
 		virtual unsigned receive(Media *phone);
 		// empties prosody buffers if data available, notifies about completion if done
 		virtual int process(Media *phone);
@@ -222,7 +222,7 @@ protected:
 		virtual ~Beep() {}
 
         virtual unsigned start(Media *phone);
-        virtual bool stop(Media *phone);
+        virtual bool stop(Media *phone, unsigned status = V3_ABORTED);
 		virtual unsigned submit(Media *phone);
 		// fills prosody buffers if space available, notifies about completion if done
 		virtual int process(Media *phone);
@@ -242,7 +242,7 @@ protected:
 		virtual ~Touchtones() {}
 
         virtual unsigned start(Media *phone);
-        virtual bool stop(Media *phone);
+        virtual bool stop(Media *phone, unsigned status = V3_ABORTED);
 		virtual int process(Media *phone);
 
 		std::string m_tt;

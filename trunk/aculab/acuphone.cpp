@@ -398,7 +398,7 @@ unsigned ProsodyChannel::Beep::submit(Media *phone)
 	return data.length;
 }
 
-bool ProsodyChannel::Beep::stop(Media *phone)
+bool ProsodyChannel::Beep::stop(Media *phone, unsigned status)
 {
 	struct sm_replay_abort_parms p;
 
@@ -415,7 +415,7 @@ bool ProsodyChannel::Beep::stop(Media *phone)
 	p.channel = m_prosody->m_channel;
 
 	m_state = stopping;
-	m_status = V3_ABORTED;
+	m_status = status;
 	
 	int rc = sm_replay_abort(&p);
 	if (rc)
@@ -527,7 +527,7 @@ unsigned ProsodyChannel::Touchtones::start(Media *phone)
 	return 0;
 }
 
-bool ProsodyChannel::Touchtones::stop(Media *phone)
+bool ProsodyChannel::Touchtones::stop(Media *phone, unsigned status)
 {
 	omni_mutex_lock l(m_prosody->m_mutex);
 
@@ -540,7 +540,7 @@ bool ProsodyChannel::Touchtones::stop(Media *phone)
 	}
 
 	m_state = stopping;
-	m_status = V3_ABORTED;
+	m_status = status;
 
 	int rc = sm_play_tone_abort(m_prosody->m_channel);
 	if (rc)
@@ -724,7 +724,7 @@ unsigned ProsodyChannel::FileSample::submit(Media *phone)
 	return data.length;
 }
 
-bool ProsodyChannel::FileSample::stop(Media *phone)
+bool ProsodyChannel::FileSample::stop(Media *phone, unsigned status)
 {
 	struct sm_replay_abort_parms p;
 
@@ -741,7 +741,7 @@ bool ProsodyChannel::FileSample::stop(Media *phone)
 	}
 
 	m_state = stopping;
-	m_status = V3_ABORTED;
+	m_status = status;
 
 	int rc = sm_replay_abort(&p);
 	if (rc)
@@ -839,7 +839,7 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 	return m_position;
 }
 
-bool ProsodyChannel::RecordFileSample::stop(Media *phone)
+bool ProsodyChannel::RecordFileSample::stop(Media *phone, unsigned status)
 {
 	struct sm_record_abort_parms abort;
 
@@ -857,7 +857,7 @@ bool ProsodyChannel::RecordFileSample::stop(Media *phone)
 	}
 
 	m_state = stopping;
-	m_status = V3_ABORTED;
+	m_status = status;
 
 	int rc = sm_record_abort(&abort);
 	if (rc)
@@ -922,7 +922,7 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 			p->m_receiving = 0;
 			p->m_mutex.unlock();
 			
-			if (m_status != V3_ABORTED)
+			if (m_status != V3_ABORTED && m_status != V3_DISCONNECTED)
 			{
 				rc = sm_record_how_terminated(&how);
 				if (rc)

@@ -10,6 +10,8 @@ const char* result_name(int r)
 		return "ok";
 	case V3_ABORTED:
 		return "aborted";
+	case V3_DISCONNECTED:
+		return "disconnected";
 	case V3_SILENCE:
 		return "silence";
 	case V3_TIMEOUT:

@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.22 2004/01/15 17:18:58 lars Exp $
+	$Id$
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -118,7 +118,7 @@ public:
 
     virtual unsigned start(Media* aMedia) = 0;
 
-    virtual bool stop(Media* aMedia) = 0;
+    virtual bool stop(Media* aMedia, unsigned status) = 0;
 
     virtual unsigned getLength()	{ return 0; }
 	virtual unsigned getStatus()	{ return m_status; }
