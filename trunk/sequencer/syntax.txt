@@ -4,6 +4,18 @@ tid := identifier
 channel := identifier
 integer := [0-9]+
 
+// response sent to client
+
+event := 'alerting' | 'touchtone' | 'disconnect' |
+	     'disconnect-done' | 'accept-done' 
+	     'play-done' | 'record-done'
+
+data := identifier
+
+result := '0' | '1'
+
+response := tid result device event data
+
 // listen for incoming call
 
 trunk := identifier | 'any'
