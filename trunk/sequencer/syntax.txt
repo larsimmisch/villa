@@ -1,0 +1,42 @@
+identifier is an arbitrary string not containing whitespace.
+
+tid := identifier
+channel := identifier
+integer := [0-9]+
+
+// listen for incoming call
+
+trunk := identifier | 'any'
+did := identifier | 'any'
+
+listen := tid 'global' 'listen' trunk did
+
+// accept incoming call
+
+accept := tid channel 'accept'
+
+// disconnect call
+disconnect := tid channel 'disconnect'
+
+// do media stuff
+
+notification := 'start' | 'stop' | 'both'
+
+atom := play notification | record notification | dtmf notification | beep notification
+	| silence notification | conference notification
+
+play := 'play' identifier
+
+record := 'record' identifier integer
+
+dtmf := 'dtmf' integer
+
+beep := 'beep' integer
+
+silence := 'silence' integer
+
+conference := 'conference' identifier
+
+add := tid channel 'add' integer integer atom+
+
+exit := 'exit'

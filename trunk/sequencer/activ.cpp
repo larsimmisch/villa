@@ -26,39 +26,39 @@ char* copyString(const char* aString)
 
 int Atom::start(Sequencer *sequencer, void *userData)
 {
-	sample->setUserData(userData);
+	m_sample->setUserData(userData);
 
-	sample->start(sequencer->getPhone());
+	m_sample->start(sequencer->getPhone());
 
 	return true;
 }
 
 int Atom::stop(Sequencer *sequencer)
 {
-	return sample->stop(sequencer->getPhone());
+	return m_sample->stop(sequencer->getPhone());
 }
 
 PlayAtom::PlayAtom(Sequencer* sequencer, const char* aFile)
 { 
-	file = copyString(aFile);
-	sample = sequencer->getPhone()->createFileSample(aFile);
+	m_file = copyString(aFile);
+	m_sample = sequencer->getPhone()->createFileSample(aFile);
 }
  
 RecordAtom::RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime)
-	: time(aTime)
+	: m_time(aTime)
 {
-	file = copyString(aFile); 
+	m_file = copyString(aFile); 
 
-	sample = sequencer->getPhone()->createRecordFileSample(aFile, aTime);
+	m_sample = sequencer->getPhone()->createRecordFileSample(aFile, aTime);
 }
 
-BeepAtom::BeepAtom(Sequencer* sequencer, unsigned count) : nBeeps(count) 
+BeepAtom::BeepAtom(Sequencer* sequencer, unsigned count) : m_nBeeps(count) 
 {
-	sample = sequencer->getPhone()->createBeeps(count);
+	m_sample = sequencer->getPhone()->createBeeps(count);
 }
 
 ConferenceAtom::ConferenceAtom(unsigned aConference, unsigned aMode)
- : mode(aMode), started(), me(0)
+ : m_mode(aMode), m_me(0)
 {
 //	  conf = new Conference(aConference);
 
@@ -74,24 +74,25 @@ ConferenceAtom::~ConferenceAtom()
 
 void ConferenceAtom::terminate()
 {
-	if (me) conf->remove(me);
+	if (m_me) 
+		m_conf->remove(m_me);
 
 #ifndef __AG__
-	delete conf;
+	delete m_conf;
 #endif
 }
 
 int ConferenceAtom::start(Sequencer* sequencer, void* aUserData)
 {
-	if (!conf)	return 0;
+	if (!m_conf)	return 0;
 
-	userData = aUserData;
+	m_userData = aUserData;
 
 	// me = conf->add(sequencer->getPhone()->getSlot(), sequencer->getPhone()->getSwitch(), mode);
 
 	// started.now();
 
-	return me ? 1 : 0;
+	return m_me ? 1 : 0;
 }
 
 int ConferenceAtom::stop(Sequencer* sequencer)
@@ -101,7 +102,7 @@ int ConferenceAtom::stop(Sequencer* sequencer)
 	// now.now();
 
 	// conf->remove(me);
-	me = 0;
+	m_me = 0;
 
 	// sequencer->addCompleted(sequencer->getPhone(), (Molecule*)userData, 0, now - started);
 
@@ -110,33 +111,33 @@ int ConferenceAtom::stop(Sequencer* sequencer)
 
 TouchtoneAtom::TouchtoneAtom(Sequencer* sequencer, const char* att)
 {
-	tt = copyString(att);
+	m_tt = copyString(att);
 
-	sample = sequencer->getPhone()->createTouchtones(att);
+	m_sample = sequencer->getPhone()->createTouchtones(att);
 }
 
 int SilenceAtom::start(Sequencer* sequencer, void* aUserData)
 {
-	timer = sequencer->getTimer().add(length, this, aUserData);
+	m_timer = sequencer->getTimer().add(m_length, this, aUserData);
 
-	seq = sequencer;
+	m_seq = sequencer;
 
 	return 1;
 }
 
 int SilenceAtom::stop(Sequencer* sequencer)
 {
-	if (timer.is_valid())
+	if (m_timer.is_valid())
 	{
 		// todo: calculate position
 
-		sequencer->getTimer().remove(timer);
+		sequencer->getTimer().remove(m_timer);
 
 		// if we have to use completed() or addCompleted() depends on the thread context
 		// here we are in the sequencers context, so we use addCompleted
-		sequencer->addCompleted(sequencer->getPhone(), (Molecule*)timer.m_data, 0, pos);
+		sequencer->addCompleted(sequencer->getPhone(), (Molecule*)m_timer.m_data, 0, m_pos);
 
-		timer.invalidate();
+		m_timer.invalidate();
 
 		return 1;
 	}
@@ -151,30 +152,23 @@ void SilenceAtom::on_timer(const Timer::TimerID &id)
 
 	Molecule * m = (Molecule*)id.m_data;
 
-	seq->completed(seq->getPhone(), m, 1, length);
-	timer.invalidate();
-	pos = 0;
+	m_seq->completed(m_seq->getPhone(), m, 1, m_length);
+	m_timer.invalidate();
+	m_pos = 0;
 }
 
 int SilenceAtom::setPos(unsigned pos)
 {
-	length = length > pos ? length - pos : 0;
+	m_length = m_length > pos ? m_length - pos : 0;
 
 	return 1;
 }
 
-Molecule::Molecule(unsigned aMode, int aPriority, int aSyncMinor) : DList()
+Molecule::Molecule(unsigned aMode, int aPriority, const std::string &id) : DList(),
+	m_mode(aMode), m_priority(aPriority), m_id(id), m_flags(0), m_current(0), 
+	m_pos(0), m_status(0), m_length(0), m_nCurrent(0)
 {
-	timeStopped.now();
-	priority = aPriority;
-	syncMinor = aSyncMinor;
-	mode = aMode;
-	flags = 0;
-	current = 0;
-	pos = 0;
-	status = 0;
-	length = 0;
-	nCurrent = 0;
+	m_timeStopped.now();
 }
 
 Molecule::~Molecule()
@@ -194,53 +188,55 @@ int Molecule::start(Sequencer* sequencer, void* userData)
 
 	if (!isStopped())
 	{
-		if (current)
+		if (m_current)
 		{
 			if (needRewind())	
-				current->setPos(0);
-			started = current->start(sequencer, this);
+				m_current->setPos(0);
+			started = m_current->start(sequencer, this);
 		}
 		else
 		{
-			nCurrent = 0;
-			current = (Atom*)head;
-			started = current ? current->start(sequencer, this) : 0;
+			m_nCurrent = 0;
+			m_current = (Atom*)head;
+			started = m_current ? m_current->start(sequencer, this) : 0;
 		}
 	}
 	else
 	{
-		if (mode & restart)
+		if (m_mode & restart)
 		{
-			nCurrent = 0;
-			current = (Atom*)head;
-			current->setPos(0);
-			started = current->start(sequencer, this);
+			m_nCurrent = 0;
+			m_current = (Atom*)head;
+			m_current->setPos(0);
+			started = m_current->start(sequencer, this);
 		}
-		else if ((mode & mute) || (mode & mix))
+		else if (m_mode & mute)
 		{
 			Time now;
 			unsigned timeInactive;
 
 			now.now();
-			timeInactive = now - timeStopped;
+			timeInactive = now - m_timeStopped;
 
 			log(log_debug + 2, "activ") << "was inactive: " << timeInactive << logend();
 
-			if (setPos(pos + timeInactive)) started =  current->start(sequencer, this);
-			else started = 0;
+			if (setPos(m_pos + timeInactive)) 
+				started = m_current->start(sequencer, this);
+			else 
+				started = 0;
 		}
-		else if (mode & pause)
+		else if (m_mode & pause)
 		{
-			setPos(pos);
-			started =  current->start(sequencer, this);
+			setPos(m_pos);
+			started = m_current->start(sequencer, this);
 		}
 	}
 
-	flags &= ~stopped;
+	m_flags &= ~stopped;
 	if (started)
 	{
-		flags |= active;
-		timeStarted.now();
+		m_flags |= active;
+		m_timeStarted.now();
 	}
 
 	return started;
@@ -248,50 +244,56 @@ int Molecule::start(Sequencer* sequencer, void* userData)
 
 int Molecule::stop(Sequencer* sequencer)
 {
-	if (mode & dont_interrupt)	  return 0;
+	if (m_mode & dont_interrupt)
+		return 0;
 
-	flags |= stopped;
+	m_flags |= stopped;
 
-	return current ? current->stop(sequencer) : 0;
+	return m_current ? m_current->stop(sequencer) : 0;
 }
 
 int Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 {
-	current->done(sequencer, msecs, status);
-	if (current->isGrowing())	length += msecs;
-	pos += msecs;
+	m_current->done(sequencer, msecs, status);
+	if (m_current->isGrowing())	
+		m_length += msecs;
+
+	m_pos += msecs;
 
 	log(log_debug + 2, "activ") << "Molecule::done. status: " << status << " msecs: " 
-		<< msecs << " pos: " << pos << " length: " << length << logend();
+		<< msecs << " pos: " << m_pos << " length: " << m_length << logend();
 
-	flags &= ~active;
+	m_flags &= ~active;
 
 	if (isStopped()) 
 	{
-		timeStopped.now();
+		m_timeStopped.now();
 		log(log_debug + 2, "activ") << "stopped after: " 
-			<< timeStopped - timeStarted << " ms" << logend();
+			<< m_timeStopped - m_timeStarted << " ms" << logend();
 	}
 
 	if (isStopped())
 	{
-		if (mode & discard)   return 1;
+		if (m_mode & discard)
+			return 1;
 
 		return 0;
 	}
 	else
 	{
-		nCurrent++;
-		current = (Atom*)current->next;
+		m_nCurrent++;
+		m_current = (Atom*)m_current->next;
 
-		if (current == 0)
+		if (m_current == 0)
 		{
-			if(mode & loop)
+			if (m_mode & loop)
 			{
-				if (pos >= length) flags |= need_rewind;
-				nCurrent = 0;
-				pos = 0;
-				current = (Atom*)head;
+				if (m_pos >= m_length) 
+					m_flags |= need_rewind;
+
+				m_nCurrent = 0;
+				m_pos = 0;
+				m_current = (Atom*)head;
  
 				return 0;
 			}
@@ -307,18 +309,20 @@ int Molecule::setPos(unsigned aPos)
 	unsigned sum = 0;
 	unsigned atomarLength;
 
-	if (mode & loop)  aPos %=  length;
-	else if (aPos >= length) return 0;
+	if (m_mode & loop)
+		aPos %= m_length;
+	else if (aPos >= m_length) 
+		return 0;
 
-	pos = aPos;
-	nCurrent = 0;
-	for (ListIter i(*this); !i.isDone(); i.next(),nCurrent++)
+	m_pos = aPos;
+	m_nCurrent = 0;
+	for (ListIter i(*this); !i.isDone(); i.next(),m_nCurrent++)
 	{
 		atomarLength = ((Atom*)i.current())->getLength();
-		if (pos <= atomarLength && pos > sum) 
+		if (m_pos <= atomarLength && m_pos > sum) 
 		{
-			current = (Atom*)i.current();
-			return current->setPos(pos - sum);
+			m_current = (Atom*)i.current();
+			return m_current->setPos(m_pos - sum);
 		}
 		sum += atomarLength;
 	}
@@ -332,7 +336,6 @@ std::ostream& operator<<(std::ostream& out, Molecule& m)
 
 	if (m.getMode() & Molecule::discard)  out << " discard";
 	if (m.getMode() & Molecule::mute)  out << " mute";
-	if (m.getMode() & Molecule::mix)  out << " mix";
 	if (m.getMode() & Molecule::dont_interrupt)  out << " dont_interupt";
 	if (m.getMode() & Molecule::restart)  out << " restart";
 	if (m.getMode() & Molecule::pause)	out << " pause";
@@ -342,20 +345,13 @@ std::ostream& operator<<(std::ostream& out, Molecule& m)
 
 	for (ListIter i(m); !i.isDone(); i.next())
 	{
-		if ((Atom*)i.current() == m.current)	out << "->  ";
+		if ((Atom*)i.current() == m.m_current)	out << "->  ";
 		else out << "    ";
 		((Atom*)i.current())->printOn(out);
 		out << std::endl;
 	}
 
 	return out;
-}
-
-
-Activity::Activity(Sequencer* aSequencer) : DList()
-{ 
-	sequencer = aSequencer;
-	flags = idle;
 }
 
 Activity::~Activity()
@@ -369,48 +365,46 @@ Molecule* Activity::add(Molecule& newMolecule)
 	Molecule* current;
 
 	for (ActivityIter i(*this); !i.isDone() && i.current()->getPriority() >= newMolecule.getPriority(); i.next());
+	
 	current = (Molecule*)i.previous();
 
 	if (current)
 	{
-		log(log_debug + 2, "activ") << "adding " << newMolecule << "syncMinor: " 
-			<< newMolecule.getSyncMinor() << " after " <<  *current << logend();
+		log(log_debug + 2, "activ") << "adding " << newMolecule << "id: " 
+			<< newMolecule.getId() << " after " <<  *current << logend();
 
 		DList::addAfter(current, &newMolecule);
 	}
 	else 
 	{
-		log(log_debug + 2, "activ") << "adding " << newMolecule << "syncMinor: " 
-			<< newMolecule.getSyncMinor() << " as first" << logend();
+		log(log_debug + 2, "activ") << "adding " << newMolecule << "id: " 
+			<< newMolecule.getId() << " as first" << logend();
  
 		addFirst(&newMolecule);
 	}
 
-	if (isActive())
+	if (lastActive == 0)
 	{
-		if (isIdle() || lastActive == 0)
-		{
-			if (newMolecule.start(sequencer))	flags &= ~idle;
-			else
-			{
-				log(log_warning, "activ") << "new molecule start failed" << logend();
-			}
- 
-			log(log_debug + 2, "activ") << "new molecule while idle. flags: " 
-				<< flags << logend();
-		}
+		if (newMolecule.start(m_sequencer))	
+			setState(active);
 		else
 		{
-			log(log_debug + 2, "activ") << "new molecule " << newMolecule.getPriority() 
-				<< " old " << lastActive->getPriority() << " interruptable: " 
-				<< !(lastActive->getMode() & Molecule::dont_interrupt) << logend();
+			log(log_warning, "activ") << "new molecule start failed" << logend();
+		}
 
-			if (newMolecule.getPriority() > lastActive->getPriority() && !(lastActive->getMode() & Molecule::dont_interrupt))
-			{
-				log(log_debug + 2, "activ") << "interrupting " << *lastActive << logend();
- 
-				lastActive->stop(sequencer);
-			}
+		log(log_debug + 2, "activ") << "new molecule while idle" << logend();
+	}
+	else
+	{
+		log(log_debug + 2, "activ") << "new molecule " << newMolecule.getPriority() 
+			<< " old " << lastActive->getPriority() << " interruptable: " 
+			<< !(lastActive->getMode() & Molecule::dont_interrupt) << logend();
+
+		if (newMolecule.getPriority() > lastActive->getPriority() && !(lastActive->getMode() & Molecule::dont_interrupt))
+		{
+			log(log_debug + 2, "activ") << "interrupting " << *lastActive << logend();
+
+			lastActive->stop(m_sequencer);
 		}
 	}
 
@@ -423,7 +417,7 @@ void Activity::remove(Molecule* aMolecule)
 {
 	if (aMolecule->isActive())	 
 	{
-		aMolecule->stop(sequencer);
+		aMolecule->stop(m_sequencer);
 
 		return;
 	}
@@ -444,13 +438,11 @@ int Activity::start()
 	int started;
 	Molecule* molecule;
 
-	flags |= active;
-
 	started = 0;
 	while(head && !started)
 	{
 		molecule = (Molecule*)head;
-		started = molecule->start(sequencer);
+		started = molecule->start(m_sequencer);
 	
 		if (started)
 		{
@@ -460,14 +452,13 @@ int Activity::start()
 		{
 			log(log_error, "activ") << "start failed: " << *molecule << logend();
 	
-			sequencer->sendMoleculeDone(molecule->getSyncMinor(), molecule->getStatus(), molecule->getPos(), molecule->getLength());
+			m_sequencer->sendMoleculeDone(molecule->getId(), molecule->getStatus(), molecule->getPos(), molecule->getLength());
 
 			remove((Molecule*)head);
 		}
 	}		
 
-	if (started) flags &= ~idle;
-	else flags |= idle;
+	setState(started ? active : idle);
 
 	return started;
 }
@@ -476,19 +467,19 @@ int Activity::stop()
 {
 	int stopped = 0;
 
-	if (head) stopped = ((Molecule*)head)->stop(sequencer);
+	if (head) 
+		stopped = ((Molecule*)head)->stop(m_sequencer);
 
-	flags &= ~active;
-	flags |= idle;
+	setState(stopped ? idle : stopping);
 
 	return stopped;
 }
 
-Molecule* Activity::find(unsigned syncMinor)
+Molecule* Activity::find(const std::string &id)
 {
 	for (ActivityIter i(*this); !i.isDone(); i.next())
 	{
-		if (i.current()->getSyncMinor() == syncMinor)  
+		if (i.current()->getId() == id)  
 		{
 			return i.current();
 		}

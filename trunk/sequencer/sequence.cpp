@@ -56,198 +56,121 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
 
 int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 {
-/* Todo:
+	unsigned mode;
+	unsigned priority;
 
-	int result;
-	unsigned pos = 0;
-	unsigned syncMinor = aPacket->getSyncMinor();
-	
-	omni_mutex_lock lock(mutex);
+	(*server) >> mode;
+	(*server) >> priority;
 
-	while(pos < aPacket->getNumArgs())
+	if (!server->good() || server->eof())
 	{
-		result = addMolecule(aPacket, &pos);
-		if (result != _ok)
-		{
-			log(log_error, "sequencer") << "add molecule failed" << logend();
-			
-			packet->clear(1);
+		server->clear();
 
-			packet->setSync(aPacket->getSyncMajor(), syncMinor);
-			packet->setContent(phone_add_molecule_done);
+		(*server) << _syntax_error << ' ' << id.c_str() 
+			<< " syntax error\r\n";
 
-			packet->setUnsignedAt(0, result);
-			tcp.send(*packet);
-
-			return _invalid;
-		}
+		return _syntax_error;
 	}
-	packet->clear(1);
 
-	int index;
-	unsigned pos = *pPos;
-	unsigned pos2;
-	int numAtoms;
-	unsigned notifications;
-	Atom* atom;
+	Molecule* molecule = new Molecule(mode, priority, id);
 
-	// mode, priority, numAtoms
+	std::string type;
+	
+	(*server) >> type;
 
-	if (aPacket->typeAt(pos) != Packet::type_unsigned ||
-		aPacket->typeAt(pos+1) != Packet::type_unsigned ||
-		aPacket->typeAt(pos+2) != Packet::type_unsigned)	return _invalid;
-
-	// Molecule's ctor parms are mode, priority, syncMinor
-	Molecule* aMolecule = new Molecule(aPacket->getUnsignedAt(pos), aPacket->getUnsignedAt(pos+1), aPacket->getSyncMinor());
-
-	pos += 2;
-
-	numAtoms = aPacket->getUnsignedAt(pos++);
-	for (index = 0; index < numAtoms; index++)
+	while (server->good() && !server->eof())
 	{
-		notifications = aPacket->getUnsignedAt(pos++);
-		
-		pos2 = pos + 1;
+		Atom *atom;
+
 		try
 		{
-			switch(aPacket->getUnsignedAt(pos++))
+			if (type == "play")
 			{
-			case atom_play_file_sample:
-				// check validity
-				if (aPacket->typeAt(pos) != Packet::type_string)
-				{
-					log(log_error, "sequencer") 
-						<< "invalid packet contents for addMolecule(atom_play_sample)." 
-						<< std::endl << *aPacket << logend();
-					
-					return _invalid;
-				}
-				// we still get the message number, but ignore it
-				pos += 2;
+				std::string file;
+			
+				(*server) >> file;
 
-				atom = new PlayAtom(this, aPacket->getStringAt(pos2));
-
-				break;
-			case atom_record_file_sample:
-				// check validity
-				if (aPacket->typeAt(pos) != Packet::type_string 
-					|| aPacket->typeAt(pos+1) != Packet::type_unsigned)
-				{
-					log(log_error, "sequencer") 
-						<< "invalid packet contents for addMolecule(atom_record_sample)." 
-						<< std::endl << *aPacket << logend();
-					
-					return _invalid;
-				}
-
-				// we still get the message number, but ignore it
-				pos += 3;
-
-				atom = new RecordAtom(this, aPacket->getStringAt(pos2), 
-					aPacket->getUnsignedAt(pos2+1));
-
-				break;
-			case atom_beep:
-				// check validity
-				if (aPacket->typeAt(pos) != Packet::type_unsigned)
-				{
-					log(log_error, "sequencer")
-						<< "invalid packet contents for addMolecule(atom_beep)." 
-						<< std::endl << *aPacket << logend();
-
-					return _invalid;
-				}
-				pos += 1;
-
-				atom = new BeepAtom(this, aPacket->getUnsignedAt(pos2));
-
-				break;
-			case atom_conference:
-				// check validity
-				if (aPacket->typeAt(pos) != Packet::type_unsigned || aPacket->typeAt(pos+1) != Packet::type_unsigned)
-				{
-					log(log_error, "sequencer") 
-						<< "invalid packet contents for addMolecule(atom_conference)." 
-						<< std::endl << *aPacket << logend();
-
-					return _invalid;
-				}
-				pos += 2;
-
-				atom = new ConferenceAtom(aPacket->getUnsignedAt(pos2), aPacket->getUnsignedAt(pos2+1));
-
-				break;
-			case atom_touchtones:
-				// check validity
-				if (aPacket->typeAt(pos) != Packet::type_string)
-				{
-					log(log_error, "sequencer") 
-						<< "invalid packet contents for addMolecule(atom_touchtone)." 
-						<< std::endl << *aPacket << logend();
-
-					return _invalid;
-				}
-				pos += 1;
-
-				atom = new TouchtoneAtom(this, aPacket->getStringAt(pos2));
-
-				break;
-			case atom_silence:
-				// check validity
-				if (aPacket->typeAt(pos) != Packet::type_unsigned)
-				{
-					log(log_error, "sequencer")
-						<< "invalid packet contents for addMolecule(atom_silence)." 
-						<< std::endl << *aPacket << logend();
-
-					return _invalid;
-				}
-				pos += 1;
-
-				atom = new SilenceAtom(aPacket->getUnsignedAt(pos2));
-
-				break;
+				atom = new PlayAtom(this, file.c_str());
 			}
+			else if (type == "record")
+			{
+				std::string file;
+				unsigned max;
+
+				(*server) >> file;
+				(*server) >> max;
+
+				atom = new RecordAtom(this, file.c_str(), max);
+			}
+			else if (type == "dtmf")
+			{
+				std::string tt;
+
+				(*server) >> tt;
+
+				atom = new TouchtoneAtom(this, tt.c_str());
+			}
+			else if (type == "beep")
+			{
+				unsigned count;
+
+				(*server) >> count;
+
+				atom = new BeepAtom(this, count);
+
+			}
+			else if (type == "silence")
+			{
+				int len;
+
+				(*server) >> len;
+
+				atom = new SilenceAtom(len);
+			}
+
+			std::string notifications;
+
+			(*server) >> notifications;
+
+			if (notifications == "start")
+				atom->setNotifications(notify_start);
+			else if (notifications == "stop")
+				atom->setNotifications(notify_stop);
+			else if (notifications == "both")
+				atom->setNotifications(notify_start | notify_stop);
+			// todo: syntax error if not 'none'
 		}
-		catch (char* e)
+		catch (const char* e)
 		{
 			log(log_error, "sequencer") << "Exception in addMolecule: " << e << logend();
 			atom = 0;
+
+			return _failed;
 		}
-		catch (Exception& e)
+		catch (const Exception& e)
 		{
 			log(log_error, "sequencer") << e << logend();
 			atom = 0;
+
+			return _failed;
 		}
-		if (atom)
-		{
-			atom->setNotifications(notifications);
-			aMolecule->add(*atom);
-		}
-		else if (notifications & notify_done)
-		{
-			sendAtomDone(aPacket->getSyncMinor(), index, _failed, 0);
-		}
+
+		molecule->add(*atom);
+
+		(*server) >> type;
 	}
 
-	if (aMolecule->getSize() == 0)
+	if (molecule->getSize() == 0)
 	{
 		log(log_warning, "sequencer") << "Molecule is empty. will not be added." 
-			<< std::endl << *aPacket << logend();
+			<< logend();
 
 		return _empty;
 	}
 
-	activity.add(*aMolecule);
+	activity.add(*molecule);
 	checkCompleted();
 
-	packet->setSync(aPacket->getSyncMajor(), syncMinor);
-	packet->setContent(phone_add_molecule_done);
-
-	packet->setUnsignedAt(0, _ok);
-	tcp.send(*packet);
-
-*/
 	return _ok;
 }
 
@@ -356,7 +279,7 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 	return _ok;
 }
 
-void Sequencer::sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status, unsigned msecs)
+void Sequencer::sendAtomDone(const char *id, unsigned nAtom, unsigned status, unsigned msecs)
 {
 /* Todo
 
@@ -374,10 +297,10 @@ void Sequencer::sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status
 */
 }
 
-void Sequencer::sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned pos, unsigned length)
+void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned length)
 {
 	log(log_debug + 2, "sequencer", phone->getName())
-		<< "send molecule done for: 0." << syncMinor << " status: " << status << " pos: " 
+		<< "send molecule done for: " << id << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
 
 /* Todo
@@ -701,7 +624,6 @@ void Sequencer::transferDone(Trunk *server)
 	log(log_debug, "sequencer", phone->getName()) 
 		<< "telephone transfer succeeded" << logend();
 
-	activity.setASAP();
 	activity.stop();
 
 	checkCompleted();
@@ -747,7 +669,6 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 
 	lock();
 
-	activity.setASAP();
 	activity.stop();
 
 	checkCompleted();
@@ -861,7 +782,7 @@ void Sequencer::started(Telephone *server, Sample *aSample)
 	if (m->notifyStart())
 	{
 		log(log_debug, "sequencer", server->getName()) << "sent atom_started for 0, " 
-			<< m->getSyncMinor() << ", " 
+			<< m->getId() << ", " 
 			<< m->currentAtom() << logend();
  
 /* Todo
@@ -887,7 +808,8 @@ void Sequencer::completed(Telephone *server, Sample *aSample, unsigned msecs)
 void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs, unsigned status)
 {
 	int done, atEnd, notifyStop, started;
-	unsigned pos, length, nAtom, syncMinor;
+	unsigned pos, length, nAtom;
+	std::string id;
 
 	omni_mutex_lock lock(mutex);
 
@@ -898,7 +820,7 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 		nAtom = aMolecule->currentAtom();
 		atEnd = aMolecule->atEnd();
 		notifyStop = aMolecule->notifyStop();
-		syncMinor = aMolecule->getSyncMinor();
+		id = aMolecule->getId();
 		done = aMolecule->done(this, msecs, status);
 		pos = aMolecule->getPos();
 		length = aMolecule->getLength();
@@ -907,11 +829,11 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 		if (notifyStop)
 		{
 			log(log_debug, "sequencer", server->getName()) 
-				<< "sent atom_done for 0, " 
-				<< ", " << aMolecule->getSyncMinor() 
-				<< ", " << nAtom << std::endl << *aMolecule << logend();
+				<< "sent atom_done for " 
+				<< ", " << id.c_str() << ", " << nAtom << std::endl 
+				<< *aMolecule << logend();
 
-			sendAtomDone(aMolecule->getSyncMinor(), nAtom, status, msecs);
+			sendAtomDone(id.c_str(), nAtom, status, msecs);
 		}
 
 		if (done)
@@ -932,21 +854,11 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
  
 		// start the new activity before sending packets to minimize delay
 
-		if (activity.isDisabled() || activity.isDiscarded())	
-		{
-			if (!atEnd && !activity.isASAP())
-			{
-				started = activity.start();
-			}
-		}
-		else 
-		{
-			started = activity.start();
-		}
+		started = activity.start();
 
 		if (atEnd)
 		{
-			sendMoleculeDone(syncMinor, status, pos, length);
+			sendMoleculeDone(id.c_str(), status, pos, length);
 		}
 	}
 }
@@ -1059,6 +971,8 @@ void Sequencer::data(InterfaceConnection* server, const std::string &id)
 			<< " syntax error - unknown command " << command.c_str()
 			<< "\r\n";
 	}
+
+	server->clear();
 }
 
 void usage()

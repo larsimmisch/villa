@@ -22,16 +22,16 @@ char* copyString(const char* aString);
 
 struct Time
 {
-	Time() : sec(0), nsec(0) {}
+	Time() : m_sec(0), m_nsec(0) {}
 
-	void now() { omni_thread::get_time(&sec, &nsec); }
+	void now() { omni_thread::get_time(&m_sec, &m_nsec); }
 	
-	unsigned long sec;
-	unsigned long nsec;
+	unsigned long m_sec;
+	unsigned long m_nsec;
 
 	unsigned operator-(const Time &b)
 	{
-		return (sec - b.sec) * 1000 - (nsec - b.nsec) / 1000000;
+		return (m_sec - b.m_sec) * 1000 - (m_nsec - b.m_nsec) / 1000000;
 	}
 };
 
@@ -55,61 +55,61 @@ public:
 
 	virtual int isGrowing() { return 0; }
 
-	void setNotifications(int notify)	{ notifications = notify; }
+	void setNotifications(int notify)	{ m_notifications = notify; }
 
-	int notifyStart() const { return notifications & notify_start; }
-	int notifyStop() const { return notifications & notify_done; }
+	int notifyStart() const { return m_notifications & notify_start; }
+	int notifyStop() const { return m_notifications & notify_stop; }
 
 	virtual void printOn(std::ostream& out)  { out << "abstract atom"; }
 
 protected:
 
-	Sample *sample;
+	Sample *m_sample;
 
-	unsigned notifications;
+	unsigned m_notifications;
 };
 
 class Molecule : public Atom, public DList
 {
 public:
 
-	enum a_mode { discard = 0x01, mute = 0x02, mix = 0x04, dont_interrupt = 0x08, restart = 0x10, pause = 0x20, loop = 0x40 };
+	enum a_mode { discard = 0x01, mute = 0x02, dont_interrupt = 0x04, restart = 0x08, pause = 0x10, loop = 0x20 };
 
 	enum a_flags { active = 0x01, need_rewind = 0x02, stopped = 0x04 };
 
-	Molecule(unsigned mode, int aPriority, int aSyncMinor);
+	Molecule(unsigned mode, int aPriority, const std::string &id);
 	virtual ~Molecule();	
 
 	virtual int start(Sequencer* sequencer, void* userData = 0);
 	virtual int stop(Sequencer* sequencer);
 	virtual int done(Sequencer* sequencer, unsigned msecs, unsigned reason);
 	virtual int setPos(unsigned aPosition);
-	unsigned getPos() const { return pos; }
-	virtual unsigned getLength() const { return length; }
+	unsigned getPos() const { return m_pos; }
+	virtual unsigned getLength() const { return m_length; }
 
 	// atEnd is slightly different than done. 
 	// atEnd returns true at the end of a looped sample, which done doesn't
-	int atEnd() const { return current == tail; }
+	int atEnd() const { return m_current == tail; }
 
-	unsigned getPriority() const { return priority; }
+	unsigned getPriority() const { return m_priority; }
 
-	void setMode(unsigned aMode) { mode = aMode; }
-	unsigned getMode() const	 { return mode;  } 
-	unsigned getStatus() const	 { return status; } 
+	void setMode(unsigned mode) { m_mode = mode; }
+	unsigned getMode() const	 { return m_mode;  } 
+	unsigned getStatus() const	 { return m_status; } 
 
-	void add(Atom& anAtom)		 { addLast(&anAtom); length += anAtom.getLength(); }
-	void remove(Atom* anAtom)	 { length -= anAtom->getLength(); DList::remove(anAtom); }
+	void add(Atom& atom)		 { addLast(&atom); m_length += atom.getLength(); }
+	void remove(Atom* atom)	 { m_length -= atom->getLength(); DList::remove(atom); }
 
-	int isActive() const { return flags & active; }
-	int needRewind() const { return flags & need_rewind; }
-	int isStopped() const { return flags & stopped; }
+	int isActive() const { return m_flags & active; }
+	int needRewind() const { return m_flags & need_rewind; }
+	int isStopped() const { return m_flags & stopped; }
 
-	unsigned getSyncMinor() const  { return syncMinor; }
+	const char *getId() { return m_id.c_str(); }
 
-	int notifyStart() const	 { return current ? current->notifyStart() : 0; }
-	int notifyStop() const { return current ? current->notifyStop() : 0;	}
+	int notifyStart() const	 { return m_current ? m_current->notifyStart() : 0; }
+	int notifyStop() const { return m_current ? m_current->notifyStop() : 0;	}
 
-	unsigned currentAtom() const { return nCurrent; }
+	unsigned currentAtom() const { return m_nCurrent; }
 	
 protected:
 
@@ -117,17 +117,17 @@ protected:
 
 	virtual void freeLink(List::Link* aLink);
 
-	unsigned mode;
-	unsigned priority;
-	unsigned syncMinor;
-	unsigned flags;
-	Time timeStarted;
-	Time timeStopped;
-	unsigned pos;
-	unsigned length;
-	unsigned status;
-	unsigned nCurrent;
-	Atom* current;
+	unsigned m_mode;
+	unsigned m_priority;
+	std::string m_id;
+	unsigned m_flags;
+	Time m_timeStarted;
+	Time m_timeStopped;
+	unsigned m_pos;
+	unsigned m_length;
+	unsigned m_status;
+	unsigned m_nCurrent;
+	Atom* m_current;
 };
 
 class PlayAtom : public Atom
@@ -135,16 +135,16 @@ class PlayAtom : public Atom
 public:
 
 	PlayAtom(Sequencer* sequencer, const char* aFile);
-	virtual ~PlayAtom() { delete file; delete sample; }
+	virtual ~PlayAtom() { delete m_file; delete m_sample; }
 
-	virtual int setPos(unsigned pos) { return sample->setPos(pos); }
-	virtual unsigned getLength()	{ return sample->getLength(); }
+	virtual int setPos(unsigned pos) { return m_sample->setPos(pos); }
+	virtual unsigned getLength()	{ return m_sample->getLength(); }
 
-	virtual void printOn(std::ostream& out)  { out << "PlayAtom(" << file << ")"; }
+	virtual void printOn(std::ostream& out)  { out << "PlayAtom(" << m_file << ")"; }
 	
 protected:
 	
-	char* file;
+	char* m_file;
 };
 
 class RecordAtom : public Atom
@@ -152,20 +152,20 @@ class RecordAtom : public Atom
 public:
 
 	RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime);
-	virtual ~RecordAtom() { delete file; delete sample; }
+	virtual ~RecordAtom() { delete m_file; delete m_sample; }
 
-	virtual int setPos(unsigned pos) { return sample->setPos(pos); }
-	virtual unsigned getLength()	{ return sample->getLength(); }
-	virtual unsigned getStatus()	{ return sample->getLength() == 0 ? _empty : _ok; }
+	virtual int setPos(unsigned pos) { return m_sample->setPos(pos); }
+	virtual unsigned getLength()	{ return m_sample->getLength(); }
+	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? _empty : _ok; }
 
 	virtual int isGrowing() { return 1; }
 
-	virtual void printOn(std::ostream& out)  { out << "RecordAtom(" << file << ", " << time << ')'; }
+	virtual void printOn(std::ostream& out)  { out << "RecordAtom(" << m_file << ", " << time << ')'; }
 
 protected:
 
-	char *file;
-	unsigned time;
+	char *m_file;
+	unsigned m_time;
 };
 
 class BeepAtom : public Atom
@@ -173,17 +173,17 @@ class BeepAtom : public Atom
 public:
 
 	BeepAtom(Sequencer* sequencer, unsigned count);
-	virtual ~BeepAtom() { delete sample; }
+	virtual ~BeepAtom() { delete m_sample; }
 
 	virtual int setPos(unsigned pos) { return 1; }
-	virtual unsigned getLength()	{ return nBeeps * 250; } // todo fix this
+	virtual unsigned getLength()	{ return m_nBeeps * 250; } // todo fix this
 	virtual unsigned getStatus()	{ return _ok; }
 
-	virtual void printOn(std::ostream& out)	{ out << "BeepAtom(" << nBeeps << ')'; }
+	virtual void printOn(std::ostream& out)	{ out << "BeepAtom(" << m_nBeeps << ')'; }
 
 protected:
 
-	unsigned nBeeps;
+	unsigned m_nBeeps;
 };
 
 class TouchtoneAtom : public Atom
@@ -191,17 +191,17 @@ class TouchtoneAtom : public Atom
 public:
 
 	TouchtoneAtom(Sequencer* sequencer, const char* att);
-	virtual ~TouchtoneAtom() { delete sample; delete tt; }
+	virtual ~TouchtoneAtom() { delete m_sample; delete m_tt; }
 
 	virtual int setPos(unsigned pos) { return 1; }
-	virtual unsigned getLength()	{ return strlen(tt) * 80; } // this is a rough guess
-	virtual unsigned getStatus()	{ return sample->getStatus(); }
+	virtual unsigned getLength()	{ return strlen(m_tt) * 80; } // this is a rough guess
+	virtual unsigned getStatus()	{ return m_sample->getStatus(); }
 
-	virtual void printOn(std::ostream& out)	{ out << "TouchtoneAtom(" << tt << ')'; }
+	virtual void printOn(std::ostream& out)	{ out << "TouchtoneAtom(" << m_tt << ')'; }
 
 protected:
 
-	char *tt;
+	char *m_tt;
 };
 
 class SilenceAtom: public Atom, public TimerClient
@@ -209,26 +209,26 @@ class SilenceAtom: public Atom, public TimerClient
 public:
 
 	// time is in milliseconds, as always
-	SilenceAtom(unsigned aLength) : length(aLength) {}
+	SilenceAtom(unsigned aLength) : m_length(aLength) {}
 	virtual ~SilenceAtom() {}
 
 	virtual int start(Sequencer* sequencer, void* userData = 0);
 	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos);
-	virtual unsigned getLength()	{ return length; } 
+	virtual unsigned getLength()	{ return m_length; } 
 	virtual unsigned getStatus()	{ return _ok; }
 
-	virtual void printOn(std::ostream& out)	{ out << "SilenceAtom(" << length << ')'; }
+	virtual void printOn(std::ostream& out)	{ out << "SilenceAtom(" << m_length << ')'; }
 
 	// protocol of TimerClient
 	virtual void on_timer(const Timer::TimerID &id);
 
 protected:
 
-	Timer::TimerID timer;
-	Sequencer *seq;
-	unsigned length;
-	unsigned pos;
+	Timer::TimerID m_timer;
+	Sequencer *m_seq;
+	unsigned m_length;
+	unsigned m_pos;
 };
 
 class ConferenceAtom : public Atom //, public Termination
@@ -250,20 +250,20 @@ protected:
 
 	virtual void terminate();
 
-	Conference *conf;
-	void *userData;
-	Conference::Member* me;
-	Time started;
-	unsigned mode;
+	Conference *m_conf;
+	void *m_userData;
+	Conference::Member* m_me;
+	Time m_started;
+	unsigned m_mode;
 };
 
 class Activity : public DList
 {
 public:
 
-	enum { active = 0x01, discarded = 0x02, idle = 0x04, disabled = 0x08, asap = 0x10 };
+	enum e_state { idle, active, stopping };
 
-	Activity(Sequencer* sequencer);
+	Activity(Sequencer* sequencer) : m_sequencer(sequencer), m_state(active) {}
 	virtual ~Activity();
 
 	virtual Molecule* add(Molecule& newMolecule);
@@ -272,26 +272,17 @@ public:
 	virtual int start();
 	virtual int stop();
 
-	virtual Molecule* find(unsigned syncMinor);
+	virtual Molecule* find(const std::string &id);
 
-	int isActive()		{ return flags & active; }
-	int isDiscarded()	{ return flags & discarded; }
-	int isDisabled()	{ return flags & disabled; }
-	int isASAP()		{ return flags & asap; }
-	int isIdle()		{ return flags & idle; }
-
-	void setDiscarded() { flags |= discarded; }
-	void setDisabled()	{ flags |= disabled; }
-	void unsetDisabled(){ flags &= ~disabled; }
-	void setASAP()		{ flags |= asap; }
-	void unsetASAP()	{ flags &= ~asap; }
+	e_state getState() const { return m_state; }
+	void setState(e_state s) { m_state = s; }
 
 protected:
 
 	virtual void freeLink(List::Link* anAtom);
 
-	unsigned flags;
-	Sequencer* sequencer;
+	e_state m_state;
+	Sequencer* m_sequencer;
 
 };
 

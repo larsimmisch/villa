@@ -53,8 +53,8 @@ public:
 	void unlock() { mutex.unlock(); }
 
 	// helpers for sending packets
-	void sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status, unsigned msecs);
-	void sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned pos, unsigned msecs);
+	void sendAtomDone(const char *id, unsigned nAtom, unsigned status, unsigned msecs);
+	void sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned msecs);
 
 	int connect(ConnectCompletion* complete);
 

@@ -1,0 +1,7 @@
+Todos for sequencer
+
+[ ] locking
+[ ] load tests
+[ ] disconnect & stop
+[ ] outbound calls
+[ ] generic syntax error with better messages

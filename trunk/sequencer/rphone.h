@@ -10,7 +10,7 @@
 
 #define interface_port 2104
 
-enum { notify_start = 0x01, notify_done = 0x02 };
+enum { notify_start = 0x01, notify_stop = 0x02 };
 
 enum { recognizer_isolated, recognizer_contiguous };
 
