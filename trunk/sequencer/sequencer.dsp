@@ -145,6 +145,10 @@ SOURCE=.\configuration.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\include\errors.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\getopt.h
 # End Source File
 # Begin Source File
