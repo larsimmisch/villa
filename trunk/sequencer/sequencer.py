@@ -67,7 +67,6 @@ class Sequencer:
 		"""
 
 		tr = string.split(line, ' ')
-		print tr
 		# check if unsolicited event
 		if tr[0] == '-1':
 			if len(tr) < 3:
@@ -99,7 +98,7 @@ class Sequencer:
 		
 		if tr[0] == '-1':
 			if not self.devices.has_key(device):
-				print "no receiver found (probably already disconnected)"
+				print "warning - no receiver found (probably already disconnected)"
 				return
 			
 			receiver = self.devices[device]

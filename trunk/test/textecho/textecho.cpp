@@ -1,6 +1,6 @@
 #include <string>
 
-#include "asynctext.h"
+#include "text.h"
 #include "transport.h"
 #include "client.h"
 

@@ -12,7 +12,7 @@
 #include <fstream.h>
 #include "phone.h"
 #include "phoneclient.h"
-#include "asynctcp.h"
+#include "text.h"
 #include "client.h"
 #include "activ.h"
 #include "queue.h"

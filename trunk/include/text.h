@@ -5,15 +5,19 @@
 #ifndef _TEXT_H_
 #define _TEXT_H_
 
-#include "iostream"
+#include <iostream>
+#include <vector>
+#include <assert.h>
 #include "socket.h"
-#include "vector"
+#include "omnithread.h"
+#include "client.h"
 
 // The streambuf implementation uses its own buffers instead of the buffers
 // in basic_streambuf - maybe this could be done more elegantly
 
 class TextTransport : public std::basic_iostream<char>,
-					  public std::basic_streambuf<char> 
+					  public std::basic_streambuf<char>,
+					  public omni_thread
 {
 public:
 
@@ -23,45 +27,47 @@ public:
 
     enum { indefinite = -1 };
 		
-	TextTransport(void* aPrivateData = 0);
+	TextTransport(TextTransportClient& client, void* userData = 0);
 	virtual ~TextTransport();
 	
 	// Connection establishment 
-	virtual int listen(SAP& aLocalSAP, unsigned aTimeout = indefinite, int single = 0);
-	virtual int connect(SAP& aRemoteSAP, unsigned aTimeout = indefinite);
+	virtual int listen(SAP& aLocalSAP, int single = 0);
+	virtual int connect(SAP& aRemoteSAP);
 	
 	// must be called by client after  a connectIndication
 	virtual void accept();
 	virtual void reject();
 	
 	// Dissolve a connection
-	virtual void disconnect(unsigned aTimeout = indefinite);
+	virtual void disconnect();
 	
-    // convenience disconnect method. returns if disconnected or timeout
-    virtual int disconnectAndWait(unsigned aTimeout = indefinite);
-
 	// must be called by client after a disconnectRequest
 	virtual void disconnectAccept();
 	
 	// Dissolve a connection rapidly
 	virtual void abort();
 
-	virtual void fatal(char* error);
-
 	states getState()	{ return m_state; }
 	int isConnected()	{ return m_state == connected; }
 	int isDisconnecting()	{ return m_state == disconnecting; }
 	int isIdle()		{ return m_state == idle; }
-	void* getPrivateData()			{ return m_privateData; }
+	void* getuserData()	{ return m_userData; }
 
     SAP& getLocalSAP()  { return m_local; }
     SAP& getRemoteSAP() { return m_remote; }
+
+	virtual void run();
+
+	void lock() { m_mutex.lock(); }
+	void unlock() { m_mutex.unlock(); }
 
 	// lock the mutex. unlocking is done via the io manipulator end()
 	TextTransport &begin()
 	{
 		lock();
 
+		clear();
+	
 		return *this;
 	}
 
@@ -69,30 +75,18 @@ public:
 
 	virtual int_type overflow(int_type c)
 	{
-		if (c == '\n'
-			&& m_pbuf.back() == '\r')
-		{
-			m_pbuf.push_back(c);
-
-			unsigned rc = sendRaw(&m_pbuf.front(), m_pbuf.size());
-			if (rc == 0)
-				return std::char_traits<char>::eof();
-
-			m_pbuf.erase(m_pbuf.begin(), m_pbuf.end());
-
-			int x = m_pbuf.capacity();
-		}
-		else
-			m_pbuf.push_back(c);
+		m_pbuf += c;
 		
 		return c;
 	}
-/*
-	virtual std::streamsize xsputn(char *s, std::streamsize l)
+
+	virtual std::streamsize xsputn(const char *s, std::streamsize l)
 	{
-		return 0;
+		m_pbuf += s;
+
+		return l;
 	}
-*/
+
 	virtual int_type underflow()
 	{
 		if (m_gpos >= m_gsize)
@@ -123,36 +117,39 @@ public:
 		return m;
 	}
 
-	virtual void lock() {}
-	virtual void unlock() {}
+	virtual unsigned send();
+	virtual unsigned receive();	
 
 protected:
 	
+	friend std::ostream& text_end(std::ostream& s);
+
 	// helper methods
 	virtual void assertState(states aState);
-	virtual unsigned receiveRaw(unsigned aTimeout = indefinite);
-	
-	virtual unsigned sendRaw(const char* data, unsigned size, 
-		unsigned aTimeout = indefinite, int expedited = 0);
 
 	virtual void aborted();
 	
 	virtual int doListen();
 	virtual int doConnect();
 	
-	virtual void setState(states aState) { m_state = aState; }
+	// helper methods
+	virtual void setState(states aState);
+		
+	TextTransportClient& getClient()	{ return m_client; }
 
 	volatile states m_state;
 	SAP m_local;
 	SAP m_remote;
-	volatile unsigned m_timeout;
-	void* m_privateData;
+	void* m_userData;
 	Socket m_socket;
-	std::vector<char> m_pbuf;
+	std::string m_pbuf;
 	char *m_gbuf;
 	int m_gpos;
 	int m_gsize;
 	int m_gmax;
+	TextTransportClient& m_client; 
+	omni_mutex m_mutex;
+	omni_condition m_event;
 };
 
 struct textmanip
@@ -171,9 +168,11 @@ inline std::ostream& operator<<(std::ostream& os, textmanip& l)
 // helper
 inline std::ostream& text_end(std::ostream& s)
 {
-	s << "\r\n";
-
 	TextTransport &t = dynamic_cast<TextTransport&>(s);
+
+	t << "\r\n";
+
+	t.send();
 
 	t.unlock();
 

@@ -21,7 +21,7 @@ extern ConfiguredTrunks gConfiguration;
 extern Conferences gConferences;
 
 InterfaceConnection::InterfaceConnection(TextTransportClient& aClient, SAP& local) 
-: AsyncText(aClient)
+: TextTransport(aClient)
 {
     listen(local);
 }

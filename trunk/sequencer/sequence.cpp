@@ -309,13 +309,12 @@ void Sequencer::sendAtomDone(const char *id, unsigned nAtom, unsigned status, un
 
 void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned length)
 {
-	log(log_debug, "sequencer", m_trunk->getName())
-		<< "send molecule done for: " << id << " status: " << status << " pos: " 
-		<< pos << " length: " << length << logend();
-
-
 	m_interface->begin() << id << ' ' << status << ' ' << m_trunk->getName()
 		<< " molecule-done " << pos << ' ' << length << end();
+
+	log(log_debug, "sequencer", m_trunk->getName())
+		<< "sent molecule done for: " << id << " status: " << status << " pos: " 
+		<< pos << " length: " << length << logend();
 }
 
 int Sequencer::connect(ConnectCompletion* complete)
@@ -423,6 +422,9 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 		m_media->disconnected(m_trunk);
 		m_trunk->disconnect(c);
 	}
+	else
+		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - stopping activity" << logend();
+
 
 	return _ok;
 }

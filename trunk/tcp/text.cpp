@@ -5,14 +5,17 @@
 #include <iostream>
 #include <stdio.h>
 #include <new.h>
+#include <assert.h>
 #include "Text.h"
 
 static char get_lost[] = "finger weg!\r\n";
 
-TextTransport::TextTransport(void* aPrivateData) : m_socket(), 
-	m_privateData(aPrivateData), m_state(idle), m_gbuf(0), m_gpos(0), 
+TextTransport::TextTransport(TextTransportClient& client, void* userData) : 
+	m_socket(), m_client(client), m_userData(userData), m_state(idle), 
+	m_gbuf(0), m_gpos(0), 
 	m_gsize(0), m_gmax(256),
-	std::basic_iostream<char>(this)
+	std::basic_iostream<char>(this),
+	m_event(&m_mutex)
 {
 	m_gbuf = new char[256];
 	m_pbuf.reserve(256);
@@ -22,6 +25,10 @@ TextTransport::TextTransport(void* aPrivateData) : m_socket(),
 
 TextTransport::~TextTransport()
 {
+	setState(dying);
+
+	m_event.signal();
+
 	if (m_state == connected)	
 		abort();
 	
@@ -36,29 +43,31 @@ void TextTransport::assertState(states aState)
 	} 
 }
 
-int TextTransport::listen(SAP& aLocalSAP, unsigned aTimeout, int single)
+int TextTransport::listen(SAP& aLocalSAP, int single)
 {	
 	assertState(idle);
 	
 	m_local = aLocalSAP;
-	m_timeout = aTimeout;
 	m_socket.bind(aLocalSAP, single);
 
 	setState(listening);
 	
-	return doListen();
+	m_event.signal();
+
+	return 0;
 }
 
-int TextTransport::connect(SAP& aRemoteSAP, unsigned aTimeout)
+int TextTransport::connect(SAP& aRemoteSAP)
 {
 	assertState(idle);
 	
 	m_remote = aRemoteSAP;
-	m_timeout = aTimeout;
 	
 	setState(calling);
 	
-	return doConnect();
+	m_event.signal();
+
+	return 0;
 }
 
 void TextTransport::accept()
@@ -77,10 +86,8 @@ void TextTransport::reject()
 	m_socket.close();	
 }
 
-void TextTransport::disconnect(unsigned aTimeout)
+void TextTransport::disconnect()
 {	
-	m_timeout = aTimeout;
-
 	switch (m_state)
     {
     case idle:
@@ -98,21 +105,6 @@ void TextTransport::disconnect(unsigned aTimeout)
         throw "disconnect in invalid state";
     }
 	
-}
-
-int TextTransport::disconnectAndWait(unsigned aTimeout)
-{
-    unsigned received;
-
-    disconnect(aTimeout);
-
-    while (m_state != idle)
-    {
-        received = receiveRaw(m_timeout);
-        if (received == 0)  return 0;
-    }
-
-    return 1;
 }
 
 void TextTransport::disconnectAccept()
@@ -133,31 +125,28 @@ void TextTransport::abort()
 	m_socket.close();
 }
 
-unsigned TextTransport::sendRaw(const char *data, unsigned size,
-								unsigned aTimeout, int expedited)
+unsigned TextTransport::send()
 {
-	int rc;
-	unsigned sent = 0;
+	//assert(m_pbuf.size());
 
-	while (sent < size)
-	{
-		m_socket.waitForSend(aTimeout);
-		rc = m_socket.send((void*)&data[sent], size - sent, expedited);
-		if (rc == 0)
-		{	
-			if (m_state == connected)
-				aborted();
+	if (!m_pbuf.size())
+		return 0;
 
-			return 0;
-		}
-		
-		sent += rc;
+	int rc = m_socket.send((void*)m_pbuf.c_str(), m_pbuf.size());
+	if (rc == 0)
+	{	
+		if (m_state == connected)
+			aborted();
+
+		return 0;
 	}
 
-    return sent;
+	m_pbuf.erase();
+
+    return rc;
 }
 
-unsigned TextTransport::receiveRaw(unsigned aTimeout)
+unsigned TextTransport::receive()
 {
 	unsigned rcvd;
 
@@ -177,12 +166,7 @@ unsigned TextTransport::receiveRaw(unsigned aTimeout)
 	m_gpos = 0;
 
 	while (true)
-	{
-		if ((m_timeout = m_socket.waitForData(aTimeout)) == 0)	
-		{
-			return 0;
-		}
-	
+	{	
 		rcvd = m_socket.receive(&m_gbuf[m_gsize], m_gmax - m_gsize);
 		if (rcvd == 0)
 		{
@@ -222,26 +206,14 @@ void TextTransport::aborted()
 	setState(idle);
 	
 	m_socket.close();
-}
 
-void TextTransport::fatal(char* error)
-{
-	throw "TextTransport::fatal";
+	getClient().abort(this);
 }
 
 int TextTransport::doListen()
 {
-    while(1)
-    {
-   		m_timeout = m_socket.listen(m_remote, m_timeout);
-    	if (m_timeout == 0)
-    	{
-    		setState(idle);
-    		m_socket.close();
-    		return 0;
-    	}
-        break;
-	}
+	m_socket.listen(m_remote);
+
 	m_socket.setLingerTimeout(2);
 	m_socket.setNoDelay(1);
 	m_socket.setKeepAlive(1);
@@ -253,13 +225,7 @@ int TextTransport::doListen()
 
 int TextTransport::doConnect()
 {
-	m_timeout = m_socket.connect(m_remote, m_timeout);
-	if (m_timeout == 0)
-	{
-		setState(idle);
-		m_socket.close();
-		return 0;
-	}
+	m_socket.connect(m_remote);
 
 	m_socket.setLingerTimeout(2);
 	m_socket.setNoDelay(1);
@@ -269,3 +235,63 @@ int TextTransport::doConnect()
     return 1;
 }
 
+void TextTransport::setState(states aState)
+{
+	if (m_state != aState)
+	{
+		m_mutex.lock();
+		m_state = aState;
+		m_mutex.unlock();
+	}
+}
+
+void TextTransport::run()
+{
+    try
+    {
+        int result;
+
+    	while(1)
+    	{
+    		switch (getState())
+    		{
+    		case idle:
+    			m_event.wait();		
+    			break;
+    		case listening:
+    			result = TextTransport::doListen();
+    			if (!result) getClient().connectRequestTimeout(this);
+    			else getClient().connectRequest(this, m_remote);
+    			break;
+    		case calling:
+    			result = TextTransport::doConnect();
+    			if (result == 0)
+    			{
+					getClient().connectReject(this);
+    			}
+    			else getClient().connectConfirm(this);
+    			break;
+    		case disconnecting:
+    		case connected:
+    			result = receive();
+                if (result == 0)    
+					break;
+
+            	getClient().data(this);
+    			break;
+    		case dying:
+    			return;
+    		default:
+    			break;
+    		}
+    	}	
+    }
+    catch (const char* e)
+    {
+        getClient().fatal(e);
+    }
+    catch(...)
+    {
+        getClient().fatal("unknown exception in thread AsyncText");
+    }
+}

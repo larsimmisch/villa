@@ -165,15 +165,12 @@ public:
 	~Socket();
 
 	void bind(SAP& local, int single = 0);
-	int listen(SAP& remote, unsigned aTimeout = infinite);	// returns what is left of timeout
-	int connect(SAP& remote, unsigned aTimeout = infinite);				// returns what is left of timeout
+	void listen(SAP& remote);
+	void connect(SAP& remote);
 
-	int send(void* data, unsigned dataLength, int expedited = 0);	// returns no of bytes sent. 0 means queue is full
+	int send(void* data, unsigned dataLength);	// returns no of bytes sent. 0 means queue is full
 	int receive(void* data, unsigned dataLength);	// returns no of bytes received
 	
-	int waitForData(unsigned aTimeout = infinite);	// returns what is left of timeout 
-	int waitForSend(unsigned aTimeout = infinite);	// returns what is left of timeout
-
 	// bytesPending returns the number of bytes pending for atomic read
 	unsigned bytesPending();
 

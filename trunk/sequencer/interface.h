@@ -13,12 +13,12 @@
 
 #include "list.h"
 #include "rphone.h"
-#include "asynctext.h"
+#include "text.h"
 #include "configuration.h"
 
 class Sequencer;
 
-class InterfaceConnection : public AsyncText, public List::Link
+class InterfaceConnection : public TextTransport, public List::Link
 {
 public:
 

@@ -257,7 +257,7 @@ void Services::empty()
 }
 
 Socket::Socket(int aProtocol) 
- : nonblocking(0), protocol(aProtocol), hsocket(-1), waiting(0), listener(0)
+ : protocol(aProtocol), hsocket(-1), waiting(0), listener(0)
 {
 }
 
@@ -320,53 +320,23 @@ void Socket::bind(SAP& local, int single)
 	}
 }
 
-int Socket::listen(SAP& remote, unsigned aTimeout)
+void Socket::listen(SAP& remote)
 {
-	DateTime now, later;
 	unsigned result;
 	
-	if (aTimeout != infinite) now.now();
-
 	if (waiting)
 	{
-		int signalled = 1;
-
 		waiting->mutex.lock();
-
-		if (aTimeout == infinite)
-			waiting->event.wait();
-		else
-		{
-			unsigned long abs_sec, abs_nsec;
-
-			omni_thread::get_time(&abs_sec, &abs_nsec, 
-				aTimeout / 1000, (aTimeout % 1000) * 1000000);
-
-			signalled = waiting->event.timedwait(abs_sec, abs_nsec);
-		}
-
+		waiting->event.wait();
 		waiting->mutex.unlock();
 
-		if (signalled)
-		{
-			hsocket = waiting->hsocket;
-			result = waiting->result;
-			delete waiting;
-			waiting = 0;
+		hsocket = waiting->hsocket;
+		result = waiting->result;
+		delete waiting;
+		waiting = 0;
 
-			if (hsocket < 0)
-			{
-				if (result == WSAEINTR) return 0;
-				else throw SocketError(__FILE__, __LINE__, "Socket::listen(SAP&,SAP&,int)", result);
-			}
-		}
-		else
-		{
-			services.remove(waiting);
-			delete waiting;
-
-			waiting = 0;
-		}
+		if (hsocket < 0)
+			throw SocketError(__FILE__, __LINE__, "Socket::listen(SAP&,SAP&,int)", result);
 	}
 	else
 	{
@@ -379,43 +349,19 @@ int Socket::listen(SAP& remote, unsigned aTimeout)
 		result = ::listen(hsocket, 1);
 		if (result < 0) 	throw SocketError(__FILE__, __LINE__, "Listener::Listener(int,SAP&)", GetLastError());
 
-		if (aTimeout != infinite)
-		{
-			if (!waitForData(aTimeout)) 
-				return 0;
-		}
-
 		size = sizeof(remoteAddress);
 		aSocket = ::accept(hsocket, (sockaddr*)&remoteAddress, &size);
 		if (aSocket < 0)
-		{
-			result = GetLastError();
-			if (result == WSAENOTSOCK || result == WSAEINTR) 
-				return 0;
-			else throw SocketError(__FILE__,__LINE__, "Socket::listen(SAP&, unsigned)", result);
-		}
+			throw SocketError(__FILE__,__LINE__, "Socket::listen(SAP&, unsigned)", GetLastError());
 
 		closesocket(hsocket);
 		hsocket = aSocket;
 
 		fillSAP(&remoteAddress, remote);
 	}
-
-	if (aTimeout != infinite)
-	{
-		later.now();
-
-		unsigned delta = aTimeout - (later - now);
-
-		return delta < 0 ? 0 : delta;
-	}
-	else
-	{
-		return infinite;
-	}
 }
 
-int Socket::connect(SAP& remote, unsigned aTimeout)
+void Socket::connect(SAP& remote)
 {
 	struct sockaddr_in remoteAddress;
 
@@ -424,41 +370,16 @@ int Socket::connect(SAP& remote, unsigned aTimeout)
 
 	fillSocketAddress(remote, &remoteAddress);
 
-	if (aTimeout != -1)    setNonblocking(1);
-
 	int rc = ::connect(hsocket, (sockaddr*)&remoteAddress, sizeof(remoteAddress));
 	if (rc < 0) 
-	{
-		// we expect EWOULDBLOCK, but handle the other cases as well
-
-		rc = GetLastError();
-		switch(rc)
-		{
-		case WSAECONNREFUSED:	
-			return 0;
-		case WSAENETUNREACH:	
-			return 0;
-		case WSAECONNRESET: 	
-			return 0;
-		case WSAEINPROGRESS:	break;
-		case WSAEWOULDBLOCK:	break;
-		default: throw SocketError(__FILE__, __LINE__, "Socket::connect(SAP&,int)", GetLastError());
-		}
-	}
-
-	aTimeout = waitForSend(aTimeout);
-	
-	return aTimeout;
+		throw SocketError(__FILE__, __LINE__, "Socket::connect(SAP&,int)", GetLastError());
 }
 
-int Socket::send(void* data, unsigned dataLength, int expedited)
+int Socket::send(void* data, unsigned dataLength)
 {
-	int rc = ::send(hsocket, (char*)data, dataLength, expedited ? MSG_OOB : 0);
+	int rc = ::send(hsocket, (char*)data, dataLength, 0);
 	if (rc < 0) 
-	{
-		rc = GetLastError();
-		return 0;
-	}
+		throw SocketError(__FILE__, __LINE__, "Socket::send()", GetLastError());
 	
 	return rc;
 }
@@ -473,98 +394,6 @@ int Socket::receive(void* data, unsigned dataLength)
 	}
 
 	return rc;
-}
-
-
-int Socket::waitForData(unsigned aTimeout)
-{	
-	fd_set read;
-	struct timeval timeout;
-
-	// if the timeout is indefinite, we make the socket blocking
-	// we hope for better performance (less system calls)
-	if (aTimeout == infinite)
-	{
-		if (nonblocking) setNonblocking(0);
-		return infinite;
-	}	
-	else 
-	if (!nonblocking)  setNonblocking(1);
-
-	if (hsocket == -1)	return 0;
-	
-	int delta;
-	DateTime now, later;
-
-	now.now();
-	
-	FD_ZERO(&read);
-	FD_SET(hsocket, &read);
-
-	timeout.tv_sec = aTimeout / 1000;
-	timeout.tv_usec = (aTimeout % 1000) * 1000;
-
-	int selected = select(1, &read, 0, 0, &timeout);
-
-	later.now();
-
-	delta = aTimeout - (later - now);
-	delta = delta < 0 ? 0 : delta;
-
-	// if we get ENOTSOCK, another thread has destroyed this socket. return 0.
-	if (selected < 0 && GetLastError() == WSAENOTSOCK)	
-	{
-		return delta;
-	}
-
-	if (selected < 0) throw SocketError(__FILE__, __LINE__, "Socket::waitForData(unsigned)", GetLastError());
-
-	return delta;
-}
-
-int Socket::waitForSend(unsigned aTimeout)
-{				 
-	if (hsocket == -1)	return 0;
-
-	fd_set write;
-	struct timeval timeout;
-
-	// if the timeout is infinite, we make the socket blocking
-	// we hope for better performance (less system calls)
-	if (aTimeout == infinite)
-	{
-		if (nonblocking) setNonblocking(0);
-		return infinite;
-	}	
-	else 
-	{
-		if (!nonblocking)  setNonblocking(1);
-	}
-
-	int delta;
-	DateTime now, later;
-
-	now.now();
-
-	FD_ZERO(&write);
-	FD_SET(hsocket, &write);
-
-	timeout.tv_sec = aTimeout / 1000;
-	timeout.tv_usec = (aTimeout % 1000) * 1000;
-
-	int selected = select(0, 0, &write, 0, &timeout);
-	
-	// if we get ENOTSOCK, another thread has destroyed this socket. return 0.
-	if (selected < 0 && GetLastError() == WSAENOTSOCK)	return 0;
-
-	if (selected < 0) throw SocketError(__FILE__, __LINE__, "Socket::waitForSend(unsigned)", GetLastError());
-
-	later.now();
-
-	if (aTimeout == infinite)	return infinite;
-	else delta = aTimeout - (later - now);
-	
-	return delta < 0 ? 0 : delta;
 }
 
 void Socket::setReceiveQueueLength(unsigned aLength)
@@ -607,13 +436,6 @@ void Socket::setKeepAlive(int on)
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setKeepAlive(int)", GetLastError());
 }
 
-void Socket::setNonblocking(int on)
-{
-	nonblocking = on;
-
-	int rc = ioctlsocket(hsocket, FIONBIO, (u_long *)&on);
-	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setNonBlocking(int)", GetLastError());
-}
 
 unsigned Socket::bytesPending()
 {
