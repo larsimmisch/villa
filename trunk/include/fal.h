@@ -165,7 +165,7 @@ class RawFileStorage : public Storage
 {
 public:
 
-	RawFileStorage(const char* name, bool write = false)
+	RawFileStorage(const char* name, bool write = false) : length(0), file(NULL)
 	{
 		file = fopen(name, write ? "wb" : "rb");
 		if (!file && write)
@@ -237,7 +237,7 @@ class WavFileStorage : public Storage
 {
 public:
 
-	WavFileStorage(const char* file, bool write) : position(0), dataOffset(0)
+	WavFileStorage(const char* file, bool write) : position(0), dataOffset(0), dataSize(0)
 	{
 		if (write) 
 		{
