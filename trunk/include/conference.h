@@ -40,7 +40,7 @@ protected:
 	friend class Conferences;
 
 	Conference(unsigned handle, void* aUserData = 0) : m_handle(handle),
-		m_userData(0) {}
+		m_userData(0), m_module(0), m_speakers(0) {}
 
 	typedef std::set<ProsodyChannel*> t_party_set;
 

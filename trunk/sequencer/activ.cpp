@@ -54,7 +54,7 @@ BeepAtom::BeepAtom(Sequencer* sequencer, unsigned count) : m_nBeeps(count)
 }
 
 ConferenceAtom::ConferenceAtom(unsigned aConference, unsigned aMode)
- : m_mode(aMode)
+ : m_mode(aMode), m_conference(0)
 {
 	m_conference = gConferences[aConference];
 }
@@ -79,7 +79,8 @@ int ConferenceAtom::stop(Sequencer* sequencer)
 
 	now.now();
 
-	m_conference->remove(sequencer->getMedia());
+	if (m_conference)
+		m_conference->remove(sequencer->getMedia());
 
 	sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_userData, 0, now - m_started);
 

@@ -145,7 +145,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 				unsigned handle(0);
 
-				sscanf(conf.c_str(), "Conf[%d]", &handle);
+				sscanf(conf.c_str(), "conf[%d]", &handle);
 
 				atom = new ConferenceAtom(handle, 
 					Conference::listen | Conference::speak);
