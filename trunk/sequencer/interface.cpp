@@ -153,7 +153,7 @@ void Interface::data(TextTransport *server)
 	(*server) >> id;
 	(*server) >> scope;
 
-	if (!server->good() || server->eof())
+	if (server->eof())
 	{
 		server->clear();
 
@@ -178,7 +178,7 @@ void Interface::data(TextTransport *server)
 
 		(*server) >> command;
 
-		if (!server->good())
+		if (!command.size())
 		{
 			server->clear();
 
@@ -228,8 +228,7 @@ void Interface::data(TextTransport *server)
 
 			(*server) >> conf;
 
-			if (!server->good() || conf.size() <= 4 
-				|| conf.substr(0, 5) != "Conf[")
+			if (conf.size() <= 4 || conf.substr(0, 5) != "Conf[")
 			{
 				server->clear();
 
@@ -269,7 +268,7 @@ void Interface::data(TextTransport *server)
 			(*server) >> trunkname;
 			(*server) >> spec;
 
-			if (!server->good())
+			if (!trunkname.size() | !spec.size())
 			{
 				server->clear();
 
