@@ -32,18 +32,14 @@ public:
 
 	// external protocol - called by remote client by sending appropriate packets
 
-	int addActivity(Packet* aPacket);
 	int addMolecule(Packet* aPacket);
 
-	int discardActivity(Packet* aPacket);
 	int discardMolecule(Packet* aPacket);
 	int discardByPriority(Packet* aPacket);
  
 	int startActivity(Packet* aPacket);
 	int stopActivity(Packet* aPacket);
  
-	int switchTo(Packet* aPacket);
-
 	int startRecognition(Packet* aPacket);
 	int stopRecognition(Packet* aPacket);
 
@@ -67,7 +63,7 @@ public:
 
 	// helpers for sending packets
 	void sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status, unsigned msecs);
-	void sendMoleculeDone(unsigned syncMajor, unsigned syncMinor, unsigned status, unsigned pos, unsigned msecs);
+	void sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned pos, unsigned msecs);
 
 #ifdef __RECOGNIZER__
 	// protocol of RecognizerClient
@@ -176,9 +172,8 @@ public:
 
 protected:
 
-	int addMolecule(Packet* aPacket, Activity& anActivity, unsigned* posInPacket);
+	int addMolecule(Packet* aPacket, unsigned* posInPacket);
  
-	Activity* findActivity(unsigned anActivity) { return activities.find(anActivity); }
 	Packet* newPacket(unsigned args, unsigned size = 1024);
 
 	TrunkConfiguration *configuration;
@@ -188,9 +183,7 @@ protected:
 	AsyncRecognizer *recognizer;
 #endif
 	ClientQueue::Item *clientSpec;
-	Activity *activity;
-	Activity *nextActivity;
-	ActivityCollection activities;
+	Activity activity;
 	CompletedQueue delayedCompletions;
 	Packet *packet;
 	char buffer[1024];

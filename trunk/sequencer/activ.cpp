@@ -352,9 +352,8 @@ std::ostream& operator<<(std::ostream& out, Molecule& m)
 }
 
 
-Activity::Activity(unsigned aSyncMajor, Sequencer* aSequencer) : DList()
+Activity::Activity(Sequencer* aSequencer) : DList()
 { 
-	syncMajor = aSyncMajor; 
 	sequencer = aSequencer;
 	flags = idle;
 }
@@ -461,7 +460,7 @@ int Activity::start()
 		{
 			log(log_error, "activ") << "start failed: " << *molecule << logend();
 	
-			sequencer->sendMoleculeDone(syncMajor, molecule->getSyncMinor(), molecule->getStatus(), molecule->getPos(), molecule->getLength());
+			sequencer->sendMoleculeDone(molecule->getSyncMinor(), molecule->getStatus(), molecule->getPos(), molecule->getLength());
 
 			remove((Molecule*)head);
 		}
@@ -498,66 +497,3 @@ Molecule* Activity::find(unsigned syncMinor)
 	return 0;
 }
 
-ActivityCollection::ActivityCollection() : DList()
-{
-}
-
-ActivityCollection::~ActivityCollection()
-{
-	for (ListIter i(*this); !i.isDone(); i.next())	  freeLink(i.current());
-}
-
-void ActivityCollection::add(Activity& anActivity)
-{
-	addFirst(&anActivity);
-}
-
-void ActivityCollection::remove(Activity* anActivity)
-{
-	DList::remove(anActivity);
-
-	delete anActivity;
-}
-
-void ActivityCollection::freeLink(List::Link* anActivity)
-{
-	delete (Activity*)anActivity;
-}
-
-Activity* ActivityCollection::find(unsigned syncMajor)
-{
-	for (ListIter i(*this); !i.isDone(); i.next())
-	{
-		if (((Activity*)i.current())->getSyncMajor() == syncMajor)	
-			return (Activity*)i.current();
-	}
-
-	return 0;
-}
-
-// throws all idle activities away and stops the active one. That one must be thrown away later!
-int ActivityCollection::empty()
-{
-	Activity* activ;
-	int success = 1;
-
-	for (ListIter i(*this); !i.isDone(); i.next())	  
-	{
-		activ = (Activity*)i.current();
-
-		if (activ->isIdle()) 
-		{
-			remove(activ);
-		}
-		else
-		{
-			activ->setDiscarded();
-			activ->setASAP();
-			activ->stop();
-
-			success = 0;
-		}
-	}
-
-	return success;
-}

@@ -257,13 +257,13 @@ protected:
 	unsigned mode;
 };
 
-class Activity : public DList, public DList::DLink
+class Activity : public DList
 {
 public:
 
 	enum { active = 0x01, discarded = 0x02, idle = 0x04, disabled = 0x08, asap = 0x10 };
 
-	Activity(unsigned aSyncMajor, Sequencer* sequencer);
+	Activity(Sequencer* sequencer);
 	virtual ~Activity();
 
 	virtual Molecule* add(Molecule& newMolecule);
@@ -274,7 +274,6 @@ public:
 
 	virtual Molecule* find(unsigned syncMinor);
 
-	unsigned getSyncMajor()  { return syncMajor; }
 	int isActive()		{ return flags & active; }
 	int isDiscarded()	{ return flags & discarded; }
 	int isDisabled()	{ return flags & disabled; }
@@ -291,7 +290,6 @@ protected:
 
 	virtual void freeLink(List::Link* anAtom);
 
-	unsigned syncMajor;
 	unsigned flags;
 	Sequencer* sequencer;
 
@@ -304,30 +302,6 @@ public:
 	ActivityIter(Activity& aList) : ListIter(aList) {}
 
 	Molecule* current()   { return (Molecule*)ListIter::current(); }
-};
-
-class ActivityCollection : public DList
-{
-public:
-
-	ActivityCollection();
-	virtual ~ActivityCollection();
-
-	virtual void add(Activity& anActivity);
-	virtual void remove(Activity* anActivity);
-
-	void lock() 	{ mutex.lock(); }
-	void unlock()	{ mutex.unlock(); }
-
-	Activity* find(unsigned syncMajor);
-
-	int empty();
-
-protected:
-
-	virtual void freeLink(List::Link* anActivity);
-
-	omni_mutex mutex;
 };
 
 #endif

@@ -43,7 +43,7 @@ Timer Sequencer::timer;
 #pragma warning(disable : 4355)
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
-  :	tcp(*this), activities(), activity(0), nextActivity(0), 
+  :	tcp(*this), activity(this),
 	mutex(), configuration(aConfiguration), connectComplete(0),
 	clientSpec(0), outOfService(0)
 {
@@ -63,85 +63,24 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
 
 #pragma warning(default : 4355)
 
-int Sequencer::addActivity(Packet* aPacket)
-{	
-	unsigned syncMajor = aPacket->getSyncMajor();
-	if (syncMajor == 0) syncMajor = activities.getSize() +1;
-
-	Activity* activ = new Activity(syncMajor, this);
-
-	// reply success or failures
-
-	omni_mutex_lock lock(mutex);
-
-	packet->clear(1);
-	packet->setSync(syncMajor, 0);
-
-	packet->setContent(phone_add_activity_done);
-
-	if (findActivity(syncMajor))
-	{
-		log(log_debug, "sequencer") << "add activity " << syncMajor 
-			<< " duplicate."<< logend();
-
-		packet->setUnsignedAt(0, _duplicate);
-		
-		tcp.send(*packet);
-
-		return _duplicate;
-	}
-
-	if (activ)
-	{
-		log(log_debug, "sequencer") << "added activity " << syncMajor << logend();
-			
-		activities.add(*activ);
-		packet->setUnsignedAt(0, _ok);
-	}
-	else packet->setUnsignedAt(0, _failed);
-
-	tcp.send(*packet);
-
-	return _ok;
-}
-
 int Sequencer::addMolecule(Packet* aPacket)
 {
 	int result;
 	unsigned pos = 0;
-	unsigned syncMajor = aPacket->getSyncMajor();
 	unsigned syncMinor = aPacket->getSyncMinor();
 	
 	omni_mutex_lock lock(mutex);
 
-	Activity* anActivity = findActivity(syncMajor);
-
-	if (anActivity == 0)
-	{
-		log(log_warning, "sequencer") << "add molecule to unknown activity " 
-			<< syncMajor << logend();
-
-		packet->clear(1);
-
-		packet->setSync(syncMajor, syncMinor);
-		packet->setContent(phone_add_molecule_done);
- 
-		packet->setUnsignedAt(0, _invalid);
-		tcp.send(*packet);
-
-		return _invalid;
-	}
-
 	while(pos < aPacket->getNumArgs())
 	{
-		result = addMolecule(aPacket, *anActivity, &pos);
+		result = addMolecule(aPacket, &pos);
 		if (result != _ok)
 		{
 			log(log_error, "sequencer") << "add molecule failed" << logend();
 			
 			packet->clear(1);
 
-			packet->setSync(syncMajor, syncMinor);
+			packet->setSync(aPacket->getSyncMajor(), syncMinor);
 			packet->setContent(phone_add_molecule_done);
 
 			packet->setUnsignedAt(0, result);
@@ -152,7 +91,7 @@ int Sequencer::addMolecule(Packet* aPacket)
 	}
 	packet->clear(1);
 
-	packet->setSync(syncMajor, syncMinor);
+	packet->setSync(aPacket->getSyncMajor(), syncMinor);
 	packet->setContent(phone_add_molecule_done);
 
 	packet->setUnsignedAt(0, _ok);
@@ -161,7 +100,7 @@ int Sequencer::addMolecule(Packet* aPacket)
 	return _ok;
 }
 
-int Sequencer::addMolecule(Packet* aPacket, Activity& anActivity, unsigned* pPos)
+int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 {
 	int index;
 	unsigned pos = *pPos;
@@ -317,81 +256,10 @@ int Sequencer::addMolecule(Packet* aPacket, Activity& anActivity, unsigned* pPos
 		return _empty;
 	}
 
-	anActivity.add(*aMolecule);
+	activity.add(*aMolecule);
 	checkCompleted();
 
 	*pPos = pos;
-
-	return _ok;
-}
-
-int Sequencer::discardActivity(Packet* aPacket)
-{
-	unsigned syncMajor = aPacket->getSyncMajor();
-	unsigned immediately = aPacket->getUnsignedAt(0);
-
-	omni_mutex_lock lock(mutex);
-
-	Activity* activ = findActivity(syncMajor);
-
-	if (!activ || activ->isDiscarded()) 
-	{
-		if (!activ) 
-			log(log_error, "sequencer") << "discard unknown activity " << syncMajor 
-			<< logend();
-		else
-			log(log_warning, "sequencer") << "discard activity " << syncMajor 
-			<< " is already discarded" << logend();
- 
-		packet->clear(1);
-		packet->setSync(syncMajor, 0);
-		packet->setContent(phone_discard_activity_done);
-		packet->setUnsignedAt(0, _invalid);
-
-		tcp.send(*packet);
-
-		return _invalid;
-	}
-
-	// if active, set discarded and send ack when stopped, else remove and send ack immediately
-	if (activ->isActive() && !activ->isIdle())
-	{
-		activ->setDiscarded();
-		if (immediately)	
-		{
-			activ->setASAP();
-			log(log_debug, "sequencer") << "discard active activity " << syncMajor 
-				<< " as soon as possible" << logend();
-			if (activ->stop() == -1) 
-			{
-				log(log_debug, "sequencer") << "activity " << syncMajor 
-					<< " was not started yet" << logend();
-			}
-		}
-		else
-		{
-			log(log_debug, "sequencer") << "discard active activity " << syncMajor 
-				<< " when finished" << logend();
-		}
-
-		checkCompleted();
-	}
-	else
-	{
-		log(log_debug, "sequencer") << "discarded activity " << syncMajor << logend();
-
-		if (activ == activity)
-			activity = 0;
-
-		activities.remove(activ);
-
-		packet->clear(1);
-		packet->setSync(syncMajor, 0);
-		packet->setContent(phone_discard_activity_done);
-		packet->setUnsignedAt(0, _ok);
-
-		tcp.send(*packet);
-	}
 
 	return _ok;
 }
@@ -403,17 +271,7 @@ int Sequencer::discardMolecule(Packet* aPacket)
 	unsigned syncMajor = aPacket->getSyncMajor();
 	unsigned syncMinor = aPacket->getSyncMinor();
 
-	Activity* activ = findActivity(syncMajor);
-
-	if (activ)
-	{
-		log(log_error, "sequencer") << "discard molecule: activity " << syncMajor
-			<< " not found" << logend();
-
-		return _invalid;
-	}
-
-	Molecule* molecule = activ->find(syncMinor);
+	Molecule* molecule = activity.find(syncMinor);
 
 	if (!molecule) 
 	{
@@ -434,11 +292,11 @@ int Sequencer::discardMolecule(Packet* aPacket)
 	else
 	{
 		packet->clear(1);
-		packet->setSync(activ->getSyncMajor(), molecule->getSyncMinor());
+		packet->setSync(syncMajor, molecule->getSyncMinor());
 		packet->setContent(phone_discard_molecule_done);
 		packet->setUnsignedAt(0, _ok);
 
-		activ->remove(molecule);
+		activity.remove(molecule);
 
 		tcp.send(*packet);
 	}
@@ -450,11 +308,8 @@ int Sequencer::discardByPriority(Packet* aPacket)
 {
 	unsigned syncMajor = aPacket->getSyncMajor();
 
-	Activity* activ = findActivity(syncMajor);
 	Molecule* molecule;
 	int discarded = 0;
-
-	if (!activ) return _invalid;
 
 	unsigned fromPriority = aPacket->getUnsignedAt(0);
 	unsigned toPriority = aPacket->getUnsignedAt(1);
@@ -465,7 +320,7 @@ int Sequencer::discardByPriority(Packet* aPacket)
 
 	omni_mutex_lock lock(mutex);
 
-	for (ActivityIter i(*activ); !i.isDone(); i.next())
+	for (ActivityIter i(activity); !i.isDone(); i.next())
 	{
 		molecule = i.current();
 
@@ -486,7 +341,7 @@ int Sequencer::discardByPriority(Packet* aPacket)
 		else
 		{
 			discarded++;
-			activ->remove(molecule);
+			activity.remove(molecule);
 			
 			log(log_debug, "sequencer") << "removed molecule (" << syncMajor 
 				<< ", " << molecule->getSyncMinor() << ')' << logend();
@@ -496,7 +351,7 @@ int Sequencer::discardByPriority(Packet* aPacket)
 	if (discarded)
 	{
 		packet->clear(2);
-		packet->setSync(activ->getSyncMajor(), 0);
+		packet->setSync(syncMajor, 0);
 		packet->setContent(phone_discard_molecule_priority_done);
 		packet->setUnsignedAt(0, _ok);
 		packet->setUnsignedAt(discarded, _ok);
@@ -507,78 +362,12 @@ int Sequencer::discardByPriority(Packet* aPacket)
 	return _ok;
 }
 
-int Sequencer::switchTo(Packet* aPacket)
-{
-	unsigned syncMajor = aPacket->getSyncMajor();
-	unsigned immediately = aPacket->getUnsignedAt(0);
-
-	omni_mutex_lock lock(mutex);
-
-	Activity* activ = findActivity(syncMajor);
-
-	if (activ)
-	{
-		activ->unsetDisabled();
-
-		// if active, set  and send ack when stopped, else switch and send ack immediately
-		if (activity && activity != activ && activity->isActive())
-		{
-			activity->setDisabled();
-			if (immediately)
-			{
-				activity->setASAP();
-
-				log(log_debug, "sequencer") << "disable active activity " << syncMajor 
-					<< " as soon as possible" << logend();
-
-				nextActivity = activ;
-
-				if (activity->stop() == -1) 
-				{
-					log(log_debug, "sequencer") << "activity " << syncMajor 
-						<< " was not started yet" << logend();
-				}
-			}
-			else
-			{
-				log(log_debug, "sequencer") << "disable active activity " << syncMajor 
-					<< " when finished" << logend();
-			}
-
-			checkCompleted();
-		}
-		else
-		{
-			log(log_debug, "sequencer") << "switch to activity " << syncMajor 
-				<< logend();
-
-			activity = activ;
-			activity->start();
-
-			packet->clear(1);
-			packet->setSync(syncMajor, 0);
-			packet->setContent(phone_switch_activity_done);
- 
-			tcp.send(*packet);
-		}
-
-	} 
-	else 
-	{
-		log(log_error, "sequencer") << "switch to unknown activity " << syncMajor 
-			<< logend();
-
-		return _invalid;
-	}
-
-	return _ok;
-}
 
 void Sequencer::sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status, unsigned msecs)
 {
 	lock();
 	packet->clear(3);
-	packet->setSync(activity->getSyncMajor(), syncMinor);
+	packet->setSync(0, syncMinor);
 	packet->setContent(phone_atom_done);
 	packet->setUnsignedAt(0, nAtom);
 	packet->setUnsignedAt(1, status);
@@ -588,15 +377,15 @@ void Sequencer::sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status
 	unlock();
 }
 
-void Sequencer::sendMoleculeDone(unsigned syncMajor, unsigned syncMinor, unsigned status, unsigned pos, unsigned length)
+void Sequencer::sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned pos, unsigned length)
 {
 	log(log_debug + 2, "sequencer")
-		<< "send molecule done for: " << syncMajor << "." << syncMinor << " status: " << status << " pos: " 
+		<< "send molecule done for: 0." << syncMinor << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
 
 	lock();
 	packet->clear(3);
-	packet->setSync(syncMajor, syncMinor);
+	packet->setSync(0, syncMinor);
 	packet->setContent(phone_molecule_done);
 	packet->setUnsignedAt(0, status);
 	packet->setUnsignedAt(1, pos);
@@ -704,7 +493,7 @@ int Sequencer::transfer(Packet* aPacket)
 #ifdef __RECOGNIZER__
 	if (recognizer) recognizer->stop();
 #endif
-	if (activity)	activity->stop();
+	activity.stop();
 
 	unlock();
 
@@ -739,11 +528,6 @@ int Sequencer::disconnect(Packet* aPacket)
 	recognizer = 0;
 #endif
 
-	if (activities.empty()) 
-	{
-		activity = 0;
-	}
-	
 	unlock();
 
 	Timer::sleep(200);
@@ -765,7 +549,6 @@ int Sequencer::abort(Packet* aPacket)
 	if (recognizer) delete recognizer;
 	recognizer = 0;
 #endif
-	if (activities.empty()) activity = 0;
 
 	unlock();
 
@@ -1031,8 +814,8 @@ void Sequencer::transferDone(Trunk *server)
 	recognizer = 0;
 #endif
 
-	if (activities.empty()) 
-		activity = 0;
+	activity.setASAP();
+	activity.stop();
 
 	checkCompleted();
 
@@ -1080,8 +863,8 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 	recognizer = 0;
 #endif
 
-	if (activities.empty()) 
-		activity = 0;
+	activity.setASAP();
+	activity.stop();
 
 	checkCompleted();
 
@@ -1226,13 +1009,13 @@ void Sequencer::started(Telephone *server, Sample *aSample)
 
 	if (m->notifyStart())
 	{
-		log(log_debug, "sequencer") << "sent atom_started for " 
-			<< activity->getSyncMajor() << ", " << m->getSyncMinor() << ", " 
+		log(log_debug, "sequencer") << "sent atom_started for 0, " 
+			<< m->getSyncMinor() << ", " 
 			<< m->currentAtom() << logend();
  
 		lock();
 		packet->clear(1);
-		packet->setSync(activity->getSyncMajor(), m->getSyncMinor());
+		packet->setSync(0, m->getSyncMinor());
 		packet->setContent(phone_atom_started);
 		packet->setUnsignedAt(0, m->currentAtom());
  
@@ -1257,12 +1040,12 @@ void Sequencer::completed(Telephone *server, Sample *aSample, unsigned msecs)
 
 void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs, unsigned status)
 {
-	int done, atEnd, notifyStop, activityStopped, started;
+	int done, atEnd, notifyStop, started;
 	unsigned pos, length, nAtom, syncMinor;
 
 	omni_mutex_lock lock(mutex);
 
-	if (activity && aMolecule)
+	if (aMolecule)
 	{
 		// the molecule will be changed after the done. Grab all necesssary information before done.
 
@@ -1277,8 +1060,8 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 
 		if (notifyStop)
 		{
-			log(log_debug, "sequencer") << "sent atom_done for " 
-				<< activity->getSyncMajor() << ", " << aMolecule->getSyncMinor() 
+			log(log_debug, "sequencer") << "sent atom_done for 0, " 
+				<< ", " << aMolecule->getSyncMinor() 
 				<< ", " << nAtom << endl << *aMolecule << logend();
 
 			sendAtomDone(aMolecule->getSyncMinor(), nAtom, status, msecs);
@@ -1291,7 +1074,7 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 				log(log_debug+2, "sequencer") << "removing " << *aMolecule << logend();
 			}
 
-			activity->remove(aMolecule);
+			activity.remove(aMolecule);
 		}
 		else
 		{
@@ -1300,71 +1083,21 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
  
 		// start the new activity before sending packets to minimize delay
 
-		activityStopped = 0;
-		if (activity->isDisabled() || activity->isDiscarded())	
+		if (activity.isDisabled() || activity.isDiscarded())	
 		{
-			if (!atEnd && !activity->isASAP())
+			if (!atEnd && !activity.isASAP())
 			{
-				started = activity->start();
+				started = activity.start();
 			}
-			else if (activity->isDisabled() && nextActivity)
-			{
-				// need to switch context. set activity later (we need to unlock it)...
-
-				started = nextActivity->start();
-			}
-			else activityStopped = 1;
 		}
 		else 
 		{
-			started = activity->start();
+			started = activity.start();
 		}
 
 		if (atEnd)
 		{
-			sendMoleculeDone(activity->getSyncMajor(), syncMinor, status, pos, length);
-		}
-
-		if (activityStopped)
-		{
-			if (activity->isDiscarded())
-			{
-				unsigned syncMajor = activity->getSyncMajor();
-
-				// the activity is possibly locked twice when the molecule is synchronously stoppable
-				// force the unlock
-
-				activities.remove(activity);
-  
-				activity = 0;
-
-				log(log_debug, "sequencer") << "discarded activity " << syncMajor 
-					<< logend();
-
-				packet->clear(0);
-				packet->setSync(syncMajor, 0);
-				packet->setContent(phone_discard_activity_done);
-				tcp.send(*packet);
-			}
-			else if (nextActivity && activity->isDisabled())
-			{
-				// send switch_activity_done only if nextActivity was set
-
-				unsigned syncMajor = activity->getSyncMajor();
-
-				log(log_debug, "sequencer") << "switched to activity " << syncMajor 
-					<< logend();
-
-				activity->unsetASAP();
-
-				activity = nextActivity;
-				nextActivity = 0;
- 
-				packet->clear(0);
-				packet->setSync(syncMajor, 0);
-				packet->setContent(phone_switch_activity_done);
-				tcp.send(*packet);
-			}
+			sendMoleculeDone(syncMinor, status, pos, length);
 		}
 	}
 }
@@ -1469,7 +1202,8 @@ void Sequencer::disconnectRequest(Transport* server, Packet* finalPacket)
 	// blast it. reset the phone->
 	lock();
 
-	if (activities.empty()) activity = 0;
+	activity.setASAP();
+	activity.stop();
 
 	unlock();
 
@@ -1485,8 +1219,8 @@ void Sequencer::abort(Transport* server, Packet* finalPacket)
 {
 	lock();
 
-	if (activities.empty())
-		activity = 0;
+	activity.setASAP();
+	activity.stop();
 
 	unlock();
 
@@ -1569,17 +1303,8 @@ void Sequencer::data(Transport* server, Packet* aPacket)
 
 	switch (aPacket->getContent())
 	{
-	case phone_add_activity:
-		addActivity(aPacket);
-		break;
 	case phone_add_molecule:
 		addMolecule(aPacket);
-		break;
-	case phone_switch_activity:
-		switchTo(aPacket);
-		break;
-	case phone_discard_activity:
-		discardActivity(aPacket);
 		break;
 	case phone_discard_molecule:
 		discardMolecule(aPacket);
