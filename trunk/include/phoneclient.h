@@ -1,7 +1,7 @@
 /*
 	phoneclient.h
 
-	$Id: phoneclient.h,v 1.1 2000/10/02 15:52:14 lars Exp $
+	$Id: phoneclient.h,v 1.2 2000/10/18 11:11:54 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -56,9 +56,6 @@ public:
 
 	// sent whenever a touchtone is received
 	virtual void touchtone(Telephone* server, char tt) = 0;
-
-	// submit new data for sample
-	virtual void submitSampleData(Telephone* server, Telephone::Sample* sample) = 0;
 
     // sent whenever a Sample is started
     virtual void started(Telephone* server, Telephone::Sample* sample) = 0;
