@@ -147,7 +147,7 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 
     // Don't start anything while we are disconnecting
-    if (m_disconnecting != INVALID_CALLREF || m_sent_rdis != INVALID_CALLREF)
+    if (m_closing || m_disconnecting != INVALID_CALLREF || m_sent_rdis != INVALID_CALLREF)
     {
         sendMLCA(id, V3_STOPPED_DISCONNECT, 0, 0);
 
