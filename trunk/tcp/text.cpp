@@ -103,7 +103,6 @@ unsigned SocketStream::fillGBuf()
 	o.write(m_gbuf, p);
 	o << logend();
 
-
 	return m_gsize;
 }
 
@@ -130,8 +129,10 @@ unsigned SocketStream::receive()
 	for(;;)
 	{	
 		unsigned rcvd = Socket::receive(m_rbuf + m_rsize, m_rmax - m_rsize - 1);
-		if (rcvd == 0)
+		if (rcvd <= 0)
 		{
+			log(log_warning, "text") << m_remote << " receive returned: " << GetLastError()
+				<< logend();
 			return 0;
 		}
 		
