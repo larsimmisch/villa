@@ -16,11 +16,17 @@
 #define NOTIFY_START 0x01
 #define NOTIFY_STOP 0x02
 
+#define INDEX_MOLECULE 0
+#define INDEX_CHANNEL 1
+
+
 // the model here is strictly asynchronous. if an atom/molecule is to be stopped, stop is called,
 // but succesful stopping is expected to be signalled by a done with completed 0
 // if new Atoms are synchronously stoppable, they must call Sequencer::completed(...)
 
 char* copyString(const char* aString);
+
+class Sequencer;
 
 struct Time
 {
@@ -37,17 +43,14 @@ struct Time
 	}
 };
 
-class Sequencer;
-
 class Atom : public DList::DLink
 {
 public:
 
-	Atom() {}
+	Atom() : m_sample(0), m_notifications(0) {}
 	virtual ~Atom() {}
 
-	virtual int start(Sequencer* sequencer, void* userData = 0);
-
+	virtual int start(Sequencer* sequencer);
 	virtual int stop(Sequencer* sequencer);
 
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return true; }
@@ -55,14 +58,18 @@ public:
 	virtual unsigned getLength()	{ return 0; }
 	virtual unsigned getStatus()	{ return V3_OK; }
 
-	virtual bool isGrowing() { return false; }
+	virtual bool isGrowing() = 0;
 
 	void setNotifications(int notify)	{ m_notifications = notify; }
 
 	bool notifyStart() const { return (m_notifications & NOTIFY_START) != 0; }
 	bool notifyStop() const { return (m_notifications & NOTIFY_STOP) != 0; }
 
-	virtual void printOn(std::ostream& out)  { out << "abstract atom"; }
+	virtual void printOn(std::ostream& out) = 0;
+
+	// no error checking - subclasses are expected to set m_sample
+	void setUserData(int index, void *data) { m_sample->setUserData(index, data); }
+	void *getUserData(int index) { return m_sample->getUserData(index); }
 
 protected:
 
@@ -95,12 +102,13 @@ public:
 	Molecule(unsigned mode, int aPriority, const std::string &id);
 	virtual ~Molecule();	
 
-	virtual int start(Sequencer* sequencer, void* userData = 0);
+	virtual int start(Sequencer* sequencer);
 	virtual int stop(Sequencer* sequencer);
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason);
 	virtual bool setPos(unsigned aPosition);
 	unsigned getPos() const { return m_pos; }
 	virtual unsigned getLength() const { return m_length; }
+	virtual bool isGrowing() { return false; }
 
 	// atEnd is slightly different than done. 
 	// atEnd returns true at the end of a looped sample, which done doesn't
@@ -125,6 +133,8 @@ public:
 	bool notifyStop() const { return m_current ? m_current->notifyStop() : false;	}
 
 	unsigned currentAtom() const { return m_nCurrent; }
+
+	virtual void printOn(std::ostream& out);
 	
 protected:
 
@@ -154,6 +164,7 @@ public:
 
 	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
 	virtual unsigned getLength()	{ return m_sample->getLength(); }
+	virtual bool isGrowing() { return false; }
 
 	virtual void printOn(std::ostream& out)  { out << "PlayAtom(" << m_file << ")"; }
 	
@@ -172,7 +183,6 @@ public:
 	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
 	virtual unsigned getLength()	{ return m_sample->getLength(); }
 	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? V3_WARNING_EMPTY : V3_OK; }
-
 	virtual bool isGrowing() { return true; }
 
 	virtual void printOn(std::ostream& out)  { out << "RecordAtom(" << m_file << ", " << time << ')'; }
@@ -193,6 +203,7 @@ public:
 	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return m_nBeeps * 250; } // todo fix this
 	virtual unsigned getStatus()	{ return V3_OK; }
+	virtual bool isGrowing()		{ return false; }
 
 	virtual void printOn(std::ostream& out)	{ out << "BeepAtom(" << m_nBeeps << ')'; }
 
@@ -211,6 +222,7 @@ public:
 	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return strlen(m_tt) * 80; } // this is a rough guess
 	virtual unsigned getStatus()	{ return m_sample->getStatus(); }
+	virtual bool isGrowing()		{ return false; }
 
 	virtual void printOn(std::ostream& out)	{ out << "TouchtoneAtom(" << m_tt << ')'; }
 
@@ -232,6 +244,7 @@ public:
 	virtual bool setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
 	virtual unsigned getStatus()	{ return V3_OK; }
+	virtual bool isGrowing()		{ return false; }
 
 	virtual void printOn(std::ostream& out)	{ out << "SilenceAtom(" << m_length << ')'; }
 
@@ -258,6 +271,7 @@ public:
 	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return INDEFINITE; }
 	virtual unsigned getStatus()	{ return V3_OK; }
+	virtual bool isGrowing()		{ return false; }
 
 	virtual void printOn(std::ostream& out)	{ out << "ConferenceAtom()"; }
 

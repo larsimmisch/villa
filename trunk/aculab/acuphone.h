@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.14 2004/01/08 21:22:20 lars Exp $
+	$Id: acuphone.h,v 1.15 2004/01/12 21:48:06 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -274,7 +274,7 @@ class AculabMedia : public Media, public ProsodyChannel
 public:
 
 	AculabMedia(MediaClient *client, Timeslot receive = Timeslot(-1, -1), Timeslot transmit = Timeslot(-1,-1), void* aClientData = 0) 
-		: Media(client, receive, transmit, aClientData), m_sw(m_info.card)
+		: Media(client, receive, transmit, aClientData), m_sw(m_info.card), m_trunk(0)
 	{
 		sprintf(m_name, "Prosody[%x]", m_channel);
 	}
@@ -293,7 +293,7 @@ public:
 	virtual void startEnergyDetector(unsigned qualTime) { ProsodyChannel::startEnergyDetector(qualTime); }
 	virtual void stopEnergyDetector() { ProsodyChannel::stopEnergyDetector(); }
 
-	virtual const char* getName() { return m_name; }
+	virtual const char* getName() { return m_trunk ? m_trunk->getName() : m_name; }
 
 	static void start() { s_dispatcher.start(); }
 
@@ -305,6 +305,7 @@ protected:
 
 	AculabSwitch m_sw;
 	// only for getName()
+	Trunk *m_trunk;
 	char m_name[64];
 };
 

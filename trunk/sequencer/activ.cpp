@@ -20,10 +20,8 @@ char* copyString(const char* aString)
 	return s;
 }
 
-int Atom::start(Sequencer *sequencer, void *userData)
+int Atom::start(Sequencer *sequencer)
 {
-	m_sample->setUserData(userData);
-
 	m_sample->start(sequencer->getMedia());
 
 	return true;
@@ -160,9 +158,9 @@ void Molecule::freeLink(List::Link* anAtom)
 	delete (Atom*)anAtom;
 }
 
-int Molecule::start(Sequencer* sequencer, void* userData)
+int Molecule::start(Sequencer* sequencer)
 {
-	int started;
+	int started(0);
 
 	if (!isStopped())
 	{
@@ -170,13 +168,11 @@ int Molecule::start(Sequencer* sequencer, void* userData)
 		{
 			if (needRewind())	
 				m_current->setPos(0);
-			started = m_current->start(sequencer, this);
 		}
 		else
 		{
 			m_nCurrent = 0;
 			m_current = (Atom*)head;
-			started = m_current ? m_current->start(sequencer, this) : 0;
 		}
 	}
 	else
@@ -186,7 +182,6 @@ int Molecule::start(Sequencer* sequencer, void* userData)
 			m_nCurrent = 0;
 			m_current = (Atom*)head;
 			m_current->setPos(0);
-			started = m_current->start(sequencer, this);
 		}
 		else if (m_mode & mute)
 		{
@@ -198,16 +193,22 @@ int Molecule::start(Sequencer* sequencer, void* userData)
 
 			log(log_debug + 2, "activ") << "was inactive: " << timeInactive << logend();
 
-			if (setPos(m_pos + timeInactive)) 
-				started = m_current->start(sequencer, this);
-			else 
-				started = 0;
+			if (!setPos(m_pos + timeInactive)) 
+			{
+				m_flags &= ~stopped;
+				return 0;
+			}
 		}
 		else if (m_mode & pause)
 		{
 			setPos(m_pos);
-			started = m_current->start(sequencer, this);
 		}
+	}
+
+	if (m_current)
+	{
+		m_current->setUserData(INDEX_MOLECULE, this);
+		started = m_current->start(sequencer);
 	}
 
 	m_flags &= ~stopped;
@@ -308,26 +309,32 @@ bool Molecule::setPos(unsigned aPos)
 	return false;
 }
 
-std::ostream& operator<<(std::ostream& out, Molecule& m)  
+void Molecule::printOn(std::ostream &out)
 { 
-	out << "Molecule(" << m.getPriority() << ", " << m.getPos() << ", " << m.getLength() << ",";
+	out << "Molecule(" << getPriority() << ", " << getPos() << ", " << getLength() << ",";
 
-	if (m.getMode() & Molecule::discard)  out << " discard";
-	if (m.getMode() & Molecule::mute)  out << " mute";
-	if (m.getMode() & Molecule::dont_interrupt)  out << " dont_interupt";
-	if (m.getMode() & Molecule::restart)  out << " restart";
-	if (m.getMode() & Molecule::pause)	out << " pause";
-	if (m.getMode() & Molecule::loop)  out << " loop";
+	if (getMode() & Molecule::discard)  out << " discard";
+	if (getMode() & Molecule::mute)  out << " mute";
+	if (getMode() & Molecule::dont_interrupt)  out << " dont_interupt";
+	if (getMode() & Molecule::restart)  out << " restart";
+	if (getMode() & Molecule::pause)	out << " pause";
+	if (getMode() & Molecule::loop)  out << " loop";
 
-	out << ", " << result_name(m.getStatus()) << ')' << std::endl;
+	out << ", " << result_name(getStatus()) << ')' << std::endl;
 
-	for (ListIter i(m); !i.isDone(); i.next())
+	for (ListIter i(*this); !i.isDone(); i.next())
 	{
-		if ((Atom*)i.current() == m.m_current)	out << "->  ";
+		if ((Atom*)i.current() == m_current)	out << "->  ";
 		else out << "    ";
 		((Atom*)i.current())->printOn(out);
 		out << std::endl;
 	}
+}
+
+
+std::ostream& operator<<(std::ostream& out, Molecule& m)
+{
+	m.printOn(out);
 
 	return out;
 }

@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.20 2004/01/08 21:22:20 lars Exp $
+	$Id: phone.h,v 1.21 2004/01/12 21:48:06 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -17,6 +17,8 @@
 #include "switch.h"
 #include "v3error.h"
 #include "exc.h"
+
+#define MAXSLOTS 2
 
 enum { INDEFINITE = -1, INVALID_CALLREF = 0 };
 
@@ -112,8 +114,12 @@ public:
 		stopping
 	};
 
-    Sample(unsigned pos = 0) : m_position(pos), m_userData(0), 
-		m_status(V3_OK), m_state(idle) {}
+    Sample(unsigned pos = 0) : m_position(pos),
+		m_status(V3_OK), m_state(idle) 
+	{
+		for (int i = 0; i < MAXSLOTS; ++i)
+			m_userData[i] = NULL;
+	}
     virtual ~Sample() {}
 
     virtual unsigned start(Media* aMedia) = 0;
@@ -127,8 +133,18 @@ public:
     bool setPos(unsigned aPosition)	{ m_position = aPosition; return m_position <= getLength(); }
     unsigned getPos()               { return m_position; }
 
-    void setUserData(void* data)    { m_userData = data; }
-    void* getUserData()             { return m_userData; }
+    void setUserData(int index, void* data) 
+	{ 
+		if (index < MAXSLOTS) 
+			m_userData[index] = data; 
+	}
+    void* getUserData(int index) 
+	{ 
+		if (index < MAXSLOTS)
+			return m_userData[index]; 
+		else
+			return NULL;
+	}
 
 	state m_state;
     unsigned m_position;
@@ -136,7 +152,7 @@ public:
 
 protected:
 
-    void* m_userData;
+    void* m_userData[MAXSLOTS];
 };
 
 class Media

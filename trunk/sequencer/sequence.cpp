@@ -529,14 +529,14 @@ int Sequencer::close(const std::string &id)
 	{
 		unlock();
  		m_interface->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-			<< " BGRC " << m_media->getName() << end();
+			<< " BGRC " << getName() << end();
 
 		return V3_ERROR_PROTOCOL_VIOLATION;
 	}
 
 	if (m_activity.getState() == Activity::active)
 	{
-		log(log_debug, "sequencer", m_media->getName()) 
+		log(log_debug, "sequencer", getName()) 
 			<< "close - stopping activity" << logend();
 
 		m_activity.stop();
@@ -546,10 +546,11 @@ int Sequencer::close(const std::string &id)
 
 	if (m_activity.getState() == Activity::idle)
 	{
+		log(log_debug, "sequencer", getName()) << "close - activity idle" << logend();
+
 		idle = true;
 		gMediaPool.release(m_media);
 		m_media = 0;
-		log(log_debug, "sequencer", m_media->getName()) << "close - activity idle" << logend();
 	}
 
 	m_id = id;
@@ -557,9 +558,11 @@ int Sequencer::close(const std::string &id)
 
 	if (idle)
 	{
-		m_interface->begin() << V3_OK << ' ' << id.c_str() << " BGRC " << m_media->getName() 
-			<< end();
-
+		if (m_interface)
+		{
+			m_interface->begin() << V3_OK << ' ' << id.c_str() << " BGRC " << getName() 
+				<< end();
+		}
 		delete this;
 
 	}
@@ -881,7 +884,7 @@ void Sequencer::remoteRinging(Trunk *server, unsigned callref)
 
 void Sequencer::started(Media *server, Sample *aSample)
 {
-	Molecule* m = (Molecule*)aSample->getUserData();
+	Molecule* m = (Molecule*)aSample->getUserData(0);
 
 	if (m->notifyStart())
 	{
@@ -899,7 +902,7 @@ void Sequencer::started(Media *server, Sample *aSample)
 
 void Sequencer::completed(Media *server, Sample *aSample, unsigned msecs)
 {
-	completed(server, (Molecule*)(aSample->getUserData()), msecs, aSample->getStatus());
+	completed(server, (Molecule*)(aSample->getUserData(0)), msecs, aSample->getStatus());
 }
 
 void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, unsigned status)
