@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.9 2001/10/01 10:06:34 lars Exp $
+$Id: client.py,v 1.10 2001/10/07 00:48:13 lars Exp $
 """
 
 import sys,getopt
@@ -24,7 +24,7 @@ class Call:
 		self.device = None
 		# we don't want any unsolicited events after we sent a disconnect
 		del self.sequencer.devices[d]
- 		self.send(d + ' disconnect')
+ 		self.send(d + ' disconnect 0')
 		
 	def listen_done(self, event, data):
 		self.device = event['device']
