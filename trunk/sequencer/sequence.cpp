@@ -1110,8 +1110,6 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 		send_molecule_done = true;
 	}
 
-	unlock();
-
     if (start)
 	{
 		// start next molecule before sending reply to minimise delay
@@ -1123,7 +1121,9 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 		m_activity[channel].setState(Activity::idle);
 	}
 
-	if (send_molecule_done)
+	unlock();
+
+    if (send_molecule_done)
 	{
 		sendMLCA(id.c_str(), status, pos, length);
 	}
