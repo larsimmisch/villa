@@ -77,7 +77,7 @@ void Conference::add(ProsodyChannel *channel, mode m)
 
 void Conference::remove(ProsodyChannel *channel)
 {
-	bool closed;
+	bool closed = false;
 	int parties = 0;
 
 	/* block to restrict lock scope */
@@ -176,6 +176,7 @@ Conference *Conferences::create(void* userData)
 bool Conferences::close(unsigned handle)
 {
 	Conference *c = 0;
+	int count = 0;
 
 	/* block to restrict lock scope */
 	{
@@ -186,15 +187,9 @@ bool Conferences::close(unsigned handle)
 		if (h == m_conferences.end())
 			return false;
 
-		if (h->second->size() == 0)
-		{
-			delete(h->second);
-		}
-		else
-		{
-			c = h->second;
-		}
+		c = h->second;
 
+		// remove the handle
 		m_conferences.erase(h);
 	}
 
@@ -202,8 +197,12 @@ bool Conferences::close(unsigned handle)
 	if (c)
 	{
 		c->lock();
+		count = c->size();
 		c->m_closed = true;
 		c->unlock();
+
+		if (count == 0)
+			delete c;
 	}
 
 	return true;
