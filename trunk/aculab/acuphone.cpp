@@ -1069,14 +1069,16 @@ void AculabMedia::disconnected(Trunk *trunk)
 
 void AculabMedia::onRead(tSMEventId id)
 {
-	omni_mutex_lock lock(m_mutex);
+    {
+	    omni_mutex_lock lock(m_mutex);
 
-	if (!m_receiving)
-	{
-		log(log_error, "phone", getName()) 
-			<< "got onRead() event while no input active" << logend();
-		return;
-	}
+	    if (!m_receiving)
+	    {
+		    log(log_error, "phone", getName()) 
+			    << "got onRead() event while no input active" << logend();
+		    return;
+	    }
+    }
 
 	try
 	{
@@ -1093,14 +1095,16 @@ void AculabMedia::onRead(tSMEventId id)
 
 void AculabMedia::onWrite(tSMEventId id)
 {
-	omni_mutex_lock l(m_mutex);
+    {
+	    omni_mutex_lock l(m_mutex);
 
-	if (!m_sending)
-	{
-		log(log_error, "phone", getName()) 
-			<< "got onWrite() event while no output active" << logend();
-		return;
-	}
+	    if (!m_sending)
+	    {
+		    log(log_error, "phone", getName()) 
+			    << "got onWrite() event while no output active" << logend();
+		    return;
+	    }
+    }
 
 	try
 	{
