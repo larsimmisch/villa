@@ -259,6 +259,7 @@ void ProsodyChannel::conferenceStart()
 
 	memset(&start, 0, sizeof(start));
 	start.channel = m_channel;
+	start.agc = 1;
 
 	int rc = sm_conf_prim_start(&start);
 
@@ -327,7 +328,7 @@ void ProsodyChannel::conferenceEC()
 	condition.alt_dest_type			= kSMInputCondAltDestNone;
 
 	int rc = sm_condition_input(&condition);
-	
+
 	if (rc == ERR_SM_WRONG_FIRMWARE_TYPE)
 	{
 		 // Fall back to sidetone suppression.
@@ -1005,7 +1006,7 @@ void AculabMedia::connected(Trunk* aTrunk)
 
 		m_listenFor.channel = m_channel;
 		m_listenFor.enable_pulse_digit_recognition = 0;
-		m_listenFor.tone_detection_mode = kSMToneLenDetectionMinDuration64; // signal event at end of tone, to avoid recording the tone
+		m_listenFor.tone_detection_mode = kSMToneLenDetectionMinDuration40; // signal event at end of tone, to avoid recording the tone
 		m_listenFor.active_tone_set_id = 0;	// use given (i.e. DTMF/FAX) tone set
 		m_listenFor.map_tones_to_digits = kSMDTMFToneSetDigitMapping;
 		m_listenFor.enable_cptone_recognition = 0;
@@ -1092,6 +1093,10 @@ void AculabMedia::onWrite(tSMEventId id)
 	catch (const Exception& e)
 	{
 		log(log_error, "phone", getName()) << e << logend();
+	}
+	catch (...)
+	{
+		log(log_error, "phone", getName()) << "unknown exception" << logend();
 	}
 }
 

@@ -54,8 +54,6 @@ public:
 		out << ": " << prosody_error(m_error);
 	}
 
-protected:
-
 	const char* m_description;
 	int m_error;
 };
