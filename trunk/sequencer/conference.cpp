@@ -78,6 +78,7 @@ void Conference::add(ProsodyChannel *channel, mode m)
 void Conference::remove(ProsodyChannel *channel)
 {
 	bool closed;
+	int parties = 0;
 
 	/* block to restrict lock scope */
 	{
@@ -97,6 +98,8 @@ void Conference::remove(ProsodyChannel *channel)
 
 		m_parties.erase(p);
     
+		parties = m_parties.size();
+
 		if (m & speak)
 		{
 			--m_speakers;
@@ -127,7 +130,7 @@ void Conference::remove(ProsodyChannel *channel)
 		}
 	}
 
-	if (closed)
+	if (closed && parties == 0)
 		delete this;
 }
 
