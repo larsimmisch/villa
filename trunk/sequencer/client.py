@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.12 2003/11/26 00:09:28 lars Exp $
+$Id: client.py,v 1.13 2003/12/01 22:26:56 lars Exp $
 """
 
 import sys,getopt
@@ -45,7 +45,7 @@ class Call:
     def DISC(self, event, data):
         print "disconnected:", event['device']
 
-    def disconnect(self, event):
+    def RDIS(self, event):
         print "remote disconnect:", event['device']
         self.restart()
     

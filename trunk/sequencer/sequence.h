@@ -58,35 +58,31 @@ public:
 	int connect(ConnectCompletion* complete);
 
 	// TrunkClients connectRequest & details are treated here
-	void onIncoming(Trunk *server, const SAP &local, const SAP &remote); 
+	void onIncoming(Trunk *server, unsigned callref, const SAP &local, const SAP &remote); 
 
 	// TrunkClient protocol
 
 	// must call server.accept or server.reject
-	virtual void connectRequest(Trunk *server, const SAP &local, const SAP &remote);
-	virtual void connectRequestFailed(Trunk *server, int cause);
+	virtual void connectRequest(Trunk *server, unsigned callref, 
+		const SAP &local, const SAP &remote);
 	
 	// replies to call from far end
-	virtual void connectDone(Trunk *server, int result);
+	virtual void connectDone(Trunk *server, unsigned callref, int result);
 	
 	// must call server.disconnectAccept
-	virtual void disconnectRequest(Trunk *server, int cause);
+	virtual void disconnectRequest(Trunk *server, unsigned callref, int cause);
 	
 	// disconnect completion
-	virtual void disconnectDone(Trunk *server, unsigned result);
+	virtual void disconnectDone(Trunk *server, unsigned callref, int result);
 
 	// accept completion
-	virtual void acceptDone(Trunk *server, unsigned result);
+	virtual void acceptDone(Trunk *server, unsigned callref, int result);
 
-	// reject completion
-	virtual void rejectDone(Trunk *server, unsigned result);
-
-	virtual void details(Trunk *server, const SAP& local, const SAP& remote);
-	virtual void remoteRinging(Trunk *server);
+	virtual void details(Trunk *server, unsigned callref, const SAP& local, const SAP& remote);
+	virtual void remoteRinging(Trunk *server, unsigned callref);
 
 	// results from transfer
-	virtual void transferDone(Trunk *server);
-	virtual void transferFailed(Trunk *server, int cause);
+	virtual void transferDone(Trunk *server, unsigned callref, int result);
 
 	// MediaClient protocol
 
@@ -128,6 +124,7 @@ protected:
 
 	TrunkConfiguration *m_configuration;
 	Trunk *m_trunk;
+	unsigned m_callref;
 	AculabMedia *m_media;
 	ClientQueue::Item *m_clientSpec;
 	Activity m_activity;

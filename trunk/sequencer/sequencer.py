@@ -73,7 +73,7 @@ class Sequencer:
 				print "parse error:", line
 				return
 			
-			event = { 'action': tr[2], 'device': tr[3] }
+			event = { 'action': tr[2], 'device': tr[1] }
 
 			if len(tr) >= 3:
 				event['data'] = tr[3:]

@@ -241,7 +241,7 @@ public:
 	virtual int start(Sequencer* sequencer, void* userData = 0);
 	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos) { return 1; }
-	virtual unsigned getLength()	{ return indefinite; }
+	virtual unsigned getLength()	{ return INDEFINITE; }
 	virtual unsigned getStatus()	{ return PHONE_OK; }
 
 	virtual void printOn(std::ostream& out)	{ out << "ConferenceAtom()"; }

@@ -1,7 +1,7 @@
 /*
 	phoneclient.h
 
-	$Id: phoneclient.h,v 1.8 2003/11/26 00:09:28 lars Exp $
+	$Id: phoneclient.h,v 1.9 2003/12/01 22:26:56 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -26,27 +26,28 @@ public:
 	virtual ~TrunkClient() {}
 	
 	// must call server.accept or server.reject
-	virtual void connectRequest(Trunk* server, const SAP& local, const SAP& remote) = 0;
+	virtual void connectRequest(Trunk* server, unsigned callref,
+		const SAP& local, const SAP& remote) = 0;
 	
 	// replies to server.connect from far end
-	virtual void connectDone(Trunk* server, int result) = 0;
+	virtual void connectDone(Trunk* server, unsigned callref, int result) = 0;
 	
 	// results from transfer
-	virtual void transferDone(Trunk* server, int result) {}
+	virtual void transferDone(Trunk* server, unsigned callref, int result) {}
 
-	virtual void disconnectRequest(Trunk* server, int cause) = 0;
+	virtual void disconnectRequest(Trunk* server, unsigned callref, int cause) = 0;
 	
 	// disconnect completion
-	virtual void disconnectDone(Trunk* server, unsigned result) = 0;
+	virtual void disconnectDone(Trunk* server, unsigned callref, int result) = 0;
 
 	// accept completion
-	virtual void acceptDone(Trunk* server, unsigned result) = 0;
+	virtual void acceptDone(Trunk* server, unsigned callref, int result) = 0;
 
     // called whenever additional dialling information comes in (caller finishes dialling)
-    virtual void details(Trunk* server, const SAP& local, const SAP& remote)   {}
+    virtual void details(Trunk* server, unsigned callref, const SAP& local, const SAP& remote)   {}
 
 	// called when remote end ringing is detected on an outgoing line
-	virtual void remoteRinging(Trunk* server) {}
+	virtual void remoteRinging(Trunk* server, unsigned callref) {}
 };
 
 class MediaClient

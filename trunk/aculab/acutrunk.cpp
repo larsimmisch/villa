@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.19 2003/11/26 00:09:28 lars Exp $
+	$Id: acutrunk.cpp,v 1.20 2003/12/01 22:26:56 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -16,6 +16,7 @@
 
 CallEventDispatcher AculabTrunk::s_dispatcher;
 struct siginfo_xparms AculabTrunk::s_siginfo[MAXPORT];
+unsigned AculabTrunk::s_callref = 0;
 
 void CallEventDispatcher::add(ACU_INT handle, AculabTrunk* trunk)
 {
@@ -125,6 +126,15 @@ const char* AculabTrunk::eventName(ACU_LONG event)
 		sprintf(name, "unknown event 0x%x", event);
 		return name;
 	}
+}
+
+unsigned AculabTrunk::new_callref()
+{
+	++s_callref;
+	if (s_callref == INVALID_CALLREF)
+		++s_callref;
+
+	return s_callref;
 }
 
 void AculabTrunk::start()
@@ -279,11 +289,11 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 	return PHONE_OK;
 }
 	
-int AculabTrunk::accept()
+int AculabTrunk::accept(unsigned callref)
 {
 	lock();
 
-	if (m_cmd != t_none)
+	if ((m_cmd != t_none) || (m_callref != callref))
 	{
 		unlock();
 
@@ -308,7 +318,7 @@ int AculabTrunk::accept()
 	return PHONE_OK;
 }
 
-int AculabTrunk::disconnect(int cause)
+int AculabTrunk::disconnect(unsigned callref, int cause)
 {
 	CAUSE_XPARMS xcause;
 
@@ -318,6 +328,11 @@ int AculabTrunk::disconnect(int cause)
 	xcause.cause = cause;
 
 	lock();
+	if (m_callref != callref)
+	{
+		unlock();
+		return PHONE_ERROR_INVALID_STATE;
+	}
 	m_cmd = t_disconnect;
 	unlock();
 
@@ -354,12 +369,6 @@ void AculabTrunk::release()
 
 }
 	
-void AculabTrunk::abort()
-{
-	release();
-	setName(-1);
-}
-
 int AculabTrunk::getCause()
 {
 	CAUSE_XPARMS cause;
@@ -486,16 +495,16 @@ void AculabTrunk::onIdle()
 		{
 		case t_connect:
 			// outgoing failed or stopped
-			m_client->connectDone(this, m_stopped ? PHONE_ERROR_ABORTED : cause);
+			m_client->connectDone(this, m_callref, m_stopped ? PHONE_ERROR_ABORTED : cause);
 			break;
 		case t_disconnect:
-			m_client->disconnectDone(this, PHONE_OK);
+			m_client->disconnectDone(this, m_callref, PHONE_OK);
 			break;
 		case t_accept:
-			m_client->acceptDone(this, cause);
+			m_client->acceptDone(this, m_callref, cause);
 			break;
 		default:
-			m_client->disconnectRequest(this, cause);
+			m_client->disconnectRequest(this, m_callref, cause);
 			break;
 		}
 	}
@@ -505,6 +514,7 @@ void AculabTrunk::onIdle()
 	m_remote_disconnect = false;
 	m_stopped = false;
 	m_cmd = t_none;
+	m_callref = INVALID_CALLREF;
 	unlock();
 
 	release();
@@ -523,6 +533,8 @@ void AculabTrunk::onIncomingCallDetected()
 	details.timeout = 0;
 	details.handle = m_handle;
 
+	m_callref = new_callref();
+
 	int rc = call_details(&details);
 
 	if (rc)
@@ -537,7 +549,6 @@ void AculabTrunk::onIncomingCallDetected()
 		return;
 	}
 
-
 	remote.setAddress(details.originating_addr);
 	local.setAddress(details.destination_addr);
 	local.setService(details.stream);
@@ -549,7 +560,7 @@ void AculabTrunk::onIncomingCallDetected()
 	m_timeslot.ts = details.ts;
 	unlock();
 
-	m_client->connectRequest(this, local, remote);
+	m_client->connectRequest(this, m_callref, local, remote);
 }
 
 void AculabTrunk::onCallConnected()
@@ -570,16 +581,17 @@ void AculabTrunk::onCallConnected()
 
 	if (details.calltype == INCOMING)
 	{
-		m_client->acceptDone(this, PHONE_OK);
+		m_client->acceptDone(this, m_callref, PHONE_OK);
 	}
 	else
 	{
-		m_client->connectDone(this, PHONE_OK);
+		m_client->connectDone(this, m_callref, PHONE_OK);
 	}
 }
 
 void AculabTrunk::onWaitForOutgoing()
 {
+	m_callref = new_callref();
 }
 
 void AculabTrunk::onOutgoingRinging()
@@ -599,18 +611,18 @@ void AculabTrunk::onRemoteDisconnect()
 	switch (cmd)
 	{
 	case t_none:
-		m_client->disconnectRequest(this, getCause());
+		m_client->disconnectRequest(this, m_callref, getCause());
 		break;
 	case t_disconnect:
-		m_client->disconnectDone(this, PHONE_OK);
+		m_client->disconnectDone(this, m_callref, PHONE_OK);
 		break;
 	case t_connect:
-		m_client->connectDone(this, PHONE_ERROR_REJECTED);
-		disconnect();
+		m_client->connectDone(this, m_callref, PHONE_ERROR_REJECTED);
+		disconnect(m_callref);
 		break;
 	case t_accept:
-		m_client->acceptDone(this, PHONE_ERROR_REJECTED);
-		disconnect();
+		m_client->acceptDone(this, m_callref, PHONE_ERROR_REJECTED);
+		disconnect(m_callref);
 		break;
 	default:
 		log(log_error, "trunk", getName()) << "unhandled command " 
@@ -660,9 +672,9 @@ void AculabTrunk::setName(int ts)
 	}
 	else
 	{
-		char buffer[MAXSIGSYS + 16];
+		char buffer[MAXSIGSYS + 35];
 
-		sprintf(buffer, "%s[%d,%d]", s_siginfo[m_port].sigsys, m_port, ts);
+		sprintf(buffer, "%s[%d:%d,%d]", s_siginfo[m_port].sigsys, m_port, ts, m_callref);
 
 		Trunk::setName(buffer);
 	}

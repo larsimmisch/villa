@@ -40,7 +40,8 @@ Timer Sequencer::timer;
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
   :	m_activity(this), m_configuration(aConfiguration), m_connectComplete(0),
-	m_clientSpec(0), m_disconnecting(false), m_interface(0)
+	m_clientSpec(0), m_disconnecting(false), m_interface(0),
+	m_callref(INVALID_CALLREF)
 {
 	Timeslot receive = gBus->allocate();
 	Timeslot transmit = gBus->allocate();
@@ -59,7 +60,7 @@ void Sequencer::lost_connection()
 	m_interface = 0;
 	unlock();
 
-	disconnect(0);
+	disconnect(m_callref);
 }
 
 #pragma warning(default : 4355)
@@ -416,10 +417,11 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 		server->clear();
 	}
 
-	omni_mutex_lock l(m_mutex);
+	lock();
 
 	if (m_id.size())
 	{
+		unlock();
  		server->begin() << PHONE_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
 			<< " protocol violation" << end();
 
@@ -428,6 +430,7 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 
 	m_disconnecting = true;
 	m_id = id;
+	unlock();
 
 	return disconnect(cause);
 }
@@ -451,7 +454,7 @@ int Sequencer::disconnect(int cause)
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
 
 		m_media->disconnected(m_trunk);
-		m_trunk->disconnect(cause);
+		m_trunk->disconnect(m_callref, cause);
 	}
 	else
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - stopping activity" << logend();
@@ -460,7 +463,7 @@ int Sequencer::disconnect(int cause)
 	return PHONE_OK;
 }
 
-void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
+void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, const SAP& remote)
 {
 	int contained; 
 
@@ -517,7 +520,7 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 			log(log_warning, "sequencer", m_trunk->getName()) 
 				<< "no client found. rejecting call." << logend(); 
 
-			m_trunk->disconnect(0);
+			m_trunk->disconnect(m_callref);
 		}
 		else
 		{
@@ -530,18 +533,19 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 
 // Protocol of TrunkClient. Basically forwards it's information to the remote client
 
-void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remote)
+void Sequencer::connectRequest(Trunk* server, unsigned callref,
+							   const SAP &local, const SAP &remote)
 {
 	if (m_connectComplete)
 	{
-		m_trunk->disconnect();
+		m_trunk->disconnect(callref);
 
 		log(log_debug, "sequencer", m_trunk->getName()) 
 			<< "rejecting request because of outstanding outgoing call" << logend();
 	}
 	else
 	{
-		onIncoming(server, local, remote);
+		onIncoming(server, callref, local, remote);
 
 		if (!m_connectComplete)
 		{
@@ -553,53 +557,45 @@ void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remot
 	}
 }
 
-void Sequencer::connectRequestFailed(Trunk* server, int cause)
-{
-	if (cause == PHONE_ERROR_ABORTED && m_connectComplete)
-	{
-		log(log_debug, "sequencer", m_trunk->getName()) << "connecting to " 
-			<< m_connectComplete->m_id.c_str() 
-			<< " for dialout" << logend();
-
-		// todo better info
-		m_connectComplete->m_interface->begin() << PHONE_ERROR_FAILED << ' '
-			<< m_connectComplete->m_id.c_str() << end();
-
-	}
-	else
-	{
-		log(log_debug, "sequencer", m_trunk->getName()) 
-			<< "connect request failed with " << cause 
-			<< logend();
-	}
-}
-
-void Sequencer::connectDone(Trunk* server, int result)
+void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 {
 	log(log_debug, "sequencer", m_trunk->getName()) 
 		<< "connect done: " << result << logend();
 
-	// good. we got through
-
-	m_media->connected(server);
-
-	if (m_connectComplete)
+	if (result == PHONE_OK)
 	{
-		m_connectComplete->m_interface->begin() 
-			<< m_connectComplete->m_id.c_str() << ' ' << result 
-			<< (result == PHONE_OK ? " connected" : " connect failed") << end();
+		// good. we got through
 
-		delete m_connectComplete;
+		m_media->connected(server);
 
-		m_connectComplete = 0;
+		if (m_connectComplete)
+		{
+			m_connectComplete->m_interface->begin() 
+				<< m_connectComplete->m_id.c_str() << ' ' << result 
+				<< (result == PHONE_OK ? " connected" : " connect failed") << end();
+
+			delete m_connectComplete;
+
+			m_connectComplete = 0;
+		}
+		else
+		{
+			// Todo log error
+		}
 	}
 	else
 	{
-		// Todo log error
+		lock();
+		m_callref = INVALID_CALLREF;
+		if (m_interface)
+		{
+			m_interface->remove(server->getName());
+		}
+		unlock();
 	}
 }
 
-void Sequencer::transferDone(Trunk *server)
+void Sequencer::transferDone(Trunk *server, unsigned callref, int result)
 {
 	log(log_debug, "sequencer", m_trunk->getName()) 
 		<< "transfer succeeded" << logend();
@@ -622,32 +618,14 @@ void Sequencer::transferDone(Trunk *server)
 */
 }
 
-void Sequencer::transferFailed(Trunk *server, int cause)
-{
-	log(log_warning, "sequencer", m_trunk->getName()) 
-		<< "transfer failed: " << cause << logend();
-
-/* Todo
-
-	lock();
-	packet->clear(1);
-
-	packet->setContent(phone_transfer_done);
-	packet->setUnsignedAt(0, cause);
- 
-	tcp.send(*packet);
-	unlock();
-*/
-}
-
-void Sequencer::disconnectRequest(Trunk *server, int cause)
+void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 {
 	log(log_debug, "sequencer", m_trunk->getName()) 
 		<< "disconnect request" << logend();
 	
 	omni_mutex_lock lock(m_mutex);
 
-	// notify client unless we are diconnecting already and not active
+	// notify client unless we are disconnecting already and not active
 	if (!m_disconnecting && m_activity.getState() == Activity::idle)
 	{
 		if (m_interface)
@@ -680,7 +658,7 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 	unlock();
 }
 
-void Sequencer::disconnectDone(Trunk *server, unsigned result)
+void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 {
 	log(log_debug, "sequencer", server->getName()) 
 		<< "call disconnected" << logend();
@@ -689,6 +667,8 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 
 	if (m_interface)
 	{
+		m_interface->remove(server->getName());
+
 		assert(m_id.size());
 
 		m_interface->begin() << result << ' ' << m_id.c_str() << " DISC "
@@ -698,7 +678,7 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 	m_id.erase();
 
 	m_disconnecting = false;
-
+	m_callref = INVALID_CALLREF;
 }
 
 int Sequencer::accept(InterfaceConnection *server, const std::string &id)
@@ -718,12 +698,12 @@ int Sequencer::accept(InterfaceConnection *server, const std::string &id)
 
 	m_id = id;
 
-	m_trunk->accept();
+	m_trunk->accept(m_callref);
 
 	return PHONE_OK;
 }
 
-void Sequencer::acceptDone(Trunk *server, unsigned result)
+void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 {
 	if (result == PHONE_OK)
 	{
@@ -745,6 +725,14 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 	}
 	else
 	{
+		lock();
+		m_callref = INVALID_CALLREF;
+		if (m_interface)
+		{
+			m_interface->remove(server->getName());
+		}
+		unlock();
+
 		log(log_error, "sequencer", server->getName()) << "call accept failed: " 
 		<< result << logend();
 
@@ -752,47 +740,15 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 	}	
 }
 
-void Sequencer::rejectDone(Trunk *server, unsigned result)
-{
-	// result is always _ok
-
-	omni_mutex_lock lock(m_mutex);
-
-	if (m_connectComplete)
-	{
-		// internal reject. an outgoing call is outstanding
-
-		m_interface = m_connectComplete->m_interface;
-
-		m_trunk->connect(m_connectComplete->m_local, m_connectComplete->m_remote, 
-			m_connectComplete->m_timeout);
-
-		log(log_debug, "sequencer", server->getName()) 
-			<< "connecting to: " << m_connectComplete->m_remote 
-			<< " timeout: " << m_connectComplete->m_timeout 
-			<< " as: " << m_connectComplete->m_local << logend();
-	}
-	else
-	{
-		delete m_clientSpec;
-		m_clientSpec = 0;
-
-		log(log_debug, "sequencer", server->getName()) 
-			<< "call rejected" << logend();
-
-		m_id.erase();
-	}
-}
-
-void Sequencer::details(Trunk *server, const SAP& local, const SAP& remote)
+void Sequencer::details(Trunk *server, unsigned callref, const SAP& local, const SAP& remote)
 {
 	log(log_debug, "sequencer", server->getName()) 
 		<< "details: " << local << " " << remote << logend();
 
-	onIncoming(server, local, remote);
+	onIncoming(server, callref, local, remote);
 }
 
-void Sequencer::remoteRinging(Trunk *server)
+void Sequencer::remoteRinging(Trunk *server, unsigned callref)
 {
 	log(log_debug, "sequencer", server->getName()) 
 		<< "remote end ringing" << logend();
@@ -885,7 +841,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
 
 		m_media->disconnected(m_trunk);
-		m_trunk->disconnect();
+		m_trunk->disconnect(m_callref);
 
 		return;
 	}

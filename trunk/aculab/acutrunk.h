@@ -1,7 +1,7 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.8 2003/11/26 00:09:28 lars Exp $
+	$Id: acutrunk.h,v 1.9 2003/12/01 22:26:56 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -56,17 +56,14 @@ public:
 
 	// Connection establishment 
 	virtual int listen();
-	virtual int connect(const SAP& local, const SAP& remote, unsigned aTimeout = indefinite);
+	virtual int connect(const SAP& local, const SAP& remote, unsigned aTimeout = INDEFINITE);
 	
 	// must be called by client after a t_connect_request
-	virtual int accept();
+	virtual int accept(unsigned callref);
 	
 	// Dissolve a connection
-	virtual int disconnect(int cause = 0);
-		
-	// forces the state to idle
-    virtual void abort();
-	
+	virtual int disconnect(unsigned callref, int cause = 0);
+
     virtual bool hasDetails()		{ return true; }
     virtual bool needDSPSupport()	{ return false; }
 
@@ -78,6 +75,7 @@ public:
 protected:
 
 	static const char* eventName(ACU_LONG event);
+	static unsigned new_callref();
 
 	void setName(int ts);
 
@@ -106,9 +104,11 @@ protected:
 	ACU_INT m_handle;
 	int m_port;
 	bool m_stopped;
+	unsigned m_callref;
 
 	static siginfo_xparms s_siginfo[MAXPORT];
 	static CallEventDispatcher s_dispatcher;
+	static unsigned s_callref;
 };
 
 #endif

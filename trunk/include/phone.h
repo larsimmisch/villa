@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.17 2003/11/26 00:09:28 lars Exp $
+	$Id: phone.h,v 1.18 2003/12/01 22:26:56 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -18,7 +18,7 @@
 #include "errors.h"
 #include "exc.h"
 
-enum { indefinite = -1 };
+enum { INDEFINITE = -1, INVALID_CALLREF = 0 };
 
 class Media;
 class MediaClient;
@@ -42,24 +42,21 @@ public:
 
 	// Connection establishment 
 	virtual int listen() = 0;
-	virtual int connect(const SAP& local, const SAP& remote, unsigned timeout = indefinite) = 0;
+	virtual int connect(const SAP& local, const SAP& remote, unsigned timeout = INDEFINITE) = 0;
 	
 	// must be called by client after a t_connect_request
 	// after acceptDone is called, the call is connected if the result is r_ok or else idle
-	virtual int accept() = 0;
+	virtual int accept(unsigned callref) = 0;
 	
 	// transfer
-	virtual int transfer(const SAP& remote, unsigned timeout = indefinite) 
+	virtual int transfer(unsigned callref, const SAP& remote, unsigned timeout = INDEFINITE) 
 	{ 
 		return PHONE_ERROR_NOT_IMPLEMENTED; 
 	}
 
 	// Dissolve a connection
-	virtual int disconnect(int cause = 0) = 0;
-	
-	// forces the state to idle - synchronous
-    virtual void abort() = 0;
-	
+	virtual int disconnect(unsigned callref, int cause = 0) = 0;
+		
     virtual bool hasDetails()		{ return false; }
     virtual bool needDSPSupport()	{ return false; }
 
