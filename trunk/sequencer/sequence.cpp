@@ -646,7 +646,7 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 	log(log_debug, "sequencer", m_trunk->getName()) 
 		<< "disconnect request" << logend();
 	
-	lock();
+	omni_mutex_lock lock(m_mutex);
 
 	// notify client unless we are diconnecting already and not active
 	if (!m_disconnecting && m_activity.getState() == Activity::idle)
@@ -683,7 +683,7 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 	log(log_debug, "sequencer", server->getName()) 
 		<< "call disconnected" << logend();
 
-	lock();
+	omni_mutex_lock lock(m_mutex);
 
 	assert(m_id.size());
 
@@ -694,7 +694,6 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 
 	m_disconnecting = false;
 
-	unlock();
 }
 
 void Sequencer::acceptDone(Trunk *server, unsigned result)
@@ -713,6 +712,8 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 	m_interface->begin() << m_id.c_str() << ' ' << result
 		<< " " << m_trunk->getName() << " accept-done" << end();
 
+	omni_mutex_lock lock(m_mutex);
+
 	m_id.erase();
 }
 
@@ -720,15 +721,13 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 {
 	// result is always _ok
 
-	lock();
+	omni_mutex_lock lock(m_mutex);
 
 	if (m_connectComplete)
 	{
 		// internal reject. an outgoing call is outstanding
 
 		m_interface = m_connectComplete->m_interface;
-
-		unlock();
 
 		m_trunk->connect(m_connectComplete->m_local, m_connectComplete->m_remote, 
 			m_connectComplete->m_timeout);
@@ -747,8 +746,6 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 			<< "call rejected" << logend();
 
 		m_id.erase();
-
-		unlock();
 	}
 }
 
