@@ -314,7 +314,7 @@ bool Interface::data(InterfaceConnection *ic)
 		(*ic) >> trunkname;
 		(*ic) >> spec;
 
-		if (!trunkname.size() | !spec.size())
+		if (!trunkname.size() || !spec.size())
 		{
 			ic->clear();
 
@@ -366,44 +366,72 @@ bool Interface::data(InterfaceConnection *ic)
 	}
 	else if (command == "CONN")
 	{
-/*
-		SAP client;
+		std::string trunkname;
+		std::string called;
+		std::string calling;
+		int timeout = -1;
+		SAP remote;
+		SAP local;
+		
+		(*ic) >> trunkname;
+		(*ic) >> called;
+		(*ic) >> timeout;
+		(*ic) >> calling;
 
-		client.setAddress(aPacket->getStringAt(0));
-		client.setService(aPacket->getStringAt(1));
-
-		// remove any listeners for this client
-		// first in the global queue
-
-		gClientQueue.remove(ic, client);
-
-		// then in all the trunks
-
-		gConfiguration.lock();
-		for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+		if (!trunkname.size() || !called.size())
 		{
-			t.current()->removeClient(ic, client);
+			ic->clear();
+			
+			log(log_error, "sequencer") << "id " << id.c_str()
+				<< " syntax error - expected trunk name, timeslot and called address" 
+				<< logend();
+			
+
+			ic->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str() << " CONN " 
+				<< " syntax error - expected trunk name, timeslot and called address" 
+				<< end();
+
+			return false;
 		}
-		gConfiguration.unlock();
+/*
+		remote.setAddress(called.c_str());
+		if (calling.size())
+		{
+			local.setAddress(calling.c_str());
+		}
 
 		// now start the connect
 
 		TrunkConfiguration* trunk;
-		unsigned result = _failed;
+		int result = V3_ERROR_NO_RESOURCE;
 
-		trunk = gConfiguration[aPacket->getStringAt(2)];
+		if (trunkname != "any")
+		{
+			trunk = gConfiguration[trunkname.c_str()];
+			if (!trunk)
+			{
+				log(log_warning, "sequencer") << "id " << id.c_str()
+					<< " trunk " << trunkname << " not found" 
+					<< logend();
+			
+				ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CONN " 
+					<< " trunk not found" << end();
 
-		log(log_debug, "sequencer") << "client " << client 
-			<< " wants outgoing line on " 
-			<< (aPacket->getStringAt(2) ? aPacket->getStringAt(2) : "any trunk") 
-			<< logend();
+				return false;
+			}
+		}
+
+
+		log(log_debug, "sequencer") << "id " << id.c_str()
+			<< " started connect on trunk " << trunkname << logend();
 
 		ConnectCompletion* complete = 
-			new ConnectCompletion(*ic, aPacket->getSyncMajor(), aPacket->getSyncMinor(), client);
+			new ConnectCompletion(ic, id, called, calling, timeout);
 
 		if (trunk)
 		{
 			result = trunk->connect(complete);
+
 		}
 		else
 		{
@@ -411,12 +439,16 @@ bool Interface::data(InterfaceConnection *ic)
 			for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
 			{
 				result = t.current()->connect(complete);
-				if (result == _ok)	break;
+				if (result == V3_OK)
+				{
+					break;
+				}
 			}
 			gConfiguration.unlock();
+
 		}
 
-		if (result != _ok)
+		if (result != V3_OK)
 		{
 			delete complete;
 

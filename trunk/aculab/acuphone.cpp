@@ -1000,6 +1000,22 @@ void AculabMedia::connected(Trunk* aTrunk)
 
 		m_sw.listen(aTrunk->getTimeslot(), m_transmit, getName());
 		m_sw.listen(m_receive, aTrunk->getTimeslot(), getName());
+
+		memset(&m_listenFor, 0, sizeof(m_listenFor));
+
+		m_listenFor.channel = m_channel;
+		m_listenFor.enable_pulse_digit_recognition = 0;
+		m_listenFor.tone_detection_mode = kSMToneLenDetectionMinDuration64; // signal event at end of tone, to avoid recording the tone
+		m_listenFor.active_tone_set_id = 0;	// use given (i.e. DTMF/FAX) tone set
+		m_listenFor.map_tones_to_digits = kSMDTMFToneSetDigitMapping;
+		m_listenFor.enable_cptone_recognition = 0;
+		m_listenFor.enable_grunt_detection = 0;
+		m_listenFor.grunt_latency = 0;
+		
+		int rc = sm_listen_for(&m_listenFor);
+		if (rc)
+			throw ProsodyError(__FILE__, __LINE__, "sm_listen_for", rc);
+
 	}
 	catch (const Exception &e)
 	{
