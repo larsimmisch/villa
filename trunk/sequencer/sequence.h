@@ -105,7 +105,7 @@ public:
 	virtual void completed(Telephone *server, Sample *aSample, 
 		unsigned msecs);
 
-	virtual void completed(Telephone *server, Molecule *aMolecule, 
+	virtual void completed(Telephone *server, Molecule *molecule, 
 		unsigned msecs, unsigned reason);
 	
 	virtual void aborted(Telephone *sender, int cause) {}

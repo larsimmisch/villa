@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.12 2001/07/16 20:34:17 lars Exp $
+	$Id: acutrunk.cpp,v 1.13 2001/07/24 01:02:22 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -625,16 +625,13 @@ void AculabTrunk::onRemoteDisconnect()
 	case disconnecting:
 		break;
 	case connected:
-	
 		cause = getCause();
-
-		m_client->disconnectRequest(this, cause);
-
 		m_state = disconnecting;
+		m_client->disconnectRequest(this, cause);
 		break;
 	case accepting:
-		m_client->acceptDone(this, getCause());
 		m_state = idle;
+		m_client->acceptDone(this, getCause());
 		disconnect();
 		break;
 	case waiting:

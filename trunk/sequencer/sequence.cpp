@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <new.h>
+#include <assert.h>
 
 #include "phoneclient.h"
 #include "acuphone.h"
@@ -303,20 +304,9 @@ void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, 
 		<< "send molecule done for: " << id << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
 
-/* Todo
 
-	lock();
-	packet->clear(3);
-	packet->setSync(0, syncMinor);
-	packet->setContent(phone_molecule_done);
-	packet->setUnsignedAt(0, status);
-	packet->setUnsignedAt(1, pos);
-	packet->setUnsignedAt(2, length);
- 
-	tcp.send(*packet);
-	unlock();
-
-*/
+	(*m_interface) << id << ' ' << status << " molecule-done " << pos 
+		<< ' ' << length << "\r\n";
 }
 
 int Sequencer::connect(ConnectCompletion* complete)
@@ -665,13 +655,20 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 	log(log_debug, "sequencer", phone->getName()) 
 		<< "telephone disconnect request" << logend();
 
-	server->disconnectAccept();
-
 	lock();
 
-	activity.stop();
+	if (activity.getState() == Activity::active)
+	{
+		activity.stop();
 
-	checkCompleted();
+		checkCompleted();
+
+		if (activity.getState() == Activity::idle)
+		{
+			(*m_interface) << _event << ' ' << phone->getName() 
+				<< " disconnect\r\n";
+		}
+	}
 
 /* Todo
 	packet->clear(0);
@@ -688,8 +685,16 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 	log(log_debug, "sequencer", server->getName()) 
 		<< "call disconnected" << logend();
 
-	(*m_interface) << m_id.c_str() << ' ' << result << ' '
-		<< phone->getName() << " disconnect-done\r\n";
+	if (m_id.size())
+	{
+		(*m_interface) << m_id.c_str() << ' ' << result << ' '
+			<< phone->getName() << " disconnect-done\r\n";
+	}
+	else
+	{
+		(*m_interface) << "-1 " << _event << ' '
+			<< phone->getName() << " disconnect\r\n";
+	}
 
 	m_id.erase();
 
@@ -805,7 +810,7 @@ void Sequencer::completed(Telephone *server, Sample *aSample, unsigned msecs)
 	completed(server, (Molecule*)(aSample->getUserData()), msecs, aSample->getStatus());
 }
 
-void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs, unsigned status)
+void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs, unsigned status)
 {
 	int done, atEnd, notifyStop, started;
 	unsigned pos, length, nAtom;
@@ -813,53 +818,58 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 
 	omni_mutex_lock lock(mutex);
 
-	if (aMolecule)
+	assert(molecule);
+
+	// the molecule will be changed after the done. Grab all necesssary information before done.
+
+	nAtom = molecule->currentAtom();
+	atEnd = molecule->atEnd();
+	notifyStop = molecule->notifyStop();
+	id = molecule->getId();
+	done = molecule->done(this, msecs, status);
+	pos = molecule->getPos();
+	length = molecule->getLength();
+	atEnd = atEnd && done;
+
+	if (notifyStop)
 	{
-		// the molecule will be changed after the done. Grab all necesssary information before done.
+		log(log_debug, "sequencer", server->getName()) 
+			<< "sent atom_done for " 
+			<< ", " << id.c_str() << ", " << nAtom << std::endl 
+			<< *molecule << logend();
 
-		nAtom = aMolecule->currentAtom();
-		atEnd = aMolecule->atEnd();
-		notifyStop = aMolecule->notifyStop();
-		id = aMolecule->getId();
-		done = aMolecule->done(this, msecs, status);
-		pos = aMolecule->getPos();
-		length = aMolecule->getLength();
-		atEnd = atEnd && done;
+		sendAtomDone(id.c_str(), nAtom, status, msecs);
+	}
 
-		if (notifyStop)
-		{
-			log(log_debug, "sequencer", server->getName()) 
-				<< "sent atom_done for " 
-				<< ", " << id.c_str() << ", " << nAtom << std::endl 
-				<< *aMolecule << logend();
+	if (activity.getState() == Activity::stopping)
+	{
+		log(log_debug+2, "sequencer", server->getName()) 
+			<< "removing " << *molecule << logend();
 
-			sendAtomDone(id.c_str(), nAtom, status, msecs);
-		}
+		activity.remove(molecule);
+	}
+	else
+	{
+		log(log_debug+2, "sequencer", server->getName()) 
+			<< "done " << *molecule << logend();
+	}
 
-		if (done)
-		{
-			if (done) 
-			{
-				log(log_debug+2, "sequencer", server->getName()) 
-					<< "removing " << *aMolecule << logend();
-			}
+	if (server->getState() == Trunk::disconnecting)
+	{
+		sendMoleculeDone(id.c_str(), status, pos, length);
 
-			activity.remove(aMolecule);
-		}
-		else
-		{
-			log(log_debug+2, "sequencer", server->getName()) 
-				<< "done " << *aMolecule << logend();
-		}
- 
-		// start the new activity before sending packets to minimize delay
+		server->disconnect();
 
-		started = activity.start();
+		return;
+	}
 
-		if (atEnd)
-		{
-			sendMoleculeDone(id.c_str(), status, pos, length);
-		}
+	// start the new activity before sending packets to minimize delay
+
+	started = activity.start();
+
+	if (atEnd)
+	{
+		sendMoleculeDone(id.c_str(), status, pos, length);
 	}
 }
 
@@ -883,29 +893,6 @@ void Sequencer::touchtone(Telephone* server, char tt)
 
 */
 }
-
-
-/* Todo
-
-void Sequencer::disconnectRequest(Transport* server, Packet* finalPacket)
-{
-	// blast it. reset the phone->
-	lock();
-
-	activity.setASAP();
-	activity.stop();
-
-	unlock();
-
-	if (!phone->isIdle())
-		phone->abort();
-
-	checkCompleted();
-
-	tcp.disconnectAccept();
-}
-
-*/
 
 void Sequencer::fatal(Telephone* server, const char* e)
 {
