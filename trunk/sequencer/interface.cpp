@@ -26,7 +26,7 @@ void InterfaceConnection::lost_connection()
 		<< m_remote << " aborted" << logend();
 
     // Villa shortcut
-    ::exit(0);
+    ::_exit(0);
 
 	// remove all listeners for the disconnected app
 	// first in the global queue
@@ -112,7 +112,6 @@ void Interface::run()
 
 				ic->setNonblocking(1);
 				ic->setKeepAlive(1);
-
 
 				ic->m_remote = remote;
 
