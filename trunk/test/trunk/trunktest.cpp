@@ -1,7 +1,7 @@
 /*
 	trunktest.cpp
 
-	$Id: trunktest.cpp,v 1.2 2000/10/18 16:58:43 lars Exp $
+	$Id: trunktest.cpp,v 1.3 2000/11/06 13:10:59 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -98,7 +98,13 @@ int main(int argc, char* argv[])
 
 	AculabTrunk::start();
 
-	trunk.listen();
+	SAP local, remote;
+
+	remote.setAddress("3172547");
+
+	trunk.connect(local, remote);
+	
+	// trunk.listen();
 
 	while(true)
 		omni_thread::sleep(-1);

@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.2 2000/10/30 11:38:57 lars Exp $
+	$Id: acuphone.cpp,v 1.3 2000/11/06 13:10:59 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -16,6 +16,43 @@
 #include "mvswdrvr.h"
 #include "acuphone.h"
 #include "prosody_error.i"
+#include "beep.i"
+
+const char* result_name(int r)
+{
+	switch (r)
+	{
+	case r_ok:
+		return "r_ok";
+	case r_timeout:
+		return "r_timeout";
+	case r_aborted: 
+		return "r_aborted";
+	case r_rejected: 
+		return "r_rejected";
+	case r_disconnected:
+		return "r_disconnected";
+	case r_failed:
+		return "r_failed";
+	case r_invalid: 
+		return "r_invalid";
+	case r_busy:
+		return "r_busy";
+	case r_not_available:
+		return "r_not_available";
+	case r_no_dialtone:
+		return "r_no_dialtone";
+	case r_empty:
+		return "r_empty";
+	case r_bad_state:
+		return "r_bad_state";
+	case r_number_changed:
+		return "r_number_changed";
+	default:
+		return "unknown";
+	}
+};
+
 
 ProsodyEventDispatcher ProsodyChannel::dispatcher;
 
@@ -29,9 +66,7 @@ void AculabSwitch::listen(const Timeslot &a, const Timeslot &b)
     args.ist = b.st;
     args.its = b.ts;
 
-#ifdef _DEBUG
-	std::cout << "switch: " << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << std::endl;
-#endif
+	log(log_debug, "switch") << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << logend();
 
     int rc = sw_set_output(device, &args);
     if (rc != 0)    
@@ -48,9 +83,7 @@ void AculabSwitch::listen(const Timeslot &a, char pattern)
     args.mode = PATTERN_MODE;
     args.pattern = pattern;
 
-#ifdef _DEBUG
-	std::cout << "switch: " << a.st << ':' << a.ts << " := 0x" << std::setbase(16) << pattern << std::setbase(10) << std::endl;
-#endif
+	log(log_debug, "switch") << a.st << ':' << a.ts << " := 0x" << std::setbase(16) << pattern << std::setbase(10) << logend();
 
     int rc = sw_set_output(device, &args);
     if (rc != 0)    
@@ -131,7 +164,7 @@ void ProsodyEventDispatcher::dispatch(int offset)
 {
 	if (offset >= methods.size())
 	{
-		std::cerr << "ProsodyEventDispatcher::dispatch: offset " << offset << " out of bounds" << std::endl;
+		log(log_error, "phone") << "ProsodyEventDispatcher::dispatch: offset " << offset << " out of bounds" << logend;
 		return;
 	}
 
@@ -147,14 +180,14 @@ void* ProsodyEventDispatcher::DispatcherThread::run_undetached(void *arg)
 		DWORD rc = WaitForMultipleObjects(length, handles, FALSE, INFINITE);
 		if (rc < WAIT_OBJECT_0 || rc > WAIT_OBJECT_0 + MAXIMUM_WAIT_OBJECTS)
 		{
-			std::cerr << "ProsodyEventDispatcherThread: WaitForMultipleObjects failed:" << GetLastError() << std::endl;
+			log(log_error, "phone") << "ProsodyEventDispatcherThread: WaitForMultipleObjects failed:" << GetLastError() << logend();
 
 			continue;
 		}
 		if (rc - WAIT_OBJECT_0 > length)
 		{
-			std::cerr << "ProsodyEventDispatcherThread: WaitForMultipleObjects returned index we did not wait upon (" 
-				<< rc - WAIT_OBJECT_0 << ")" << std::endl;
+			log(log_error, "phone") << "ProsodyEventDispatcherThread: WaitForMultipleObjects returned index we did not wait upon (" 
+				<< rc - WAIT_OBJECT_0 << ")" << logend();
 
 			continue;
 		}
@@ -233,12 +266,110 @@ tSMEventId ProsodyChannel::set_event(tSM_INT type)
 
 unsigned ProsodyChannel::Beep::start(Telephone *phone)
 {
-	return 0;
+	struct sm_replay_parms start;
+
+	start.channel = prosody->channel;
+	start.background = kSMNullChannelId;
+	start.speed = 100;
+	start.agc = 0;
+	start.volume = 0;
+	start.type = kSMDataFormat8KHzALawPCM;
+	start.data_length = sizeof(beep);
+
+	omni_mutex_lock(phone->getMutex());
+
+	int rc = sm_replay_start(&start);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
+
+	log(log_debug, "phone") << "beep " << beeps << " started" << logend();
+	
+	phone->started(this);
+
+	process(phone);
+
+	return position;
+}
+
+unsigned ProsodyChannel::Beep::submit(Telephone *phone)
+{	
+	struct sm_ts_data_parms data;
+	data.channel = prosody->channel;
+	data.length = min(sizeof(beep) - offset, kSMMaxReplayDataBufferSize);
+	data.data = (char*)&beep[offset];
+
+	int rc = sm_put_replay_data(&data);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_put_replay_data", rc);
+
+	position += data.length / 8;
+	offset += data.length;
+
+	return position;
 }
 
 bool ProsodyChannel::Beep::stop(Telephone *phone)
 {
+	struct sm_replay_abort_parms p;
+
+	p.channel = prosody->channel;
+
+	int rc = sm_replay_abort(&p);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
+
+	position = (count * sizeof(beep) + p.offset) / 8;
+
+	status = r_aborted;
+
+	log(log_debug+1, "phone") << "stopping beep " << beeps << logend();
+
 	return false;
+}
+
+// fills prosody buffers if space available, notifies about completion if done
+int ProsodyChannel::Beep::process(Telephone *phone)
+{
+	struct sm_replay_status_parms replay;
+
+	replay.channel = prosody->channel;
+	
+	while (true)
+	{
+		int rc = sm_replay_status(&replay);
+		if (rc)
+			throw ProsodyError(__FILE__, __LINE__, "sm_replay_status", rc);
+
+		switch (replay.status)
+		{
+		case kSMReplayStatusComplete:
+			++count;
+			if (count == beeps)
+			{
+				log(log_debug, "phone") << "beep " << beeps << " done [" << result_name(status) << ',' << position << ']' << logend();
+
+				phone->completed(this);
+			}
+			else
+			{
+				offset = 0;
+				start(phone);
+			}
+			return replay.status;
+		case kSMReplayStatusUnderrun:
+			log(log_error, "phone") << "underrun!" << logend();
+		case kSMReplayStatusHasCapacity:
+			submit(phone);
+			break;
+		case kSMReplayStatusCompleteData:
+			return replay.status;
+		case kSMReplayStatusNoCapacity:
+			return replay.status;
+		}
+	}
+
+	// unreached statement
+	return replay.status;
 }
 
 unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
@@ -258,12 +389,14 @@ unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
 	// warn if digits too long
 	if (tt.length() > kSMMaxDigits)
 	{
-		std::cerr << "warning: digits string " << tt.c_str() << " too long. truncated to: " << digits.digits.digit_string << std::endl;
+		log(log_warning, "phone") << "warning: digits string " << tt.c_str() << " too long. truncated to: " << digits.digits.digit_string << logend();
 	}
 
 	int rc = sm_play_digits(&digits);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
+
+	log(log_debug, "phone") << "touchtones " << tt.c_str() << " started" << logend();
 
 	phone->started(this);
 
@@ -279,9 +412,30 @@ bool ProsodyChannel::Touchtones::stop(Telephone *phone)
 
 	status = r_aborted;
 
+	log(log_debug, "phone") << "touchtones " << tt.c_str() << " stopped" << logend();
+
 	phone->completed(this);
 
 	return true;
+}
+
+int ProsodyChannel::Touchtones::process(Telephone *phone)
+{
+	struct sm_play_tone_status_parms tone;
+
+	tone.channel = prosody->channel;
+
+	int rc = sm_play_tone_status(&tone);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_status", rc);
+
+	if (tone.status == kSMPlayToneStatusComplete)
+	{
+		log(log_debug, "phone") << "touchtones " << tt.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
+		phone->completed(this);
+	}
+
+	return tone.status;
 }
 
 void ProsodyChannel::startEnergyDetector(unsigned qualTime)
@@ -334,13 +488,17 @@ unsigned ProsodyChannel::FileSample::start(Telephone *phone)
 	start.type = storage->encoding;
 	start.data_length = storage->getLength();
 
+	omni_mutex_lock(phone->getMutex());
+
 	int rc = sm_replay_start(&start);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
 
-	process(phone);
+	log(log_debug, "phone") << "file sample " << name.c_str() << " started" << logend();
 
 	phone->started(this);
+
+	process(phone);
 
 	return position;
 }
@@ -378,57 +536,145 @@ bool ProsodyChannel::FileSample::stop(Telephone *phone)
 
 	status = r_aborted;
 
+	log(log_debug+1, "phone") << "stopping file sample " << name.c_str() << logend();
+
 	return false;
 }
 
 // fills prosody buffers if space available, notifies about completion if done
 int ProsodyChannel::FileSample::process(Telephone *phone)
 {
-	struct sm_replay_status_parms status;
+	struct sm_replay_status_parms replay;
 
-	status.channel = prosody->channel;
+	replay.channel = prosody->channel;
 	
 	while (true)
 	{
-		int rc = sm_replay_status(&status);
+		int rc = sm_replay_status(&replay);
 		if (rc)
 			throw ProsodyError(__FILE__, __LINE__, "sm_replay_status", rc);
 
-		switch (status.status)
+		switch (replay.status)
 		{
 		case kSMReplayStatusComplete:
+			log(log_debug, "phone") << "file sample " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
 			phone->completed(this);
-			return status.status;
+			return replay.status;
 		case kSMReplayStatusUnderrun:
-			std::cerr << "underrun!" << std::endl;
+			log(log_error, "phone") << "underrun!" << logend();
 		case kSMReplayStatusHasCapacity:
 			submit(phone);
 			break;
 		case kSMReplayStatusCompleteData:
-			return status.status;
+			return replay.status;
 		case kSMReplayStatusNoCapacity:
-			return status.status;
+			return replay.status;
 		}
 	}
 
 	// unreached statement
-	return status.status;
+	return replay.status;
 }
 
 unsigned ProsodyChannel::RecordFileSample::start(Telephone *phone)
 {
-	return 0;
+	struct sm_record_parms record;
+
+	record.channel = prosody->channel;
+	record.alt_data_source = kSMNullChannelId;
+	record.type = storage->encoding;
+	record.elimination = 0;
+	record.max_octets = 0;
+	record.max_elapsed_time = maxTime;
+	// this shouldn't be hardcoded...
+	record.max_silence = 1000;
+
+	omni_mutex_lock(phone->getMutex());
+
+	int rc = sm_record_start(&record);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_record_start", rc);
+
+	phone->started(this);
+
+	log(log_debug, "phone") << "recording " << name.c_str() << " started" << logend();
+
+	return position;
 }
 
 bool ProsodyChannel::RecordFileSample::stop(Telephone *phone)
 {
+	struct sm_record_abort_parms abort;
+
+	abort.channel = prosody->channel;
+	abort.discard = 0;
+
+	int rc = sm_record_abort(&abort);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_record_abort", rc);
+
+	log(log_debug, "phone") << "stopping recording " << name.c_str() << logend();
+
 	return false;
+}
+
+unsigned ProsodyChannel::RecordFileSample::receive(Telephone *phone)
+{	
+	char buffer[kSMMaxRecordDataBufferSize];
+
+	struct sm_ts_data_parms data;
+	data.channel = prosody->channel;
+	data.length = sizeof(buffer);
+	data.data = buffer;
+
+	int rc = sm_get_recorded_data(&data);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_put_replay_data", rc);
+
+	storage->write(data.data, data.length);
+
+	position += data.length * 1000 / storage->bytesPerSecond;
+
+	return position;
+}
+
+int ProsodyChannel::RecordFileSample::process(Telephone *phone)
+{
+	struct sm_record_status_parms record;
+
+	record.channel = prosody->channel;
+	
+	while (true)
+	{
+		int rc = sm_record_status(&record);
+		if (rc)
+			throw ProsodyError(__FILE__, __LINE__, "sm_record_status", rc);
+
+		switch (record.status)
+		{
+		case kSMRecordStatusComplete:
+			log(log_debug, "phone") << "recording " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
+			phone->completed(this);
+			return record.status;
+		case kSMRecordStatusOverrun:
+			log(log_error, "phone") << "overrun!" << logend();
+		case kSMRecordStatusData:
+		case kSMRecordStatusCompleteData:
+			receive(phone);
+			break;
+		case kSMRecordStatusNoData:
+			return record.status;
+		}
+	}
+
+	// unreached statement
+	return record.status;
 }
 
 void AculabPhone::connected(Trunk* aTrunk)
 {
 	if (receive.st == -1 || transmit.st == -1)
-		std::cerr << "no transmit or receive timeslot" << std::endl;
+		log(log_error, "phone") << "no transmit or receive timeslot" << logend();
 
 	try
 	{
@@ -466,7 +712,7 @@ void AculabPhone::connected(Trunk* aTrunk)
 	}
 	catch (const Exception &e)
 	{
-		e.printOn(std::cerr);
+		log(log_error, "phone") << e << logend();
 	}
 
 	client->connected(this);
@@ -484,14 +730,34 @@ void AculabPhone::disconnected(Trunk *trunk, int cause)
 
 void AculabPhone::onRead(tSMEventId id)
 {
-	int x = 9;
+	omni_mutex_lock l(mutex);
+
+	if (!current)
+	{
+		log(log_error, "phone") << "got onRead() event while no output active" << logend();
+		return;
+	}
+
+	try
+	{
+		if (typeid(*current) == typeid(ProsodyChannel::RecordFileSample))
+		{
+			dynamic_cast<FileSample*>(current)->process(this);
+		}
+	}
+	catch (const Exception& e)
+	{
+		log(log_error, "phone") << e << logend();
+	}
 }
 
 void AculabPhone::onWrite(tSMEventId id)
 {
+	omni_mutex_lock l(mutex);
+
 	if (!current)
 	{
-		std::cerr << "got onWrite() event while no output active" << std::endl;
+		log(log_error, "phone") << "got onWrite() event while no output active" << logend();
 		return;
 	}
 
@@ -499,27 +765,20 @@ void AculabPhone::onWrite(tSMEventId id)
 	{
 		if (typeid(*current) == typeid(ProsodyChannel::Touchtones))
 		{
-			struct sm_play_tone_status_parms status;
-
-			status.channel = channel;
-
-			int rc = sm_play_tone_status(&status);
-			if (rc)
-				throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_status", rc);
-
-			if (status.status == kSMPlayToneStatusComplete)
-			{
-				completed(current);
-			}
+			dynamic_cast<Touchtones*>(current)->process(this);
 		}
 		else if (typeid(*current) == typeid(ProsodyChannel::FileSample))
 		{
 			dynamic_cast<FileSample*>(current)->process(this);
 		}
+		else if (typeid(*current) == typeid(ProsodyChannel::Beep))
+		{
+			dynamic_cast<Beep*>(current)->process(this);
+		}
 	}
 	catch (const Exception& e)
 	{
-		std::cerr << e << std::endl;
+		log(log_error, "phone") << e << logend();
 	}
 }
 

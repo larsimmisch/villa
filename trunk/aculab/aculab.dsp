@@ -221,5 +221,32 @@ SOURCE=.\smwavlib.h
 SOURCE=..\include\switch.h
 # End Source File
 # End Group
+# Begin Source File
+
+SOURCE=.\beep.al
+
+!IF  "$(CFG)" == "aculab - Win32 Release"
+
+# Begin Custom Build - Performing Custom Build Step on $(InputPath)
+InputPath=.\beep.al
+
+"beep.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+	perl ..\scripts\raw-to-c.pl $(InputPath) beep.i beep
+
+# End Custom Build
+
+!ELSEIF  "$(CFG)" == "aculab - Win32 Debug"
+
+# Begin Custom Build - Performing Custom Build Step on $(InputPath)
+InputPath=.\beep.al
+
+"beep.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+	perl ..\scripts\raw-to-c.pl $(InputPath) beep.i beep
+
+# End Custom Build
+
+!ENDIF 
+
+# End Source File
 # End Target
 # End Project

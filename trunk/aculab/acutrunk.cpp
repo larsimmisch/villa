@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.2 2000/10/18 16:58:43 lars Exp $
+	$Id: acutrunk.cpp,v 1.3 2000/11/06 13:10:59 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -201,19 +201,19 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 
 	int sigsys = call_type(port);
 
+	memset(&outdetail, 0, sizeof(outdetail));
+
     outdetail.net = port;
-    outdetail.ts = -1;
+    outdetail.ts = 1;
+	outdetail.cnf = CNF_REM_DISC | CNF_CALL_CHARGE;
+	outdetail.sending_complete = 1;
+
     strcpy(outdetail.destination_addr, remote.getAddress());
     if (local.getAddress()) 
 	{
 		strcpy(outdetail.originating_addr, local.getAddress());
 	}
-	else
-	{
-		outdetail.originating_addr[0] = '\0';
-	}
 
-	memset(&outdetail.unique_xparms, 0, sizeof(UNIQUEXU));
 	switch (sigsys)
 	{
 	case S_ETS300:
@@ -241,11 +241,12 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 	case BR_ETSNET:
 	case BR_ATT:
 	case BR_ATTNET:
-		outdetail.sending_complete = 1;
 		outdetail.unique_xparms.sig_q931.service_octet = TELEPHONY;
 		outdetail.unique_xparms.sig_q931.add_info_octet = ANALOGUE;
 		outdetail.unique_xparms.sig_q931.dest_numbering_type = NT_UNKNOWN;
 		outdetail.unique_xparms.sig_q931.dest_numbering_plan = NP_ISDN;
+		outdetail.unique_xparms.sig_q931.orig_numbering_type = NT_UNKNOWN;
+		outdetail.unique_xparms.sig_q931.orig_numbering_plan = NP_ISDN;
 		break;
 	case S_DASS:
 	case S_DPNSS:
@@ -255,16 +256,26 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 		throw Exception(__FILE__, __LINE__, "AculabTrunk::connect()", "invalid signalling system");
 	}
 
+	// we must lock the global dispatcher before we enter call_openout
+	// to avoid that the the dispatcher dispatches an event for this channel
+	// before it was added to it's map
+	dispatcher.lock();
+
 	int rc = call_openout(&outdetail);
 	if (rc != 0)
 	{
 		std::cerr << "call_openout failed: " << rc << std::endl;
+
         return r_failed;
     }
 
     handle = outdetail.handle;
 
 	dispatcher.add(handle, this);
+
+	dispatcher.unlock();
+
+	state = connecting;
 
 	return r_ok;
 }
@@ -403,6 +414,8 @@ void AculabTrunk::onCallEvent(ACU_LONG event)
 {
 	omni_mutex_lock l(mutex);
 
+	log(log_debug+2, "trunk") << eventName(event) << logend();
+
 	switch (event)
 	{
 	case EV_IDLE:
@@ -451,7 +464,7 @@ void AculabTrunk::onCallEvent(ACU_LONG event)
 	case EV_TEST_CONNECT:
 	case EV_EXTENDED:
 	default:
-		std::cerr << "unhandled call event " << eventName(event) << std::endl;
+		log(log_warning, "trunk") << "unhandled call event " << eventName(event) << logend();
 		break;
 	}
 }
@@ -466,7 +479,7 @@ void AculabTrunk::onIdle()
 	{
 	case collecting_details:
 	case waiting:
-		std::cerr << "incoming call went idle in state " << stateName(state) << std::endl;
+		log(log_warning, "trunk") << "incoming call went idle in state " << stateName(state) << logend();
 
 		// restart automatically
 		release();
@@ -516,7 +529,7 @@ void AculabTrunk::onIncomingCallDetected()
 
 	if (rc)
 	{
-		std::cerr << "call_details failed: " << rc << std::endl;
+		log(log_error, "trunk") << "call_details failed: " << rc << logend();
 
 		// restart automatically
 
@@ -550,7 +563,7 @@ void AculabTrunk::onCallConnected()
 
 	if (rc)
 	{
-		std::cerr << "call_details failed: " << rc << std::endl;
+		log(log_error, "trunk") << "call_details failed: " << rc << logend();
 
 		return;
 	}
@@ -595,7 +608,7 @@ void AculabTrunk::onRemoteDisconnect()
 		release();
 		break;
 	default:
-		std::cerr << "unhandled state " << stateName(state) << " in onRemoteDisconnect" << std::endl;
+		log(log_error, "trunk") << "unhandled state " << stateName(state) << " in onRemoteDisconnect" << logend();
 		break;
 	}
 }
@@ -620,7 +633,7 @@ void AculabTrunk::onDetails()
 
 	if (rc)
 	{
-		std::cerr << "call_details failed: " << rc << std::endl;
+		log(log_error, "trunk") << "call_details failed: " << rc << logend();
 
 		return;
 	}	

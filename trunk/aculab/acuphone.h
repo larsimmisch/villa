@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.2 2000/10/30 11:38:57 lars Exp $
+	$Id: acuphone.h,v 1.3 2000/11/06 13:10:59 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -155,10 +155,10 @@ protected:
 	{
 	public:
 
-		FileSample(ProsodyChannel *channel, const char* name, bool isRecordable = false)
-				: recordable(isRecordable), storage(0), prosody(channel)
+		FileSample(ProsodyChannel *channel, const char* file, bool isRecordable = false)
+				: recordable(isRecordable), storage(0), prosody(channel), name(file)
 		{
-			storage = allocateStorage(name, isRecordable);
+			storage = allocateStorage(file, isRecordable);
 		}
 
 		virtual ~FileSample()
@@ -183,6 +183,7 @@ protected:
 		bool recordable;
 		Storage* storage;
 		ProsodyChannel *prosody;
+		std::string name;
 	};
 
 	class RecordFileSample : public FileSample
@@ -195,6 +196,9 @@ protected:
 
         virtual unsigned start(Telephone *phone);
         virtual bool stop(Telephone *phone);
+		virtual unsigned receive(Telephone *phone);
+		// empties prosody buffers if data available, notifies about completion if done
+		virtual int process(Telephone *phone);
 
 		virtual bool isOutgoing()	{ return false; }
 
@@ -207,13 +211,18 @@ protected:
 	{
 	public:
 		
-		Beep(ProsodyChannel *channel, int numBeeps) : beeps(numBeeps), prosody(channel) {}
+		Beep(ProsodyChannel *channel, int numBeeps) : beeps(numBeeps), prosody(channel), count(0), offset(0) {}
 		virtual ~Beep() {}
 
         virtual unsigned start(Telephone *phone);
         virtual bool stop(Telephone *phone);
+		virtual unsigned submit(Telephone *phone);
+		// fills prosody buffers if space available, notifies about completion if done
+		virtual int process(Telephone *phone);
 
 		int beeps;
+		int count;
+		unsigned offset;
 		ProsodyChannel *prosody;
 	};
 
@@ -226,6 +235,7 @@ protected:
 
         virtual unsigned start(Telephone *phone);
         virtual bool stop(Telephone *phone);
+		virtual int process(Telephone *phone);
 
 		std::string tt;
 		ProsodyChannel *prosody;

@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.4 2000/10/30 11:38:57 lars Exp $
+	$Id: phone.h,v 1.5 2000/11/06 13:10:59 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -11,6 +11,8 @@
 #ifndef _PHONE_H_
 #define _PHONE_H_ 
 
+#include <string>
+#include "log.h"
 #include "phoneclient.h"
 #include "switch.h"
 #include "exc.h"
@@ -45,7 +47,7 @@ public:
 
     enum states  { idle, listening, connecting, connected, disconnecting, transferring, waiting, collecting_details, accepting, rejecting };
 
-	Trunk(TrunkClient* aClient, Telephone* aTelephone = 0) : client(aClient), phone(aTelephone) {}
+	Trunk(TrunkClient* aClient, Telephone* aTelephone = 0) : client(aClient), phone(aTelephone), state(idle) {}
     virtual ~Trunk() {}
 
 	// Connection establishment 
@@ -78,6 +80,9 @@ public:
     virtual Switch* getSwitch() { return 0; }
 	virtual Timeslot getTimeslot()		{ return timeslot; }
 
+	void setName(const char* s) { name = std::string(s); }
+	const char* getName() { return name.c_str(); }
+
 protected:
 
 	friend class Telephone;
@@ -86,13 +91,14 @@ protected:
 	Timeslot timeslot;
 	TrunkClient* client;
     Telephone* phone;
+	std::string name;
 };
 
 class Sample
 {
 public:
 
-    Sample(unsigned aPosition = 0) : position(aPosition), userData(0), status(r_ok) {}
+    Sample(unsigned pos = 0) : position(pos), userData(0), status(r_ok) {}
     virtual ~Sample() {}
 
     virtual unsigned start(Telephone* aTelephone) = 0;
@@ -203,13 +209,12 @@ public:
 	virtual Sample* createTouchtones(const char *tt) = 0;
 	virtual Sample* createBeeps(int nBeeps) = 0;
 
+	// must be called with mutex held
 	virtual void completed(Sample *sample)
 	{
-		omni_mutex_lock l(mutex);
+		current = NULL;
 
 		client->completed(this, sample, sample->position);
-
-		current = NULL;
 	}
 
     virtual bool abortSending()
@@ -278,19 +283,19 @@ public:
 
 	virtual TelephoneClient* getClient() { return client; }		
 
-	// must be called whenever a sample subclass has been started
+	// must be called whenever a sample subclass has been started with locks held
     virtual void started(Sample* sample) 
 	{
-		omni_mutex_lock l(mutex);
-
 		current = sample;
 	}
 
-protected:
-	
 	void lock() { mutex.lock(); }
 	void unlock() { mutex.unlock(); }
 
+	omni_mutex& getMutex() { return mutex; }
+
+protected:
+	
 	SAP local;
 	SAP remote;
 	Timeslot transmit;

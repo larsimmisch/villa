@@ -1,3 +1,5 @@
+#!/usr/bin/perl -w
+
 # this code relies on the output format of cvs 1.10
 
 $repository = `cat CVS/Repository` or die "no version found";
