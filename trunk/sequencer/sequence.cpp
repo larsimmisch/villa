@@ -825,8 +825,9 @@ void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs,
 
 void Sequencer::touchtone(Telephone* server, char tt)
 {
-	(*m_interface) << server->getName() << ' ' << _event << " touchtone " << tt 
-		<< "\r\n";
+	(*m_interface) << "-1 0 " <<
+	server->getName() << " touchtone " << tt 
+	<< "\r\n";
 }
 
 void Sequencer::fatal(Telephone* server, const char* e)
