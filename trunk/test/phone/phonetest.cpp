@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.4 2000/11/06 15:08:57 lars Exp $
+	$Id: phonetest.cpp,v 1.5 2001/01/14 16:22:41 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -123,7 +123,7 @@ public:
 
 		// Sample* sample = server->createBeeps(5);
 
-		// sample->start(server);
+		sample->start(server);
 	}
 
 	virtual void disconnected(Telephone *server)
@@ -145,7 +145,7 @@ public:
 
 void usage()
 {
-	cout << "usage: phonetest" << endl;
+	cout << "usage: phonetest -c <count> -p <port> -s <switch> -l <loglevel>" << endl;
 }
 
 int main(int argc, char* argv[])
