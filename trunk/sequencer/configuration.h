@@ -124,7 +124,7 @@ public:
 	virtual int isDigital()			{ return 0; }
 	virtual Timeslot preferredSlot()	{ return Timeslot(-1,-1); }
 
-	virtual Trunk* getTrunk() = 0;
+	virtual Trunk* getTrunk(TrunkClient *client = 0) = 0;
 	virtual unsigned numLines() = 0;
 
 	virtual int readFromKey(RegistryKey& key);
@@ -168,7 +168,10 @@ public:
 
 	virtual int isDigital()		{ return 1; }
 
-	virtual Trunk* getTrunk()	{ return new AculabTrunk(0, device, 0); }
+	virtual Trunk* getTrunk(TrunkClient *client = 0)	
+	{ 
+		return new AculabTrunk(client, device, 0); 
+	}
 	virtual unsigned numLines()	{ return lines; }
 
 	virtual int readFromKey(RegistryKey& key);

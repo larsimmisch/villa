@@ -20,6 +20,7 @@
 #include "phoneclient.h"
 #include "acuphone.h"
 #include "rphone.h"
+#include "bitset.h"
 #include "activ.h"
 #include "sequence.h"
 #include "interface.h"
@@ -27,7 +28,9 @@
 
 int debug = 0;
 
-// MVIP gMVIP;
+bitset<1024> SCBus;
+
+Log cout_log(std::cout);
 
 #ifdef __AG__
 Conferences gConferences;
@@ -42,12 +45,20 @@ Timer Sequencer::timer;
 #pragma warning(disable : 4355)
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
-  : // phone(*this, aConfiguration->getTrunk(), aConfiguration->preferredSlot()),
-	tcp(*this), activities(), activity(0), nextActivity(0), 
+  :	tcp(*this), activities(), activity(0), nextActivity(0), 
 	mutex(), configuration(aConfiguration), connectComplete(0),
 	clientSpec(0), outOfService(0)
 {
 	packet = new(buffer) Packet(0, sizeof(buffer));
+
+	Timeslot receive(24, SCBus.lowest_bit());
+	SCBus.set_bit(receive.ts, false);
+
+	Timeslot transmit(24, SCBus.lowest_bit());
+	SCBus.set_bit(transmit.ts, false);
+
+	phone = new AculabPhone(this, aConfiguration->getTrunk(this), 0, 
+		receive, transmit);
 
 	phone->listen();
 }
@@ -192,7 +203,8 @@ int Sequencer::addMolecule(Packet* aPacket, Activity& anActivity, unsigned* pPos
 					
 					return _invalid;
 				}
-				pos += 1;
+				// we still get the message number, but ignore it
+				pos += 2;
 
 				atom = new PlayAtom(this, aPacket->getStringAt(pos2));
 
@@ -208,7 +220,9 @@ int Sequencer::addMolecule(Packet* aPacket, Activity& anActivity, unsigned* pPos
 					
 					return _invalid;
 				}
-				pos += 2;
+
+				// we still get the message number, but ignore it
+				pos += 3;
 
 				atom = new RecordAtom(this, aPacket->getStringAt(pos2), 
 					aPacket->getUnsignedAt(pos2+1));
@@ -1617,6 +1631,17 @@ int main(int argc, char* argv[])
 	char* switchModule = 0;
 	char szKey[256];
 
+	ULONG rc;
+	WSADATA wsa;
+
+	// free timeslots are marked true
+	SCBus.set_bits(true);
+
+	set_log_instance(&cout_log);
+	set_log_level(4);
+
+	rc = WSAStartup(MAKEWORD(2,0), &wsa);
+
 	cout << "sequence starting." << endl;
 
 	/*
@@ -1672,6 +1697,10 @@ int main(int argc, char* argv[])
 
 			return 0;
 		}
+
+		AculabTrunk::start();
+		AculabPhone::start();
+		Sequencer::getTimer().start();
 
 		SAP local;
 		

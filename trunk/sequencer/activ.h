@@ -144,7 +144,6 @@ public:
 	
 protected:
 	
-	Sample* sample;
 	char* file;
 };
 
@@ -165,7 +164,6 @@ public:
 
 protected:
 
-	Sample *sample;
 	char *file;
 	unsigned time;
 };
@@ -175,7 +173,7 @@ class BeepAtom : public Atom
 public:
 
 	BeepAtom(Sequencer* sequencer, unsigned count);
-	virtual ~BeepAtom() { delete beep; }
+	virtual ~BeepAtom() { delete sample; }
 
 	virtual int setPos(unsigned pos) { return 1; }
 	virtual unsigned getLength()	{ return nBeeps * 250; } // todo fix this
@@ -186,7 +184,6 @@ public:
 protected:
 
 	unsigned nBeeps;
-	Sample *beep;
 };
 
 class TouchtoneAtom : public Atom
@@ -205,7 +202,6 @@ public:
 protected:
 
 	char *tt;
-	Sample *sample;
 };
 
 class SilenceAtom: public Atom, public TimerClient

@@ -171,7 +171,7 @@ public:
 
 	// void loadSwitch(const char* aName, int is32bit = 1, int aDevice = 0)	{ phone.loadSwitch(aName, aDevice); }
 
-	Timer& getTimer()				{ return timer; }
+	static Timer& getTimer()				{ return timer; }
 	Telephone*	getPhone()				{ return phone; }
 
 protected:
