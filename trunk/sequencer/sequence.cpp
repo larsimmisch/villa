@@ -82,6 +82,11 @@ Sequencer::Sequencer(InterfaceConnection *server)
 	}
 }
 
+Sequencer::~Sequencer()
+{
+	release();
+}
+
 const char *Sequencer::getName()   
 { 
 	if (m_trunk)
@@ -111,7 +116,8 @@ void Sequencer::lost_connection()
 
 void Sequencer::release()
 {
-	gMediaPool.release(m_media);
+	if (m_media)
+		gMediaPool.release(m_media);
 	m_media = 0;
 	m_id.erase();
 
@@ -718,7 +724,8 @@ bool Sequencer::close(const char *id)
 		log(log_debug, "sequencer", getName()) << "close - all channels idle" << logend();
 
 		idle = true;
-		gMediaPool.release(m_media);
+		if (m_media)
+			gMediaPool.release(m_media);
 		m_media = 0;
 	}
 
@@ -773,8 +780,11 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 			}
 		}
 	}
+
 	if (m_clientSpec)
 	{
+		m_media->connected(server);
+
 		m_interface = m_clientSpec->m_interface;
 		m_interface->add(getName(), this);
 
@@ -916,6 +926,13 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	}
 
 	checkCompleted();
+
+	if (channelsIdle())
+	{
+		if (m_media)
+			gMediaPool.release(m_media);
+		m_media = 0;
+	}
 
 	// notify client unless already disconnecting
 	if (m_disconnecting == INVALID_CALLREF)

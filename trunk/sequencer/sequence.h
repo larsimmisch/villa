@@ -31,7 +31,7 @@ public:
 	Sequencer(TrunkConfiguration* configuration);
 	// background server
 	Sequencer(InterfaceConnection *server);
-	virtual ~Sequencer() {}
+	virtual ~Sequencer();
 
 	/* Add molecule */
 	unsigned MLCA(InterfaceConnection *server, const std::string &id);
