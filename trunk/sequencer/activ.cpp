@@ -56,13 +56,15 @@ BeepAtom::BeepAtom(unsigned channel, Sequencer* sequencer,
 }
 
 ConferenceAtom::ConferenceAtom(unsigned channel, unsigned aConference, Conference::mode m)
- : Atom(channel), m_mode(m), m_conference(0), m_data(0)
+ : Atom(channel), m_mode(m), m_conference(0), m_data(0), m_conferenceID(aConference)
 {
-	m_conference = gConferences[aConference];
+	
 }
 
 bool ConferenceAtom::start(Sequencer* sequencer)
 {
+    m_conference = gConferences[m_conferenceID];
+
 	if (!m_conference)
 		return false;
 

@@ -291,6 +291,7 @@ public:
 protected:
 
 	Conference *m_conference;
+    unsigned m_conferenceID;
 	void *m_data;
 	Time m_started;
 	Conference::mode m_mode;
