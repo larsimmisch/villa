@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.16 2001/09/20 20:02:40 lars Exp $
+	$Id: acuphone.cpp,v 1.17 2001/09/26 22:41:57 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -32,7 +32,7 @@ void AculabSwitch::listen(const Timeslot &a, const Timeslot &b, const char *name
     args.ist = b.st; // source
     args.its = b.ts;
 
-	log(log_debug, "switch", name) << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << logend();
+	log(log_debug + 2, "switch", name) << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << logend();
 
     int rc = sw_set_output(device, &args);
     if (rc != 0)    
@@ -49,7 +49,7 @@ void AculabSwitch::listen(const Timeslot &a, char pattern, const char *name)
     args.mode = PATTERN_MODE;
     args.pattern = pattern;
 
-	log(log_debug, "switch", name) << a.st << ':' << a.ts << " := 0x" 
+	log(log_debug + 2, "switch", name) << a.st << ':' << a.ts << " := 0x" 
 		<< std::setbase(16) << pattern << std::setbase(10) << logend();
 
     int rc = sw_set_output(device, &args);
@@ -71,7 +71,7 @@ void AculabSwitch::disable(const Timeslot &a, const char *name)
     if (rc != 0)    
 		throw SwitchError(__FILE__,__LINE__,"AculabSwitch::disable(Timeslot)", "sw_set_output(DISABLE_MODE)", rc);
 
-	log(log_debug, "switch", name) << a.st << ':' << a.ts << " disabled"
+	log(log_debug + 2, "switch", name) << a.st << ':' << a.ts << " disabled"
 		<< logend();
 }
 

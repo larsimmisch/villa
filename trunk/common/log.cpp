@@ -7,13 +7,13 @@ Log* log_instance = NULL;
 
 std::ostream& Log::log(int loglevel, const char *logclass, const char *name)
 { 
+	lock();
+
 	if (log_os && log_level >= loglevel)
 	{
 		time_t now;
 		time(&now);
 		struct tm *time = localtime(&now);
-
-		lock();
 
 		char fill = log_os.fill('0');
 

@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.15 2001/09/11 22:11:27 lars Exp $
+	$Id: acutrunk.cpp,v 1.16 2001/09/26 22:41:57 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -53,10 +53,10 @@ void* CallEventDispatcher::run_undetached(void* arg)
 				std::map<ACU_INT, AculabTrunk*>::iterator i = 
 					m_handle_map.find(event.handle);
 
-				unlock();
-
 				if (i == m_handle_map.end())
 				{
+					unlock();
+
 					log(log_error, "trunk") << 
 						"no device registered for handle : 0x" 
 						<< std::setbase(16) << event.handle 
@@ -64,6 +64,8 @@ void* CallEventDispatcher::run_undetached(void* arg)
 				}
 				else
 				{
+					unlock();
+
 					i->second->onCallEvent(event.state);
 				}
 			}
@@ -85,6 +87,8 @@ const char* AculabTrunk::stateName(states state)
 		return "connected";
 	case disconnecting:
 		return "disconnecting";
+	case remote_disconnect:
+		return "remote_disconnect";
 	case transferring:
 		return "transferring";
 	case waiting:
@@ -169,8 +173,6 @@ int AculabTrunk::listen()
 
 	memset(&incoming, 0, sizeof(incoming));
 
-	omni_mutex_lock l(m_mutex);
-
 	incoming.net = m_port;
     incoming.ts = -1;
 	incoming.cnf = CNF_REM_DISC | CNF_CALL_CHARGE;
@@ -183,18 +185,18 @@ int AculabTrunk::listen()
     int rc = call_openin(&incoming);
     if (rc != 0)
 	{
-		s_dispatcher.unlock();
-
 		log(log_error, "trunk") << "call_openin failed: " << rc << logend();
 	}
 
+
+	lock();
 	m_handle = incoming.handle;
 	m_stopped = false;
+	m_state = waiting;
+	unlock();
 
 	s_dispatcher.add(incoming.handle, this);
 	s_dispatcher.unlock();
-
-	m_state = waiting;
 
 	return r_ok;
 }
@@ -205,12 +207,16 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 
 	memset(&outdetail, 0, sizeof(outdetail));
 
-	omni_mutex_lock l(m_mutex);
+	lock();
 
 	if (m_state != idle)
 	{
+		unlock();
+
 		return r_bad_state;
 	}
+
+	unlock();
 
     if (remote.getAddress() == 0)   
 	{
@@ -282,25 +288,34 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 	{
 		log(log_error, "trunk") << "call_openout failed: " << rc << logend();
 
+		s_dispatcher.unlock();
+
         return r_failed;
     }
 
+	lock();
     m_handle = outdetail.handle;
+	m_state = connecting;
+	unlock();
 
 	s_dispatcher.add(m_handle, this);
 	s_dispatcher.unlock();
-
-	m_state = connecting;
 
 	return r_ok;
 }
 	
 int AculabTrunk::accept()
 {
-	omni_mutex_lock l(m_mutex);
+	lock();
 
 	if (m_state != collecting_details)
+	{
+		unlock();
+
 		return r_bad_state;
+	}
+
+	unlock();
 
 	int rc = call_accept(m_handle);
 
@@ -314,20 +329,15 @@ int AculabTrunk::accept()
 		return r_failed;
 	}
 
+	lock();
 	m_state = accepting;
+	unlock();
 
 	return r_ok;
 }
 
 int AculabTrunk::reject(int cause)
 {
-	return disconnect(cause);
-}
-
-int AculabTrunk::disconnect(int cause)
-{
-	omni_mutex_lock l(m_mutex);
-
 	CAUSE_XPARMS xcause;
 
 	memset(&xcause, 0, sizeof(xcause));
@@ -338,15 +348,40 @@ int AculabTrunk::disconnect(int cause)
 	int rc = call_disconnect(&xcause);
 	if (rc)
 	{
-		release();
-
 		log(log_error, "trunk", getName()) 
 			<< "call_disconnect failed: " << rc << logend();
 
 		return r_failed;
 	}
 
+	lock();
+	m_state = rejecting;
+	unlock();
+
+	return r_ok;
+}
+
+int AculabTrunk::disconnect(int cause)
+{
+	CAUSE_XPARMS xcause;
+
+	memset(&xcause, 0, sizeof(xcause));
+
+	xcause.handle = m_handle;
+	xcause.cause = cause;
+
+	int rc = call_disconnect(&xcause);
+	if (rc)
+	{
+		log(log_error, "trunk", getName()) 
+			<< "call_disconnect failed: " << rc << logend();
+
+		return r_failed;
+	}
+
+	lock();
 	m_state = disconnecting;
+	unlock();
 
 	return r_ok;
 }
@@ -377,7 +412,9 @@ void AculabTrunk::release()
 	s_dispatcher.remove(m_handle);
 	s_dispatcher.unlock();
 
+	lock();
 	m_state = idle;
+	unlock();
 }
 	
 void AculabTrunk::abort()
@@ -435,9 +472,8 @@ int AculabTrunk::getCause()
 
 void AculabTrunk::onCallEvent(ACU_LONG event)
 {
-	omni_mutex_lock l(m_mutex);
 
-	log(log_debug+2, "trunk", getName()) << eventName(event) << logend();
+	log(log_debug, "trunk", getName()) << eventName(event) << logend();
 
 	switch (event)
 	{
@@ -497,18 +533,23 @@ void AculabTrunk::onIdle()
 {
 	int cause = getCause();
 
+	bool restart(false);
+
 	// stopTimer();
 
 	switch (m_state)
 	{
 	case collecting_details:
 	case waiting:
+	case remote_disconnect:
 		log(log_warning, "trunk", getName()) 
 			<< "incoming call went idle in state " << stateName(m_state) << logend();
 
 		// restart automatically
 		release();
+		lock();
 		setName(-1);
+		unlock();
 		listen();
 
 		break;
@@ -516,26 +557,48 @@ void AculabTrunk::onIdle()
 		// outgoing failed or stopped
 		release();
 		m_client->connectDone(this, m_stopped ? r_aborted : cause);
+		lock();
 		setName(-1);
 		m_stopped = false;
+		unlock();
+		listen();
 		break;
 	case connected:
+		lock();
+		m_state = remote_disconnect;
+		unlock();
 		m_client->disconnectRequest(this, cause);
-		m_state = disconnecting;
 		break;
 	case disconnecting:
 		release();
 		m_client->disconnectDone(this, r_ok);
+		lock();
 		setName(-1);
+		unlock();
+		listen();
+		break;
+	case rejecting:
+		release();
+		m_client->rejectDone(this, r_ok);
+		lock();
+		setName(-1);
+		unlock();
+		listen();
 		break;
 	case accepting:
 		release();
 		m_client->acceptDone(this, cause);
+		lock();
 		setName(-1);
+		unlock();
+		listen();
 		break;
 	default:
 		release();
+		lock();
 		setName(-1);
+		unlock();
+		listen();
 		break;
 	}
 }
@@ -628,7 +691,7 @@ void AculabTrunk::onRemoteDisconnect()
 		break;
 	case connected:
 		cause = getCause();
-		m_state = disconnecting;
+		m_state = remote_disconnect;
 		m_client->disconnectRequest(this, cause);
 		break;
 	case accepting:

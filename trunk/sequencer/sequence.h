@@ -48,8 +48,8 @@ public:
 	int stopTransferring(InterfaceConnection *server, const std::string &id);
 
 
-	void lock()   { mutex.lock(); }
-	void unlock() { mutex.unlock(); }
+	void lock()   { m_mutex.lock(); }
+	void unlock() { m_mutex.unlock(); }
 
 	// helpers for sending packets
 	void sendAtomDone(const char *id, unsigned nAtom, unsigned status, unsigned msecs);
@@ -123,15 +123,15 @@ public:
 
 protected:
 
-	TrunkConfiguration *configuration;
+	TrunkConfiguration *m_configuration;
 	Trunk *m_trunk;
 	AculabMedia *m_media;
-	ClientQueue::Item *clientSpec;
-	Activity activity;
-	CompletedQueue delayedCompletions;
-	omni_mutex mutex;
-	ConnectCompletion *connectComplete;
-	int outOfService;
+	ClientQueue::Item *m_clientSpec;
+	Activity m_activity;
+	CompletedQueue m_delayedCompletions;
+	omni_mutex m_mutex;
+	ConnectCompletion *m_connectComplete;
+	bool m_disconnecting;
 	InterfaceConnection *m_interface;
 
 	// the transaction id for trunk operations

@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.12 2001/09/14 16:02:28 lars Exp $
+	$Id: acuphone.h,v 1.13 2001/09/26 22:41:57 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -303,6 +303,7 @@ protected:
 	virtual void onRecog(tSMEventId id);
 
 	AculabSwitch m_sw;
+	// only for getName()
 	Trunk *m_trunk;
 };
 

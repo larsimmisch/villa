@@ -39,8 +39,8 @@ Timer Sequencer::timer;
 #pragma warning(disable : 4355)
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
-  :	activity(this), configuration(aConfiguration), connectComplete(0),
-	clientSpec(0), outOfService(0), m_interface(0)
+  :	m_activity(this), m_configuration(aConfiguration), m_connectComplete(0),
+	m_clientSpec(0), m_disconnecting(false), m_interface(0)
 {
 	Timeslot receive = gBus->allocate();
 	Timeslot transmit = gBus->allocate();
@@ -189,7 +189,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 		return _empty;
 	}
 
-	activity.add(*molecule);
+	m_activity.add(*molecule);
 	checkCompleted();
 
 	return _ok;
@@ -209,7 +209,7 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 		return _syntax_error;
 	}
 
-	Molecule* molecule = activity.find(mid);
+	Molecule* molecule = m_activity.find(mid);
 
 	if (!molecule) 
 	{
@@ -232,7 +232,7 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 	}
 	else
 	{
-		activity.remove(molecule);
+		m_activity.remove(molecule);
 
 		server->begin() << id.c_str() << ' ' << _ok << " molecule " << m_id.c_str()
 			<< " removed" << end();
@@ -261,9 +261,9 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 	log(log_debug, "sequencer") << "discarding molecules with " << fromPriority 
 		<< " <= priority <= " << toPriority << logend();
 
-	omni_mutex_lock lock(mutex);
+	omni_mutex_lock lock(m_mutex);
 
-	for (ActivityIter i(activity); !i.isDone(); i.next())
+	for (ActivityIter i(m_activity); !i.isDone(); i.next())
 	{
 		Molecule *molecule = i.current();
 
@@ -285,7 +285,7 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 		else
 		{
 			discarded++;
-			activity.remove(molecule);
+			m_activity.remove(molecule);
 			
 			log(log_debug, "sequencer") << "removed molecule "  
 				<< molecule->getId() << logend();
@@ -309,7 +309,7 @@ void Sequencer::sendAtomDone(const char *id, unsigned nAtom, unsigned status, un
 
 void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned length)
 {
-	log(log_debug + 2, "sequencer", m_trunk->getName())
+	log(log_debug, "sequencer", m_trunk->getName())
 		<< "send molecule done for: " << id << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
 
@@ -320,32 +320,26 @@ void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, 
 
 int Sequencer::connect(ConnectCompletion* complete)
 {
-	lock();
+	omni_mutex_lock lock(m_mutex);
 
-	if (connectComplete	|| m_trunk->getState() != Trunk::listening)
+	if (m_connectComplete	|| m_trunk->getState() != Trunk::listening)
 	{
 		log(log_debug, "sequencer", m_trunk->getName())
 			<< "connect failed - invalid state: " 
 			<< m_trunk->getState() << logend();
 
-		unlock();
 		return _busy;
 	}
-	else if (outOfService)
-	{
-		unlock();
-		return _out_of_service;
-	}
 
-	connectComplete = complete;
-
-	unlock();
+	m_connectComplete = complete;
 
 	return _ok;
 }
 
 int Sequencer::accept(InterfaceConnection *server, const std::string &id)
 {
+	omni_mutex_lock lock(m_mutex);
+
 	if (m_id.size())
 	{
  		server->begin() << _protocol_violation << ' ' << id.c_str() 
@@ -415,7 +409,7 @@ int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
 #ifdef __RECOGNIZER__
 	if (recognizer) recognizer->stop();
 #endif
-	activity.stop();
+	m_activity.stop();
 
 	unlock();
 
@@ -437,6 +431,8 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 	else
 		c = atoi(cause.c_str());
 
+	omni_mutex_lock l(m_mutex);
+
 	if (m_id.size())
 	{
  		server->begin() << _protocol_violation << ' ' << id.c_str() 
@@ -445,14 +441,26 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 		return _protocol_violation;
 	}
 
+	m_disconnecting = true;
 	m_id = id;
 
-	log(log_debug, "sequencer", m_trunk->getName()) << "disconnecting" << logend();
+	if (m_activity.getState() == Activity::active)
+	{
+		log(log_debug, "sequencer", m_trunk->getName()) 
+			<< "disconnect - stopping activity" << logend();
 
-	m_trunk->disconnect(c);
-	m_media->disconnected(m_trunk);
+		m_activity.stop();
+	}
 
 	checkCompleted();
+
+	if (m_activity.getState() == Activity::idle)
+	{
+		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
+
+		m_media->disconnected(m_trunk);
+		m_trunk->disconnect(c);
+	}
 
 	return _ok;
 }
@@ -461,48 +469,47 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 {
 	int contained; 
 
+	omni_mutex_lock lock(m_mutex);
+
 	// do we have an exact match?
-	clientSpec = configuration->dequeue(local);
-	if (clientSpec)
+	m_clientSpec = m_configuration->dequeue(local);
+	if (m_clientSpec)
 	{
 		log(log_debug, "sequencer", m_trunk->getName()) 
-			<< "found client matching: " << local 
-			<< " id: " << clientSpec->m_id << logend();
+			<< "id: " << m_clientSpec->m_id
+			<< " found client matching: " << local << logend();
 	}
 	else
 	{
 		// no exact match. 
 		// is the destination known so far part of a client spec?
-		contained = configuration->isContained(local);
+		contained = m_configuration->isContained(local);
 		
 		if (!contained)
 		{
 			// ok. look in the global queue
-			clientSpec = gClientQueue.dequeue();
-			if (clientSpec)
+			m_clientSpec = gClientQueue.dequeue();
+			if (m_clientSpec)
 			{
 				log(log_debug, "sequencer", m_trunk->getName()) 
-					<< "found client in global queue, remote: " 
-					<< clientSpec->m_id << logend();
+					<< "id: " << m_clientSpec->m_id
+					<< " found client in global queue" << logend();
 			}
 		}
 	}
-	if (clientSpec)
+	if (m_clientSpec)
 	{
-		lock();
-
-		m_interface = clientSpec->m_interface;
+		m_interface = m_clientSpec->m_interface;
 		m_interface->add(m_trunk->getName(), this);
 
-		m_interface->begin() << clientSpec->m_id.c_str() << ' ' << _ok 
+		m_interface->begin() << m_clientSpec->m_id.c_str() << ' ' << _ok 
 			<< ' ' << m_trunk->getName()
 			<< " listen-done "
 			<< " \"" << remote.getAddress() << "\" \""
-			<< configuration->getNumber() << "\" \""
+			<< m_configuration->getNumber() << "\" \""
 			<< local.getService() << "\" "
 			<< server->getTimeslot().ts << end();
 
-		unlock();
 	}
 	else 
 	{
@@ -526,7 +533,7 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 
 void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remote)
 {
-	if (connectComplete)
+	if (m_connectComplete)
 	{
 		m_trunk->reject();
 
@@ -537,7 +544,7 @@ void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remot
 	{
 		onIncoming(server, local, remote);
 
-		if (!connectComplete)
+		if (!m_connectComplete)
 		{
 			log(log_debug, "sequencer", m_trunk->getName()) 
 				<< "connect request from: " 
@@ -549,15 +556,15 @@ void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remot
 
 void Sequencer::connectRequestFailed(Trunk* server, int cause)
 {
-	if (cause == _aborted && connectComplete)
+	if (cause == _aborted && m_connectComplete)
 	{
 		log(log_debug, "sequencer", m_trunk->getName()) << "connecting to " 
-			<< connectComplete->m_id.c_str() 
+			<< m_connectComplete->m_id.c_str() 
 			<< " for dialout" << logend();
 
 		// todo better info
-		(*connectComplete->m_interface) << connectComplete->m_id.c_str() 
-			<< ' ' << _failed << end();
+		m_connectComplete->m_interface->begin() 
+			<< m_connectComplete->m_id.c_str() << ' ' << _failed << end();
 
 	}
 	else
@@ -565,8 +572,6 @@ void Sequencer::connectRequestFailed(Trunk* server, int cause)
 		log(log_debug, "sequencer", m_trunk->getName()) 
 			<< "connect request failed with " << cause 
 			<< logend();
-
-		m_trunk->listen();
 	}
 }
 
@@ -579,15 +584,15 @@ void Sequencer::connectDone(Trunk* server, int result)
 
 	m_media->connected(server);
 
-	if (connectComplete)
+	if (m_connectComplete)
 	{
-		(*connectComplete->m_interface) << connectComplete->m_id.c_str()
-			<< ' ' << result 
-			<< (result == _ok ? " connected\r\n" : " connect failed\r\n");
+		m_connectComplete->m_interface->begin() 
+			<< m_connectComplete->m_id.c_str() << ' ' << result 
+			<< (result == _ok ? " connected" : " connect failed") << end();
 
-		delete connectComplete;
+		delete m_connectComplete;
 
-		connectComplete = 0;
+		m_connectComplete = 0;
 	}
 	else
 	{
@@ -600,7 +605,7 @@ void Sequencer::transferDone(Trunk *server)
 	log(log_debug, "sequencer", m_trunk->getName()) 
 		<< "transfer succeeded" << logend();
 
-	activity.stop();
+	m_activity.stop();
 
 	checkCompleted();
 
@@ -640,24 +645,31 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 {
 	log(log_debug, "sequencer", m_trunk->getName()) 
 		<< "disconnect request" << logend();
-
-	m_media->disconnected(server);
 	
 	lock();
 
-	if (activity.getState() == Activity::active)
+	// notify client unless we are diconnecting already and not active
+	if (!m_disconnecting && m_activity.getState() == Activity::idle)
 	{
-		activity.stop();
+		m_interface->begin() << _event << ' ' << m_trunk->getName() 
+			<< " disconnect" << end();
 
-		checkCompleted();
-
-		if (activity.getState() == Activity::idle)
-		{
-			m_interface->begin() << _event << ' ' << m_trunk->getName() 
-				<< " disconnect" << end();
-		}
+		return;
 	}
-	else
+
+	// if we are active, stop
+	if (m_activity.getState() == Activity::active)
+	{
+		log(log_debug, "sequencer", m_trunk->getName()) 
+			<< "disconnect request - stopping activity" << logend();
+
+		m_activity.stop();
+	}
+
+	checkCompleted();
+
+	// if the stop was synchronous, notify client
+	if (m_activity.getState() == Activity::idle)
 	{
 		m_interface->begin() << _event << ' ' << m_trunk->getName() 
 			<< " disconnect" << end();
@@ -671,31 +683,32 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 	log(log_debug, "sequencer", server->getName()) 
 		<< "call disconnected" << logend();
 
-	if (m_id.size())
-	{
-		m_interface->begin() << m_id.c_str() << ' ' << result << ' '
-			<< m_trunk->getName() << " disconnect-done" << end();
-	}
-	else if (m_interface)
-	{
-		m_interface->begin() << _event << ' '
-			<< m_trunk->getName() << " disconnect" << end();
-	}
+	lock();
+
+	assert(m_id.size());
+
+	m_interface->begin() << m_id.c_str() << ' ' << result << ' '
+		<< m_trunk->getName() << " disconnect-done" << end();
 
 	m_id.erase();
 
-	server->listen();
+	m_disconnecting = false;
+
+	unlock();
 }
 
 void Sequencer::acceptDone(Trunk *server, unsigned result)
 {
 	if (result == r_ok)
+	{
 		log(log_debug, "sequencer", server->getName()) << "call accepted" << logend();
+
+		m_media->connected(server);
+	}
 	else
 		log(log_debug, "sequencer", server->getName()) << "call accept failed: " 
 		<< result << logend();
 
-	m_media->connected(server);
 
 	m_interface->begin() << m_id.c_str() << ' ' << result
 		<< " " << m_trunk->getName() << " accept-done" << end();
@@ -709,37 +722,33 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 
 	lock();
 
-	if (connectComplete)
+	if (m_connectComplete)
 	{
 		// internal reject. an outgoing call is outstanding
 
-		m_interface = connectComplete->m_interface;
+		m_interface = m_connectComplete->m_interface;
 
 		unlock();
 
-		m_trunk->connect(connectComplete->m_local, connectComplete->m_remote, 
-			connectComplete->m_timeout);
+		m_trunk->connect(m_connectComplete->m_local, m_connectComplete->m_remote, 
+			m_connectComplete->m_timeout);
 
 		log(log_debug, "sequencer", server->getName()) 
-			<< "connecting to: " << connectComplete->m_remote 
-			<< " timeout: " << connectComplete->m_timeout 
-			<< " as: " << connectComplete->m_local << logend();
+			<< "connecting to: " << m_connectComplete->m_remote 
+			<< " timeout: " << m_connectComplete->m_timeout 
+			<< " as: " << m_connectComplete->m_local << logend();
 	}
 	else
 	{
-		delete clientSpec;
-		clientSpec = 0;
+		delete m_clientSpec;
+		m_clientSpec = 0;
 
 		log(log_debug, "sequencer", server->getName()) 
 			<< "call rejected" << logend();
 
-		m_interface->begin() << m_id.c_str() << ' ' << result << server->getName() 
-			<< " reject-done" << end();
-
 		m_id.erase();
 
 		unlock();
-		m_trunk->listen();
 	}
 }
 
@@ -796,7 +805,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	unsigned pos, length, nAtom;
 	std::string id;
 
-	omni_mutex_lock lock(mutex);
+	omni_mutex_lock lock(m_mutex);
 
 	assert(molecule);
 
@@ -821,12 +830,12 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 		sendAtomDone(id.c_str(), nAtom, status, msecs);
 	}
 
-	if (activity.getState() == Activity::stopping || done)
+	if (m_activity.getState() == Activity::stopping || done)
 	{
 		log(log_debug+2, "sequencer", server->getName()) 
 			<< "removing " << *molecule << logend();
 
-		activity.remove(molecule);
+		m_activity.remove(molecule);
 	}
 	else
 	{
@@ -834,17 +843,31 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 			<< "done " << *molecule << logend();
 	}
 
-	if (m_trunk->getState() == Trunk::disconnecting)
+	// handle the various disconnect conditions
+	if (m_disconnecting)
 	{
-		sendMoleculeDone(id.c_str(), status, pos, length);
+		sendMoleculeDone(id.c_str(), r_disconnected, pos, length);
 
+		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
+
+		m_media->disconnected(m_trunk);
 		m_trunk->disconnect();
 
 		return;
 	}
 
-	// start mext molecule before sending reply to minimise delay
-	activity.start();
+	if (m_trunk->getState() == Trunk::remote_disconnect)
+	{
+		sendMoleculeDone(id.c_str(), r_disconnected, pos, length);
+
+		m_interface->begin() << _event << ' ' << server->getName() 
+			<< " disconnect" << end();
+
+		return;
+	}
+
+	// start next molecule before sending reply to minimise delay
+	m_activity.start();
 
 	if (atEnd)
 	{
@@ -881,12 +904,12 @@ void Sequencer::fatal(Media* server, Exception& e)
 
 void Sequencer::addCompleted(Media* server, Molecule* molecule, unsigned msecs, unsigned status)
 {
-	delayedCompletions.enqueue(server, molecule, msecs, status);
+	m_delayedCompletions.enqueue(server, molecule, msecs, status);
 }
 
 void Sequencer::checkCompleted()
 {
-	CompletedQueue::Item* i = delayedCompletions.dequeue();
+	CompletedQueue::Item* i = m_delayedCompletions.dequeue();
 
 	if (i)
 	{
@@ -945,7 +968,7 @@ int main(int argc, char* argv[])
 	WSADATA wsa;
 
 	set_log_instance(&cout_log);
-	set_log_level(4);
+	set_log_level(2);
 
 	rc = WSAStartup(MAKEWORD(2,0), &wsa);
 

@@ -237,7 +237,7 @@ int Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 
 	m_pos += msecs;
 
-	log(log_debug + 2, "activ") << "Molecule::done. status: " << status << " msecs: " 
+	log(log_debug, "activ") << "Molecule::done. status: " << status << " msecs: " 
 		<< msecs << " pos: " << m_pos << " length: " << m_length << logend();
 
 	m_flags &= ~active;

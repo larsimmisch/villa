@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.6 2001/09/25 09:01:45 lars Exp $
+$Id: client.py,v 1.7 2001/09/26 22:41:57 lars Exp $
 """
 import socket,re,sys,time,getopt,string
 
@@ -12,13 +12,13 @@ class Transactions:
 		self.tid = 0
 		self.transactions = {}
 
-	def create(self, call, d = None):
+	def create(self, sender, d = None):
 		self.tid = self.tid + 1
 		# only return valid transaction IDs - '-1' is reserved
 		if self.tid == -1:
 			self.tid = 1
 
-		self.transactions[self.tid] = (call, d)
+		self.transactions[self.tid] = (sender, d)
 		return self.tid
 
 	def remove(self, tid):
@@ -26,15 +26,16 @@ class Transactions:
 			print "error: tid %d not found. probable protocol violation" % (tid)
 			sys.exit(1)
 		else:
-			call, d = self.transactions[tid]
+			sender, d = self.transactions[tid]
 			del self.transactions[tid]
 
-		return call, d
+			return sender, d
 
 class Interface:
 	
 	def __init__(self,host,port):
 		self.transactions = Transactions()
+		self.device = 'global'
 
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.socket.connect((host, port))
@@ -98,14 +99,18 @@ class Interface:
 		# - we need to translate them
 		# to underscores because dashes are illegal in Python identifiers
 		action = string.replace(action, '-', '_')
+		device = event['device']
 		
 		if tr[0] == '-1':
-			device = self.devices[event['device']]
-			device.__class__.__dict__[action](device, event)
-			return
-
-		sender, data = self.transactions.remove(long(tr[0]))
-		sender.__class__.__dict__[action](sender, event, data)
+			if not self.devices.has_key(device):
+				print "no receiver found (probably already disconnected)"
+				return
+			
+			receiver = self.devices[device]
+			receiver.__class__.__dict__[action](receiver, event)
+		else:
+			receiver, data = self.transactions.remove(long(tr[0]))
+			receiver.__class__.__dict__[action](receiver, event, data)
 			
 	def process(self):
 		event = self.stdin.readline()[:-2]
@@ -122,40 +127,46 @@ class Call:
 		self.device = None
 		self.interface = interface
 
-		interface.send(self, 'global listen any any') 
-	
+		self.interface.send(self, 'global listen any any') 
+
+	def send(self, cmd):
+		self.interface.send(self, cmd)
+
+	def restart(self):
+		d = self.device
+		self.device = None
+		# we don't want any unsolicited events after we sent a disconnect
+		del self.interface.devices[d]
+ 		self.send(d + ' disconnect')
+		
 	def listen_done(self, event, data):
 		self.device = event['device']
-		interface.devices[self.device] = self
-
-		interface.send(self, self.device + ' accept')
+		self.interface.devices[self.device] = self
+		self.send(self.device + ' accept')
 
 	def accept_done(self, event, data):
+		# queue next listen as early as possible
+ 		self.send('global listen any any')
 		print 'connected:', self.device
-		interface.send(self, self.device + ' add 2 1 play sitrtoot.al none')
+		self.send(self.device + ' add 2 1 play sitrtoot.al none')
 
 	def molecule_done(self, event, data):
- 		interface.send(self, 'global listen any any') 
- 		interface.send(self, self.device + ' disconnect')
-		pass
-
+		self.restart()
+		
 	def disconnect_done(self, event, data):
-		del interface.devices[self.device]
-		self.device = None
+		print "disconnected:", event['device']
 
 	def disconnect(self, event):
-		interface.send(self, 'global listen any any')
- 		interface.send(self, self.device + ' disconnect')
-
+		print "remote disconnect:", event['device']
+	
 	def touchtone(self, event):
 		tt = event['data'][0]
 		print "touchtone:", tt
 
 		if tt == '#':
-	 		interface.send(self, 'global listen any any') 
-			interface.send(self, self.device + ' disconnect')
+			self.restart()
 		elif tt == '0':
-			interface.send(self, self.device + ' add 2 1 conference '
+			self.send(self.device + ' add 2 1 conference '
 						   + interface.conference + ' none')
 
 

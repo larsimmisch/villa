@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.13 2001/09/11 22:11:27 lars Exp $
+	$Id: phone.h,v 1.14 2001/09/26 22:41:57 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -49,7 +49,8 @@ public:
 		listening, 
 		connecting, 
 		connected, 
-		disconnecting, 
+		remote_disconnect,
+		disconnecting,
 		transferring, 
 		waiting, 
 		collecting_details, 

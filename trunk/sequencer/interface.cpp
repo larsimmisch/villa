@@ -146,10 +146,9 @@ void Interface::data(TextTransport *server)
     // this is the main packet inspection method...
 	InterfaceConnection* ico = (InterfaceConnection*)server;
 
-	omni_mutex_lock lock(ico->getMutex());
-
 	std::string id;
 	std::string scope;
+
 
 	(*server) >> id;
 	(*server) >> scope;
@@ -302,19 +301,21 @@ void Interface::data(TextTransport *server)
 					return;
 				}
 	
+
+				trunk->enqueue(id, detail, ico);
+
 				log(log_debug, "sequencer") << "id " << id.c_str() 
 					<< " added listen for " << trunk->getName() 
 					<< ' ' << (detail.getService() ? detail.getService() : "any") 
 					<< logend();
-
-				trunk->enqueue(id, detail, ico);
 			}
 			else
 			{
+				gClientQueue.enqueue(id, detail, ico);
+
 				log(log_debug, "sequencer") << "id " << id.c_str()
 					<< " added listen for any trunk " << logend();
 
-				gClientQueue.enqueue(id, detail, ico);
 			}
 		}
 		else if (command == "connect")

@@ -132,11 +132,15 @@ unsigned AculabPRITrunkConfiguration::connect(ConnectCompletion* complete)
 
 ClientQueue::Item* ClientQueue::dequeue()
 {
+	omni_mutex_lock lock(m_mutex);
+
 	return (Item*)removeFirst();
 }
 
 void ClientQueue::remove(InterfaceConnection *iface)
 {
+	omni_mutex_lock lock(m_mutex);
+
 	for (ListIter gc(*this); !gc.isDone(); gc.next())
 	{
 		Item* item = (Item*)gc.current();
@@ -153,6 +157,8 @@ void ClientQueue::remove(InterfaceConnection *iface)
 
 void ClientQueue::remove(InterfaceConnection *iface, const std::string &id)
 {
+	omni_mutex_lock lock(m_mutex);
+
 	for (ListIter gc(*this); !gc.isDone(); gc.next())
 	{
 		Item* item = (Item*)gc.current();

@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.18 2001/07/04 16:29:26 lars Exp $
+	$Id: phonetest.cpp,v 1.19 2001/09/26 22:41:57 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -23,11 +23,17 @@ using namespace std;
 
 Log cout_log(cout);
 
-class Application : public TelephoneClient
+class Application : public MediaClient, public TrunkClient
 {
 public:
 
-	Application() : m_active(0) {}
+	Application() : m_active(0), m_media(0), m_trunk(0) {}
+
+	void init(Trunk *trunk, AculabMedia *media)
+	{
+		m_media = media;
+		m_trunk = trunk;
+	}
 
 	// must call server.accept or server.reject
 	virtual void connectRequest(Trunk *server, const SAP& local, const SAP& remote)
@@ -58,7 +64,7 @@ public:
 
 		if (m_active)
 		{
-			m_active->stop(server->getTelephone());
+			m_active->stop(m_media);
 			m_mutex.unlock();
 			log(log_debug, "app", server->getName()) << "remote disconnect - aborting DSP activity" << logend();
 		}
@@ -75,7 +81,7 @@ public:
 	{
 		log(log_debug, "app", server->getName()) << "disconnected" << logend();
 
-		server->listen();
+		m_media->disconnected(server);
 	}
 
 	// accept completion
@@ -84,12 +90,31 @@ public:
 		if (result == r_ok)
 		{
 			log(log_debug, "app", server->getName()) << "incoming call connected" << logend();
+
+			m_media->connected(server);
+
+			try
+			{
+				Sample* sample = m_media->createFileSample("sitrtoot.al");
+
+				m_mutex.lock();
+				sample->start(m_media);
+				m_active = sample;
+				m_mutex.unlock();
+
+			}
+			catch(const Exception &e)
+			{
+				log(log_error, "app", server->getName()) << "caught exception starting sample: " 
+					<< e << logend();
+
+				server->disconnect();
+			}		
+
 		}
 		else
 		{
 			log(log_debug, "app", server->getName()) << "incoming call failed" << logend();
-
-			server->listen();
 		}
 	}
 
@@ -97,8 +122,6 @@ public:
 	virtual void rejectDone(Trunk *server, unsigned result)
 	{
 		log(log_debug, "app", server->getName()) << "rejected" << logend();
-
-		server->listen();
 	}
 
     // called whenever additional dialling information comes in (caller finishes dialling)
@@ -113,7 +136,7 @@ public:
 		log(log_debug, "app", server->getName()) << "remote ringing" << logend();
 	}
 
-	virtual void touchtone(Telephone* server, char tt)
+	virtual void touchtone(Media *server, char tt)
 	{
 		log(log_debug, "app", server->getName()) << "received touchtone: " << tt << logend();
 
@@ -126,36 +149,11 @@ public:
 		// touchtones->start(server);
 	}
 
-	virtual void started(Telephone *server, Sample *sample)
+	virtual void started(Media *server, Sample *sample)
 	{
 	}
 
-	virtual void connected(Telephone *server)
-	{
-		try
-		{
-			Sample* sample = server->createFileSample("sitrtoot.al");
-
-			m_mutex.lock();
-			sample->start(server);
-			m_active = sample;
-			m_mutex.unlock();
-
-		}
-		catch(const Exception &e)
-		{
-			log(log_error, "app", server->getName()) << "caught exception starting sample: " 
-				<< e << logend();
-
-			server->disconnect();
-		}		
-	}
-
-	virtual void disconnected(Telephone *server)
-	{
-	}
-
-	virtual void completed(Telephone *server, Sample *sample, unsigned msecs)
+	virtual void completed(Media *server, Sample *sample, unsigned msecs)
 	{		
 		m_mutex.lock();
 		m_active = 0;
@@ -166,14 +164,15 @@ public:
 		log(log_debug, "app", server->getName()) << "sample completed" 
 			<< logend();
 
-		server->disconnect();
+		m_trunk->disconnect();
 	}
 
 private:
 
 	omni_mutex m_mutex; 
 	Sample *m_active;
-
+	AculabMedia *m_media;
+	Trunk *m_trunk;
 };
 
 void usage()
@@ -262,7 +261,7 @@ int main(int argc, char* argv[])
 	}
 
 	vector<AculabTrunk*> trunks;
-	vector<AculabPhone*> phones;
+	vector<AculabMedia*> media;
 
 	int count = 0;
 	for (std::map<int,int>::iterator i = port_counts.begin(); i != port_counts.end(); ++i)
@@ -275,22 +274,27 @@ int main(int argc, char* argv[])
 			Timeslot receive = bus->allocate();
 			Timeslot transmit = bus->allocate();
 
-			// this will leak memory - we don't care
 			Application *app = new Application;
 
-			trunks.push_back(new AculabTrunk(app, i->first));
-			phones.push_back(new AculabPhone(app, trunks[count], sw, 
-				receive, transmit));
+			// this will leak memory - we don't care
+			AculabTrunk *t = new AculabTrunk(app, i->first);
+			AculabMedia *m = new AculabMedia(app, sw, 
+				receive, transmit);
+
+			app->init(t, m);
+
+			trunks.push_back(t);
+			media.push_back(m);
 			++count;
 		}
 	}
 
 	AculabTrunk::start();
-	AculabPhone::start();
+	AculabMedia::start();
 
 	for (int j = 0; j < count; ++j)
 	{
-		phones[j]->listen();
+		trunks[j]->listen();
 	}
 
 	while(true)

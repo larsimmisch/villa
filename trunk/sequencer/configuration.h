@@ -58,6 +58,8 @@ public:
 	void enqueue(const std::string &id, const SAP &details, 
 		InterfaceConnection *iface)	
 	{ 
+		omni_mutex_lock lock(m_mutex);
+
 		addLast(new Item(id, details, iface)); 
 	}
 
@@ -67,6 +69,11 @@ public:
 	void remove(InterfaceConnection *iface, const std::string &id);
 
 	virtual void freeLink(List::Link* item)	{ delete (Item*)item; }
+
+protected:
+
+	omni_mutex m_mutex;
+
 };
 
 class DDIIterator;

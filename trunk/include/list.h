@@ -171,12 +171,10 @@ class DList : public List
 	DLink* remove(DLink* aLink) 
 	{ if (aLink->prev == 0) return (DLink*)removeFirst(); else return (DLink*)removeAfter(aLink->prev); }
 
-	protected:
+protected:
 
 	DList() : List() {}
 	virtual ~DList() {}
-
-	protected:	//	internal protocol
 
 	virtual void  addLinkAfter(Link* first, Link* second);	//	read DLink
 	virtual void  addLinkBefore(DLink* first, DLink* second);
