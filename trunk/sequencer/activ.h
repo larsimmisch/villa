@@ -90,7 +90,7 @@ public:
 		stopped = 0x04 
 	};
 
-	Molecule(unsigned mode, int aPriority, const std::string &id, const std::string& jobid);
+	Molecule(unsigned mode, int aPriority, const std::string &id);
 	virtual ~Molecule();	
 
 	virtual int start(Sequencer* sequencer, void* userData = 0);
@@ -118,7 +118,6 @@ public:
 	int isStopped() const { return m_flags & stopped; }
 
 	const char *getId() { return m_id.c_str(); }
-	const char *getJobId() { return m_jobid.c_str(); }
 
 	int notifyStart() const	 { return m_current ? m_current->notifyStart() : 0; }
 	int notifyStop() const { return m_current ? m_current->notifyStop() : 0;	}
@@ -134,7 +133,6 @@ protected:
 	unsigned m_mode;
 	unsigned m_priority;
 	std::string m_id;
-	std::string m_jobid;
 	unsigned m_flags;
 	Time m_timeStarted;
 	Time m_timeStopped;

@@ -141,9 +141,8 @@ int SilenceAtom::setPos(unsigned pos)
 	return 1;
 }
 
-Molecule::Molecule(unsigned aMode, int aPriority, const std::string &id, 
-				   const std::string &jobid) 
-	: DList(), m_mode(aMode), m_priority(aPriority), m_id(id), m_jobid(jobid), m_flags(0), 
+Molecule::Molecule(unsigned aMode, int aPriority, const std::string &id) 
+	: DList(), m_mode(aMode), m_priority(aPriority), m_id(id), m_flags(0), 
 	m_current(0), m_pos(0), m_status(0), m_length(0), m_nCurrent(0)
 {
 	m_timeStopped.now();
@@ -430,7 +429,7 @@ int Activity::start()
 		{
 			log(log_error, "activ") << "start failed: " << *molecule << logend();
 	
-			m_sequencer->sendMoleculeDone(molecule->getId(), molecule->getJobId(),
+			m_sequencer->sendMoleculeDone(molecule->getId(),
 				molecule->getStatus(), molecule->getPos(), molecule->getLength());
 
 			remove((Molecule*)head);
