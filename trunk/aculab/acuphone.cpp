@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.15 2001/09/19 12:36:56 lars Exp $
+	$Id: acuphone.cpp,v 1.16 2001/09/20 20:02:40 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -26,10 +26,10 @@ void AculabSwitch::listen(const Timeslot &a, const Timeslot &b, const char *name
 {
 	OUTPUT_PARMS args;
 
-    args.ost = a.st;
+    args.ost = a.st; // sink
     args.ots = a.ts;
     args.mode = CONNECT_MODE;
-    args.ist = b.st;
+    args.ist = b.st; // source
     args.its = b.ts;
 
 	log(log_debug, "switch", name) << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << logend();
@@ -910,9 +910,6 @@ void AculabMedia::connected(Trunk* aTrunk)
 
 	try
 	{
-		m_sw.listen(aTrunk->getTimeslot(), m_transmit, getName());
-		m_sw.listen(m_receive, aTrunk->getTimeslot(), getName());
-
 		if (m_info.card == -1)
 		{
 			struct sm_switch_channel_parms input;
@@ -929,7 +926,7 @@ void AculabMedia::connected(Trunk* aTrunk)
 			output.st	  = m_transmit.st;
 			output.ts	  = m_transmit.ts;
 			
-			rc = sm_switch_channel_output(&input);
+			rc = sm_switch_channel_output(&output);
 			if (rc)
 				throw ProsodyError(__FILE__, __LINE__, "sm_switch_channel_output", rc);
 		}
@@ -941,6 +938,9 @@ void AculabMedia::connected(Trunk* aTrunk)
 			m_sw.listen(m_transmit, out, getName());
 			m_sw.listen(in, m_receive, getName());
 		}
+
+		m_sw.listen(aTrunk->getTimeslot(), m_transmit, getName());
+		m_sw.listen(m_receive, aTrunk->getTimeslot(), getName());
 	}
 	catch (const Exception &e)
 	{
