@@ -466,12 +466,20 @@ unsigned Sequencer::connect(ConnectCompletion* complete)
 {
 	omni_mutex_lock lock(m_mutex);
 
+	if (m_callref != INVALID_CALLREF)
+	{
+		log(log_debug, "sequencer", getName())
+			<< "connect failed - call in process" << logend();
+
+		return V3_ERROR_NO_RESOURCE;
+	}
+
 	if (m_connectComplete)
 	{
 		log(log_debug, "sequencer", getName())
-			<< "connect failed - busy" << logend();
+			<< "connect failed - outgoing call in process" << logend();
 
-		return V3_ERROR_BUSY;
+		return V3_ERROR_NO_RESOURCE;
 	}
 
 	m_media = gMediaPool.allocate(this);
@@ -483,7 +491,17 @@ unsigned Sequencer::connect(ConnectCompletion* complete)
 		return V3_ERROR_NO_RESOURCE;
 	}
 
+	if (!m_trunk)
+	{
+		log(log_error, "sequencer", getName()) 
+			<< "internal error: no trunk" << logend(); 
+		
+		return V3_ERROR_NO_RESOURCE;
+	}
+
 	m_connectComplete = complete;
+
+	m_trunk->connect(complete->m_local, complete->m_remote, complete->m_timeout);
 
 	return V3_OK;
 }
@@ -798,23 +816,21 @@ void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 
 	if (result == V3_OK)
 	{
-		// good. we got through
-
-		m_media->connected(server);
-
 		if (m_connectComplete)
 		{
-			m_connectComplete->m_interface->begin() 
-				<< m_connectComplete->m_id.c_str() << ' ' << result 
-				<< (result == V3_OK ? " connected" : " connect failed") << end();
+			// good. we got through
+			m_interface = m_connectComplete->m_interface;
+			m_interface->add(server->getName(), this);
 
-			delete m_connectComplete;
+			m_media->connected(server);
 
-			m_connectComplete = 0;
+			m_interface->begin() << V3_OK << ' ' << m_connectComplete->m_id.c_str() 
+				<< " CONN " << getName() << end();
 		}
 		else
 		{
-			// Todo log error
+			log(log_error, "sequencer", getName()) 
+				<< "internal error: m_connectComplete is NULL in connectDone()" << logend();
 		}
 	}
 	else
@@ -827,6 +843,11 @@ void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 		}
 		unlock();
 	}
+
+	lock();
+	delete m_connectComplete;
+	m_connectComplete = 0;
+	unlock();
 }
 
 void Sequencer::transferDone(Trunk *server, unsigned callref, int result)

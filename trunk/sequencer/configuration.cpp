@@ -133,12 +133,13 @@ unsigned AculabPRITrunkConfiguration::connect(ConnectCompletion* complete)
 {
 	omni_mutex_lock lock(mutex);
 
-	unsigned result = V3_ERROR_BUSY;
+	unsigned result = V3_ERROR_NO_RESOURCE;
 
 	for (unsigned index = 0; index < lines; index++)
 	{
 		result = sequencers[index]->connect(complete);
-		if (result == V3_OK)	return V3_OK;
+		if (result == V3_OK)	
+			return V3_OK;
 	}
 
 	return result;

@@ -393,16 +393,16 @@ bool Interface::data(InterfaceConnection *ic)
 
 			return false;
 		}
-/*
+
 		remote.setAddress(called.c_str());
-		if (calling.size())
+		if (calling.size() && calling != "default")
 		{
 			local.setAddress(calling.c_str());
 		}
 
 		// now start the connect
 
-		TrunkConfiguration* trunk;
+		TrunkConfiguration* trunk = 0;
 		int result = V3_ERROR_NO_RESOURCE;
 
 		if (trunkname != "any")
@@ -426,12 +426,11 @@ bool Interface::data(InterfaceConnection *ic)
 			<< " started connect on trunk " << trunkname << logend();
 
 		ConnectCompletion* complete = 
-			new ConnectCompletion(ic, id, called, calling, timeout);
+			new ConnectCompletion(ic, id, local, remote, timeout);
 
 		if (trunk)
 		{
 			result = trunk->connect(complete);
-
 		}
 		else
 		{
@@ -452,10 +451,10 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			delete complete;
 
-			reply->setUnsignedAt(0, result);
-			ic->send(*reply);
+			ic->begin() << result << ' ' << id.c_str() << " CONN " 
+				<< end();
 		}
-*/
+
 	}
 	else if (command == "STOP")
 	{

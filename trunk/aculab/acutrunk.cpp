@@ -313,6 +313,9 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
         return V3_ERROR_FAILED;
     }
 
+	m_shadow = m_handle;
+	m_handle = outdetail.handle;
+
 	s_dispatcher.add(m_handle, this);
 	s_dispatcher.unlock();
 
@@ -472,6 +475,9 @@ void AculabTrunk::onCallEvent(ACU_LONG event)
 	case EV_WAIT_FOR_OUTGOING:
 		onWaitForOutgoing();
 		break;
+	case EV_OUTGOING_PROCEEDING:
+		onOutgoingProceeding();
+		break;
 	case EV_OUTGOING_RINGING:
 		onOutgoingRinging();
 		break;
@@ -480,9 +486,6 @@ void AculabTrunk::onCallEvent(ACU_LONG event)
 		break;
 	case EV_WAIT_FOR_ACCEPT:
 		onWaitForAccept();
-		break;
-	case EV_OUTGOING_PROCEEDING:
-		onOutgoingProceeding();
 		break;
 	case EV_DETAILS:
 		onDetails();
@@ -537,6 +540,9 @@ void AculabTrunk::onIdle()
 		break;
 	case t_connect:
 		// outgoing failed or stopped
+		if (cause == V3_OK)
+			cause = V3_ERROR_FAILED;
+
 		m_client->connectDone(this, callref, stopped ? V3_STOPPED : cause);
 		break;
 	case t_disconnect:
@@ -550,12 +556,22 @@ void AculabTrunk::onIdle()
 		break;
 	}
 
+	release();
+
 	lock();
 	setName(-1);
-	unlock();
 
-	release();
-	listen();
+	if (m_shadow != -1)
+	{
+		m_handle = m_shadow;
+		m_shadow = -1;
+		unlock();
+	}
+	else
+	{
+		unlock();
+		listen();
+	}
 }
 
 void AculabTrunk::onWaitForIncoming()
@@ -635,6 +651,25 @@ void AculabTrunk::onWaitForOutgoing()
 	m_callref = new_callref();
 }
 
+void AculabTrunk::onOutgoingProceeding()
+{
+	DETAIL_XPARMS details;
+
+	details.timeout = 0;
+	details.handle = m_handle;
+
+	int rc = call_details(&details);
+
+	if (rc)
+	{
+		log(log_error, "trunk", getName()) << "call_details failed: " << rc << logend();
+		return;
+	}
+
+	setName(details.ts);
+
+}
+
 void AculabTrunk::onOutgoingRinging()
 {
 }
@@ -673,10 +708,6 @@ void AculabTrunk::onRemoteDisconnect()
 }
 
 void AculabTrunk::onWaitForAccept()
-{
-}
-
-void AculabTrunk::onOutgoingProceeding()
 {
 }
 

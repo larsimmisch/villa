@@ -1,7 +1,7 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.10 2004/01/08 21:22:20 lars Exp $
+	$Id$
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -50,7 +50,7 @@ class AculabTrunk : public Trunk
 public:
 
 	AculabTrunk(TrunkClient* aClient, int aPort) 
-		: Trunk(aClient), m_handle(-1), m_port(aPort), 
+		: Trunk(aClient), m_handle(-1), m_shadow(-1), m_port(aPort), 
 		m_stopped(false) {}
     virtual ~AculabTrunk() {}
 
@@ -92,10 +92,10 @@ protected:
 	void onIncomingCallDetected();
 	void onCallConnected();
 	void onOutgoingRinging();
+	void onOutgoingProceeding();
 	void onRemoteDisconnect();
 	void onWaitForAccept();
 	void onWaitForOutgoing();
-	void onOutgoingProceeding();
 	void onDetails();
 	void onCallCharge();
 	void onChargeInt();
@@ -104,6 +104,7 @@ protected:
 
 	omni_mutex m_mutex;
 	ACU_INT m_handle;
+	ACU_INT m_shadow;
 	int m_port;
 	bool m_stopped;
 	unsigned m_callref;
