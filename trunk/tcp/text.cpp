@@ -12,8 +12,8 @@
 static char get_lost[] = "finger weg!\r\n";
 
 #define RMIN 256
-#define RSIZE 1024
-#define GSIZE 1024
+#define RSIZE 2048
+#define GSIZE 2048
 
 SocketStream::SocketStream(const Socket &socket) : 
 	Socket(socket.protocol(), socket.fd()),
