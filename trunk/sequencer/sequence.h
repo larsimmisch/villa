@@ -140,6 +140,8 @@ public:
 
 protected:
 
+	void release();
+
 	TrunkConfiguration *m_configuration;
 	Trunk *m_trunk;
 	unsigned m_callref;

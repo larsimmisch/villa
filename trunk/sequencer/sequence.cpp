@@ -93,6 +93,21 @@ void Sequencer::lost_connection()
 	}
 }
 
+void Sequencer::release()
+{
+	gMediaPool.release(m_media);
+	m_media = 0;
+	m_id.erase();
+
+	m_disconnecting = INVALID_CALLREF;
+	m_callref = INVALID_CALLREF;
+
+	for (int i = 0; i < MAXCHANNELS; ++i)
+	{
+		m_activity[i].empty();
+	}
+}
+
 #pragma warning(default : 4355)
 
 int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
@@ -844,12 +859,7 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 			<< getName() << end();
 	}
 
-	gMediaPool.release(m_media);
-	m_media = 0;
-	m_id.erase();
-
-	m_disconnecting = INVALID_CALLREF;
-	m_callref = INVALID_CALLREF;
+	release();
 }
 
 int Sequencer::accept(InterfaceConnection *server, const std::string &id)
@@ -1085,8 +1095,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 				<< getName() << end();
 		}
 
-		gMediaPool.release(m_media);
-		m_media = 0;
+		release();
 
 		delete this;
 	}

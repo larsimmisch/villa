@@ -488,7 +488,6 @@ bool Activity::abort()
 	if (stopped)
 	{
 		setState(idle);
-		empty();
 	}
 
 	return stopped;

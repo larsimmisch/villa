@@ -6,7 +6,6 @@
 #define _TCP_H_
 
 #include "transport.h"
-#include "packet.h"
 #include "socket.h"
 
 class TCP : public Transport

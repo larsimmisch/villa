@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.19 2004/01/15 17:18:59 lars Exp $
+$Id $
 """
 
 import sys,getopt
