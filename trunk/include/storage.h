@@ -1,7 +1,7 @@
 /*
 	buffers.h
 
-	$Id: storage.h,v 1.3 2001/05/27 21:15:20 lars Exp $
+	$Id: storage.h,v 1.4 2001/06/08 10:09:33 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -20,13 +20,16 @@ class FileDoesNotExist : public Exception
 {
 public:
 
-    FileDoesNotExist(const char *file, Exception* prev = 0)
-		: Exception(0, 0, 0, "FileDoesNotExist", prev), failed(file) {}
+    FileDoesNotExist(const char *file, int line, const char* function, 
+		const char *notfound, Exception* prev = 0)
+		: Exception(file, line, function, "FileDoesNotExist", prev), failed(notfound) {}
     virtual ~FileDoesNotExist() {}
 
-    virtual void printOn(std::ostream& aStream)
+    virtual void printOn(std::ostream& aStream) const
 	{
-		aStream << "file does not exist: " << failed << std::endl;
+		Exception::printOn(aStream);
+
+		aStream << ": " << failed;
 	}
 
 protected:
@@ -38,12 +41,12 @@ class FileFormatError : public Exception
 {
 public:
 
-    FileFormatError(const char *file, int lineNumber, const char* function, const char* desc, Exception* prev = 0)
+    FileFormatError(const char *file, int line, const char* function, const char* desc, Exception* prev = 0)
 		: Exception(file, line, function, "FileFormatError", prev), description(desc) {}
 
     virtual ~FileFormatError() {}
 
-    virtual void printOn(std::ostream& aStream)
+    virtual void printOn(std::ostream& aStream) const
 	{
 		Exception::printOn(aStream);
 
@@ -58,8 +61,8 @@ protected:
 class ReadError : public Exception
 {
 public:
-	ReadError(const char *file, int lineNumber, const char* function, int e, Exception* prev = 0)
-		: Exception(file, lineNumber, function, "ReadError", prev), error(e) {}
+	ReadError(const char *file, int line, const char* function, int e, Exception* prev = 0)
+		: Exception(file, line, function, "ReadError", prev), error(e) {}
 
 	virtual ~ReadError() {}
 
@@ -78,8 +81,8 @@ protected:
 class WriteError : public Exception
 {
 public:
-	WriteError(const char *file, int lineNumber, const char* function, int e, Exception* prev = 0)
-		: Exception(file, lineNumber, function, "WriteError", prev), error(e) {}
+	WriteError(const char *file, int line, const char* function, int e, Exception* prev = 0)
+		: Exception(file, line, function, "WriteError", prev), error(e) {}
 
 	virtual ~WriteError() {}
 
@@ -122,7 +125,8 @@ public:
 		file = fopen(name, write ? "wb" : "rb");
 		if (!file)
 		{
-			throw FileDoesNotExist(name);
+			throw FileDoesNotExist(__FILE__, __LINE__, 
+				"RawFileStorage::RawFileStorage", name);
 		}
 
 		// compute the length - we've got no header 

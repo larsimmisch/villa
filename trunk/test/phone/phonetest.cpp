@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.7 2001/06/07 12:58:25 lars Exp $
+	$Id: phonetest.cpp,v 1.8 2001/06/08 10:09:33 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -117,14 +117,20 @@ public:
 
 	virtual void connected(Telephone *server)
 	{
-		Sample* sample = server->createFileSample("startrek.al");
+		try
+		{
+			Sample* sample = server->createFileSample("startrek.al");
+
+			sample->start(server);
+		}
+		catch(const Exception &e)
+		{
+			log(log_error, "app") << "caught exception starting sample: " 
+				<< e << logend();
+
+			server->disconnect();
+		}
 		
-		// Sample* sample = server->createRecordFileSample("test.al", 10000);
-		// sample->setUserData((void*)1);
-
-		// Sample* sample = server->createBeeps(5);
-
-		sample->start(server);
 	}
 
 	virtual void disconnected(Telephone *server)
