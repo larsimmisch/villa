@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.11 2001/09/11 22:11:27 lars Exp $
+	$Id: acuphone.h,v 1.12 2001/09/14 16:02:28 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -30,7 +30,7 @@ public:
 	AculabSwitch(int device) : Switch(device, "Aculab") {}
 	virtual ~AculabSwitch() {}
 	
-	virtual void listen(const Timeslot &a, const Timeslot &b, const char *name = NULL);
+	virtual void listen(const Timeslot &a, const Timeslot &b, const char *name = 0);
 	virtual void listen(const Timeslot &a, char pattern, const char *name = 0);
 
 	virtual void disable(const Timeslot &a, const char *name = 0);
@@ -154,6 +154,13 @@ public:
 	virtual void startEnergyDetector(unsigned qualTime);
 	virtual void stopEnergyDetector();
 
+	void conferenceStart();
+	void conferenceClone(ProsodyChannel *model);
+	void conferenceAdd(ProsodyChannel *party);
+	void conferenceLeave(ProsodyChannel *party);
+	void conferenceAbort();
+	void conferenceEC();
+
 protected:
 
 	class FileSample : public Sample
@@ -253,6 +260,7 @@ protected:
 	tSMEventId m_eventRead;
 	tSMEventId m_eventWrite;
 	tSMEventId m_eventRecog;
+	int m_conferenceId;
 	struct sm_listen_for_parms m_listenFor;
 	struct sm_channel_info_parms m_info;
 	omni_mutex m_mutex;
@@ -284,7 +292,7 @@ public:
 	virtual void startEnergyDetector(unsigned qualTime) { ProsodyChannel::startEnergyDetector(qualTime); }
 	virtual void stopEnergyDetector() { ProsodyChannel::stopEnergyDetector(); }
 
-	virtual const char* getName() { return m_trunk ? m_trunk->getName() : NULL; }
+	virtual const char* getName() { return m_trunk ? m_trunk->getName() : 0; }
 
 	static void start() { s_dispatcher.start(); }
 

@@ -93,6 +93,10 @@ SOURCE=.\activ.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\conference.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\configuration.cpp
 # End Source File
 # Begin Source File

@@ -26,9 +26,7 @@
 
 Log cout_log(std::cout);
 
-#ifdef __AG__
 Conferences gConferences;
-#endif
 
 ConfiguredTrunks gConfiguration;
 ClientQueue gClientQueue;

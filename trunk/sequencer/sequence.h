@@ -119,13 +119,13 @@ public:
 	// void loadSwitch(const char* aName, int is32bit = 1, int aDevice = 0)	{ phone.loadSwitch(aName, aDevice); }
 
 	static Timer& getTimer()		{ return timer; }
-	Media*	getMedia()				{ return m_media; }
+	AculabMedia* getMedia()			{ return m_media; }
 
 protected:
 
 	TrunkConfiguration *configuration;
 	Trunk *m_trunk;
-	Media *m_media;
+	AculabMedia *m_media;
 	ClientQueue::Item *clientSpec;
 	Activity activity;
 	CompletedQueue delayedCompletions;

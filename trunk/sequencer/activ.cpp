@@ -2,19 +2,15 @@
 	activ.cpp
 */
 
-// this is a comment
 
-#ifdef _WIN32
 #include <windows.h>
-#else
-#define INCL_BASE
-#include <os2.h>
-#endif
 
 #include "log.h"
 #include "names.h"
 #include "activ.h"
 #include "sequence.h"
+
+extern Conferences gConferences;
 
 char* copyString(const char* aString)
 {
@@ -58,53 +54,34 @@ BeepAtom::BeepAtom(Sequencer* sequencer, unsigned count) : m_nBeeps(count)
 }
 
 ConferenceAtom::ConferenceAtom(unsigned aConference, unsigned aMode)
- : m_mode(aMode), m_me(0)
+ : m_mode(aMode)
 {
-//	  conf = new Conference(aConference);
-
-//	  Terminator::getInstance().addLast(this);
-}
-
-ConferenceAtom::~ConferenceAtom()
-{
-//	  terminate();
-
- //   Terminator::getInstance().remove(this);
-}
-
-void ConferenceAtom::terminate()
-{
-	if (m_me) 
-		m_conf->remove(m_me);
-
-#ifndef __AG__
-	delete m_conf;
-#endif
+	m_conference = gConferences[aConference];
 }
 
 int ConferenceAtom::start(Sequencer* sequencer, void* aUserData)
 {
-	if (!m_conf)	return 0;
+	if (!m_conference)
+		return 0;
 
 	m_userData = aUserData;
 
-	// me = conf->add(sequencer->getMedia()->getSlot(), sequencer->getMedia()->getSwitch(), mode);
+	m_conference->add(sequencer->getMedia(), m_mode);
 
-	// started.now();
+	m_started.now();
 
-	return m_me ? 1 : 0;
+	return 1;
 }
 
 int ConferenceAtom::stop(Sequencer* sequencer)
 {
-	// Time now;
+	Time now;
 
-	// now.now();
+	now.now();
 
-	// conf->remove(me);
-	m_me = 0;
+	m_conference->remove(sequencer->getMedia());
 
-	// sequencer->addCompleted(sequencer->getMedia(), (Molecule*)userData, 0, now - started);
+	sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_userData, 0, now - m_started);
 
 	return 1;
 }

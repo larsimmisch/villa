@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.13 2001/09/11 22:11:27 lars Exp $
+	$Id: acuphone.cpp,v 1.14 2001/09/14 16:02:28 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -233,6 +233,120 @@ tSMEventId ProsodyChannel::set_event(tSM_INT type)
 		throw ProsodyError(__FILE__, __LINE__, "sm_channel_set_event", rc);
 
 	return event.event;
+}
+
+void ProsodyChannel::conferenceClone(ProsodyChannel *model)
+{
+	struct sm_conf_prim_clone_parms clone;
+
+	memset(&clone, 0, sizeof(clone));
+	clone.channel = m_channel;
+	clone.model = model->m_channel;
+
+	int rc = sm_conf_prim_clone(&clone);
+
+	if (rc)
+	{
+		throw ProsodyError(__FILE__, __LINE__, "sm_conf_prim_clone", rc);
+	}
+}
+
+void ProsodyChannel::conferenceStart()
+{
+	struct sm_conf_prim_start_parms start;
+
+	memset(&start, 0, sizeof(start));
+	start.channel = m_channel;
+
+	int rc = sm_conf_prim_start(&start);
+
+	if (rc)
+	{
+		throw ProsodyError(__FILE__, __LINE__, "sm_conf_prim_start", rc);
+	}
+}
+
+void ProsodyChannel::conferenceAdd(ProsodyChannel *party)
+{
+	struct sm_conf_prim_add_parms add;
+
+	memset(&add, 0, sizeof(add));
+
+	add.channel = m_channel;
+	add.participant = party->m_channel;
+
+	int rc = sm_conf_prim_add(&add);
+
+	if (rc)
+	{
+		throw ProsodyError(__FILE__, __LINE__, "sm_conf_prim_add", rc);
+	}
+
+	party->m_conferenceId = add.id;
+}
+
+void ProsodyChannel::conferenceLeave(ProsodyChannel *party)
+{
+	struct sm_conf_prim_leave_parms leave;
+
+	memset(&leave, 0, sizeof(leave));
+	leave.channel = m_channel;
+	leave.id = party->m_conferenceId;
+
+	int rc = sm_conf_prim_leave(&leave);
+
+	if (rc)
+	{
+		throw ProsodyError(__FILE__, __LINE__, "sm_conf_prim_leave", rc);
+	}
+}
+
+void ProsodyChannel::conferenceAbort()
+{
+	int rc = sm_conf_prim_abort(m_channel);
+
+	if (rc)
+	{
+		throw ProsodyError(__FILE__, __LINE__, "sm_conf_prim_abort", rc);
+	}
+}
+
+void ProsodyChannel::conferenceEC()
+{
+	struct sm_condition_input_parms	condition;
+
+	// Attempt to use echo cancelation in conference.
+	memset(&condition, 0, sizeof(condition));
+
+	condition.channel = m_channel;
+	condition.reference	= m_channel;
+	condition.reference_type = kSMInputCondRefUseOutput;
+	condition.conditioning_type	= kSMInputCondEchoCancelation;
+	condition.alt_dest_type			= kSMInputCondAltDestNone;
+
+	int rc = sm_condition_input(&condition);
+	
+	if (rc == ERR_SM_WRONG_FIRMWARE_TYPE)
+	{
+		 // Fall back to sidetone suppression.
+		struct sm_set_sidetone_channel_parms sidetone;
+
+		memset(&sidetone, 0, sizeof(sidetone));
+
+		sidetone.channel   = m_channel;
+		sidetone.output    = m_channel;
+
+		rc = sm_set_sidetone_channel(&sidetone);
+
+		if (rc != 0) 
+		{
+			throw ProsodyError(__FILE__, __LINE__, "sm_set_sidetone_channel", rc);
+		}
+	}
+	else if (rc != 0)
+	{
+		throw ProsodyError(__FILE__, __LINE__, "sm_condition_input", rc);
+	}
 }
 
 unsigned ProsodyChannel::Beep::start(Media *phone)

@@ -6,6 +6,21 @@
 #include <windows.h>
 #include "exc.h"
 
+class OutOfMemory : public Exception
+{
+	public:
+
+	OutOfMemory(
+		const char* fileName,
+		int lineNumber,
+		const char* function,
+		const char* errorName = "out of memory",
+		Exception* prev = 0)
+	: Exception(fileName,lineNumber,function,errorName,prev) {}
+
+	virtual ~OutOfMemory() {}
+};
+
 class OSError : public Exception
 {
 	public:

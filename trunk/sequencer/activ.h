@@ -236,7 +236,7 @@ class ConferenceAtom : public Atom //, public Termination
 public:
 
 	ConferenceAtom(unsigned aConf, unsigned aMode);
-	virtual ~ConferenceAtom();
+	virtual ~ConferenceAtom() {}
 
 	virtual int start(Sequencer* sequencer, void* userData = 0);
 	virtual int stop(Sequencer* sequencer);
@@ -248,11 +248,8 @@ public:
 
 protected:
 
-	virtual void terminate();
-
-	Conference *m_conf;
+	Conference *m_conference;
 	void *m_userData;
-	Conference::Member* m_me;
 	Time m_started;
 	unsigned m_mode;
 };

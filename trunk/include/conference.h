@@ -9,120 +9,71 @@
 #ifndef _CONFERENCE_H_
 #define _CONFERENCE_H_
 
-#include "list.h"
+#include <set>
+#include <map>
 #include "omnithread.h"
 #include "switch.h"
+#include "exc.h"
+#include "acuphone.h"
+#include "smclib.h"
 
-enum { max_conferences = 64 };
-
-class Conferences;
-
-class Conference : public DList
+class Conference
 {
 public:
-
-	enum mode { listen = 0x01, speak = 0x02, play = 0x04 };
-
-	class Member : public DList::DLink
-	{
-	public:
 	
-		Member(Timeslot aVoice, int aMode, Switch* aSwitch);
-		~Member();
-		
-		void listenTo(Timeslot slot);	
-		void speakTo(Timeslot slot);   
-		void playTo(Timeslot slot);   
-		
-		void connect(Member* aMamber);
-		void addToConference(unsigned aConf);
-		void removeFromConference(unsigned aConf);
-		
-		void restore();
-		
-		// return number of auxilliary slots used
-		int slots() 	{ return ((mode & speak) || (mode & listen)) && (mode & play) ? 2 : 1; }
-		
-		Timeslot voice;
-		Timeslot trunk;
-		Timeslot aux[2];
-		Timeslot conf[2];
-		int  used;
-		Switch* sw;
-		int mode;
-	};
-	
-	virtual ~Conference();
+	enum mode { listen = 0x01, speak = 0x02, background = 0x04 };
 
-	virtual Member* add(Timeslot aVoice, Switch* aSwitch, int aMode);
-	virtual void remove(Member* aMember);
-	
-	void mute(Member* aMember);
-		
-	unsigned getHandle()	{ return handle; }
+	virtual ~Conference() {}
 
-	void* getUserData() 	{ return userData; }
+	void add(ProsodyChannel *channel, int aMode);
+	void remove(ProsodyChannel *channel);
+
+	void lock() 	{ m_mutex.lock(); }
+	void unlock()	{ m_mutex.unlock(); }
+
+	unsigned getHandle()	{ return m_handle; }
+
+	void* getUserData() 	{ return m_userData; }
 	
 protected:
 
-	Conference(unsigned aHandle, void* aUserData = 0);
-	void freeLink(List::Link* aLink) { delete (Member*)aLink; }
-
 	friend class Conferences;
 
-	omni_mutex mutex;
-	unsigned handle;
-	unsigned xds;
-	unsigned speakers;
-	void*	 userData;
-};
+	Conference(unsigned handle, void* aUserData = 0) : m_handle(handle),
+		m_userData(0) {}
 
-class ConferencesIterator;
-class ConferenceSwitch;
+	typedef std::set<ProsodyChannel*> t_party_set;
+
+	omni_mutex m_mutex;
+	int m_module;
+	unsigned m_handle;
+	unsigned m_speakers;
+	void*	 m_userData;
+	t_party_set m_parties;
+};
 
 class Conferences
 {
 public:
 
-	Conferences(unsigned max = max_conferences);
-	~Conferences();
+	Conferences() : m_handle(0) {}
 
-	Conference* operator[](unsigned index);
+	Conference *create(void* aUserData = 0);
+	bool close(unsigned handle);
 
-	Conference* create(void* aUserData = 0);
-	int close(unsigned index, int force = 0);
+	Conference *operator[](unsigned handle);
 
-	// static void setMVIP(MVIP& instance);
-	// static void setMixing(ConferenceSwitch* aMixing);
-
-	void lock() 	{ mutex.lock(); }
-	void unlock()	{ mutex.unlock(); }
+	void lock() 	{ m_mutex.lock(); }
+	void unlock()	{ m_mutex.unlock(); }
 
 protected:
 
-	friend class ConferencesIterator;
+	typedef std::map<unsigned, Conference*> t_conf_map;
+	typedef t_conf_map::iterator iterator;
 
-	omni_mutex mutex;
-	Conference** array;
-	unsigned size;
-	unsigned offset;
-};
-
-class ConferencesIterator
-{
-public:
- 
-	ConferencesIterator(Conferences c);
-	~ConferencesIterator() {}
- 
-	Conference* next();
-	Conference* current()	{ return conferences.array[index]; }	
-	int 		isDone()	{ return index < conferences.size; }
-  
-protected:
- 
-	Conferences&	conferences;
-	unsigned		index;
+	omni_mutex m_mutex;
+	t_conf_map m_conferences;
+	unsigned m_handle;
 };
 
 #endif
