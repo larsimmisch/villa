@@ -657,7 +657,9 @@ unsigned Sequencer::disconnect(int cause)
 	{
 		log(log_debug, "sequencer", getName()) << "disconnect - all channels idle" << logend();
 
-		m_media->disconnected(m_trunk);
+        if (m_media)
+		    m_media->disconnected(m_trunk);
+
 		rc = m_trunk->disconnect(m_callref, cause);
 	}
 
