@@ -2,96 +2,127 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.2 2001/08/07 22:16:36 lars Exp $
+$Id: client.py,v 1.3 2001/09/11 22:10:11 lars Exp $
 """
-import socket,re,sys,time,getopt
+import socket,re,sys,time,getopt, string
 
-class sequencer_client:
-    def __init__(self,host,port):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((host, port))
+class Transactions:
 
-        # make file from socket :-)
-        self.stdin=self.socket.makefile("r")
-        self.stdout=self.socket.makefile("w")
+	def __init__(self):
+		self.tid = 0
+		self.transactions = {}
 
-        # will be increased on each command
-        self.transaction_id=0
+	def create(self, call, d = None):
+		self.tid = self.tid + 1
+		# only return valid transaction IDs - '-1' is reserved
+		if self.tid == -1:
+			self.tid = 1
 
-        # will be set to the something the sequencer tells us
-        self.device='(unset)'
+		self.transactions[self.tid] = (call, d)
+		return self.tid
 
-    def send_command(self, command):
-        # perform next transaction/command
-        self.transaction_id = self.transaction_id+1
+	def remove(self, tid):
+		if not self.transactions.has_key(tid):
+			print "error: tid %d not found. probable protocol violation" % (tid)
+			sys.exit(1)
+		else:
+			call, d = self.transactions[tid]
+			del self.transactions[tid]
 
-        cmd=str(self.transaction_id)+' '+command+'\r\n'
+		return call, d
 
-        print "command sent to sequencer: "+cmd
+class Interface:
+	
+	def __init__(self,host,port):
+		self.transactions = Transactions()
+
+		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.socket.connect((host, port))
+
+		# make file from socket
+		self.stdin=self.socket.makefile("r")
+		self.stdout=self.socket.makefile("w")
+		# initialise devices for unsolicited events
+		self.devices = {}
+		# read and ignore initial 'sequence protocol...'
+		self.stdin.readline()
+
+	def send(self, call, command, data = None):
+		# perform next transaction/command
+		tid = self.transactions.create(call, data)
+		cmd = str(tid) + ' ' + command
+
+		print "command sent to sequencer: " + cmd
         
-        self.stdout.write(cmd)
-        self.stdout.flush()
+		self.stdout.write(cmd + '\r\n')
+		self.stdout.flush()
 
-    def listen_to_any(self):
-        self.send_command("global listen any any")
-
-    def wait_for_response(self):
-        print "wait for data from server"
-        line=self.stdin.readline()
-        print "response from server: "+line
-        self.split_server_response(line)
-        
-    def split_server_response(self,line):
-        """Split server's response. `line' is supposed to be built from
-        the transaction-id, the result of the operation, the action that
-        was just performed and additional data.
-        """
-        m=re.match(r"(?P<transaction>\w*) (?P<result>\d) (?P<device>\w*\[\d,\d\])"+
+	def parse(self, line):
+		"""parse the event. `line' is supposed to be built from
+		the transaction-id, the result of the operation, the action that
+		was just performed and additional data.
+		"""
+		m = re.match(r"(?P<tid>\w*) (?P<result>\d) (?P<device>\w*\[\d,\d\])"+
                    r" (?P<action>[\w\-_]*)(?P<data>.*)", line)
-        if (m==None):
-            self.response=None
-            print "parsing the server's response failed"
-        else:
-            self.response=m.groupdict()
+		
+		if  m == None:
+			print "parse error:", line
+			return None
+		else:
+			return m.groupdict()
+			
+	def process(self):
+		event = self.stdin.readline()[:-2]
+		print "event from sequencer: " + event
+		event = self.parse(event)
 
-    def act_on_response(self):
-        if (self.response==None):
-            print "(response couldn't be parsed)"
-            return
+		if not event:
+			return
 
-        action=self.response['action']
+		tid = event['tid']
+		action = event['action']
 
-        if (action=='alerting'):
-            self.device=self.response['device']
-            # FIXME: check for error
+		# the sequencer protocol uses dashes '-'  - we need to translate them
+		# to underscores because dashes are illegal in Python identifiers
+		action = string.replace(action, '-', '_')
+		
+		if tid == '-1':
+			device = self.devices[event['device']]
+			device.__class__.__dict__[action](device, event['data'])
+			return
 
-            self.accept_incoming_call()
+		device, data = self.transactions.remove(long(tid))
+		device.__class__.__dict__[action](device, event, data)
+		return
 
-        elif (action=='accept-done'):
-            print "call accepted on device "+self.device
-            self.play_sample('sitrtoot.al')
-            time.sleep(5)
-            self.send_command(self.device+' disconnect')
-            
-        elif (action=='disconnect-done'):
-            print "disconnect done, quitting"
-            sys.exit(1)
-        else:
-            print "(not processed)"
+	def run(self):
+		while 1:
+			self.process()
 
-    def accept_incoming_call(self):
-        self.send_command(self.device+' accept')
+class Call:
 
-    def disconnect(self):
-        self.send_command(self.device+' disconnect')
+	def __init__(self, interface):
+		self.device = None
+		self.interface = interface
 
-    def play_sample(self, filename):
-        self.send_command(self.device+' add 2 1 play '+filename+' none')
-        
-    def event_loop(self):
-        while 1:
-            x.wait_for_response()
-            x.act_on_response()
+		interface.send(self, 'global listen any any') 
+	
+	def listen_done(self, event, data):
+		self.device = event['device']
+		interface.devices[self.device] = self
+
+		interface.send(self, self.device + ' accept')
+
+	def accept_done(self, event, data):
+		interface.send(self, self.device + ' add 2 1 play sitrtoot.al none')
+
+	def molecule_done(self, event, data):
+		interface.send(self, 'global listen any any') 
+		interface.send(self, self.device + ' disconnect')
+
+	def disconnect_done(self, event, data):
+		del interface.devices[self.device]
+		self.device = None
 
 if __name__ == '__main__':
 
@@ -107,13 +138,9 @@ if __name__ == '__main__':
 	if hostname == None:
 		hostname = socket.gethostname()
 
-	x=sequencer_client(hostname, 2104)
+	interface = Interface(hostname, 2104)
 
-	# 'sequence protocol...' lesen und ignorieren
-	x.stdin.readline()
+	# start one call
+	call = Call(interface)
 
-	# auf alles hören, was da anruft
-	x.listen_to_any()
-
-	# ab in die event loop
-	x.event_loop()
+	interface.run()
