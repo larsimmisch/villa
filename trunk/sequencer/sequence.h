@@ -39,6 +39,7 @@ public:
  
 	int transfer(InterfaceConnection *server, const std::string &id);
 	int disconnect(InterfaceConnection *server, const std::string &id);
+	int disconnect(int cause);
 
 	int accept(InterfaceConnection *server, const std::string &id);
 	int reject(InterfaceConnection *server, const std::string &id);
@@ -46,7 +47,6 @@ public:
 	int stopListening(InterfaceConnection *server, const std::string &id);
 	int stopConnecting(InterfaceConnection *server, const std::string &id);
 	int stopTransferring(InterfaceConnection *server, const std::string &id);
-
 
 	void lock()   { m_mutex.lock(); }
 	void unlock() { m_mutex.unlock(); }
@@ -108,10 +108,13 @@ public:
 	virtual void fatal(Media *server, const char *e);
 	virtual void fatal(Media *server, Exception& e);
 
-	void data(InterfaceConnection* server, const std::string &id);
+	bool data(InterfaceConnection* server, const std::string &data, const std::string &id);
 
 	void addCompleted(Media* server, Molecule* molecule, unsigned msecs, unsigned reason);
 	void checkCompleted();
+
+	// called when connection to client is lost
+	void lost_connection();
 
 	// todo: needed?
 	// virtual void waitForCompletion()	{ done.wait(); }

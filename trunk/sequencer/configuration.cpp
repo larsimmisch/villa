@@ -49,6 +49,7 @@ void AculabPRITrunkConfiguration::init(int d, int sw, int l)
 	sprintf(buffer, "Aculab%d", d);
 
 	name = copyString(buffer);
+	number = copyString("");
 
 	device = d;
 	swdevice = sw;
@@ -132,12 +133,12 @@ unsigned AculabPRITrunkConfiguration::connect(ConnectCompletion* complete)
 {
 	omni_mutex_lock lock(mutex);
 
-	unsigned result = _busy;
+	unsigned result = PHONE_ERROR_BUSY;
 
 	for (unsigned index = 0; index < lines; index++)
 	{
 		result = sequencers[index]->connect(complete);
-		if (result == _ok)	return _ok;
+		if (result == PHONE_OK)	return PHONE_OK;
 	}
 
 	return result;

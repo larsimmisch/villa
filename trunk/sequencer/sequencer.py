@@ -29,7 +29,7 @@ class Sequencer:
 	
 	def __init__(self,host,port):
 		self.transactions = Transactions()
-		self.device = 'global'
+		self.device = None
 
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.socket.connect((host, port))
@@ -44,9 +44,9 @@ class Sequencer:
 		# read and ignore initial 'sequence protocol...'
 		self.stdin.readline()
 		# open one conference
-		self.send(self, "global open-conference")
+		# self.send(self, "CNFO")
 
-	def open_conference_done(self, event, data):
+	def CNFO(self, event, data):
 		self.conference = event['data'][0]
 		print "conference:", self.conference
 
@@ -68,12 +68,12 @@ class Sequencer:
 
 		tr = string.split(line, ' ')
 		# check if unsolicited event
-		if tr[0] == '-1':
+		if tr[0] == '100':
 			if len(tr) < 3:
 				print "parse error:", line
 				return
 			
-			event = { 'device': tr[1], 'action': tr[2] }
+			event = { 'action': tr[2], 'device': tr[3] }
 
 			if len(tr) >= 3:
 				event['data'] = tr[3:]
@@ -82,8 +82,8 @@ class Sequencer:
 				print "parse error:", line
 				return
 			
-			event = { 'result': tr[1], 'device': tr[2],
-					  'action': tr[3] }
+			event = { 'result': tr[0], 'action': tr[2],
+                      'device': tr[3] }
 		
 			if len(tr) >= 4:
 				event['data'] = tr[4:]
@@ -96,7 +96,7 @@ class Sequencer:
 		action = string.replace(action, '-', '_')
 		device = event['device']
 		
-		if tr[0] == '-1':
+		if tr[0] == '100':
 			if not self.devices.has_key(device):
 				print "warning - no receiver found (probably already disconnected)"
 				return
@@ -104,7 +104,7 @@ class Sequencer:
 			receiver = self.devices[device]
 			receiver.__class__.__dict__[action](receiver, event)
 		else:
-			receiver, data = self.transactions.remove(long(tr[0]))
+			receiver, data = self.transactions.remove(long(tr[1]))
 			receiver.__class__.__dict__[action](receiver, event, data)
 			
 	def process(self):

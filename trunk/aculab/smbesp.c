@@ -1,5 +1,5 @@
 /*------------------------------------------------------------*/
-/* Copyright ACULAB plc. (c) 1996-1998                        */
+/* Copyright ACULAB plc. (c) 1996-2000                        */
 /*------------------------------------------------------------*/
 /*                                                            */
 /*                                                            */
@@ -241,7 +241,15 @@ int sm_adjust_input_tone_set( struct sm_adjust_tone_set_parms* tonesetp )
 
 		*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_value[0])) = (tSMIEEE32Bit754854Float) tonesetp->parameter_value.fp_value;
 
-		drv_parms.int_value     = tonesetp->parameter_value.int_value;;
+		if (	(tonesetp->parameter_id == kAdjustToneSetFPParamIdStartFreq)
+			||	(tonesetp->parameter_id == kAdjustToneSetFPParamIdStopFreq)  )
+		{
+			drv_parms.int_value = (tSM_INT)(tonesetp->parameter_value.fp_value/31.25);
+		}
+		else
+		{
+			drv_parms.int_value = tonesetp->parameter_value.int_value;;
+		}
 
 		result = smd_ioctl_dev_fwapi( 	BESPIO_ADJUST_INPUT_TONE_SET, 
 			                        	(SMIOCTLU *) &drv_parms,
@@ -465,7 +473,7 @@ int sm_put_last_replay_data( struct sm_ts_data_parms* datap )
 
 			dataBlock2.channel = datap->channel;
 			dataBlock2.length  = 0;
-			dataBlock2.data	   = &lastBlockBuffer[0];
+			dataBlock2.data	   = (char*) (&lastBlockBuffer[0]);
 	
 			fillCount = lastDataLength.fill_count;
 
@@ -975,8 +983,16 @@ int sm_record_start( struct sm_record_parms* recordp )
 
 		recordp->alt_data_source = (tSMChannelId) channelIx;
 
-		result = smd_ioctl_dev_fwapi( 	BESPIO_RECORD_START1, 
-			                        	(SMIOCTLU *) recordp,
+		/*
+		 * Record start2 indicates paramter block has volume/AGC.
+		 */
+		result = smd_ioctl_dev_fwapi( 	
+#ifdef _SM_BESP_PRE1P4_
+										BESPIO_RECORD_START1, 
+#else
+										BESPIO_RECORD_START2, 
+#endif
+										(SMIOCTLU *) recordp,
 										(tSMDevHandle) recordp->channel,
 										sizeof(struct sm_record_parms),
 										-1,
@@ -2425,12 +2441,42 @@ int sm_get_recognised( struct sm_recognised_parms* recogp )
 }
 
 
+/*
+ * SM_GET_RECOGNISED_IX
+ *
+ * Poll channel for recognised item (digit, tone, etc. ).
+ */
+#ifdef _PROSDLL
+ACUDLL 
+#endif
+int sm_get_recognised_ix( struct sm_recognised_ix_parms* recogp )
+{
+	int 			result;
+	tSMDevHandle 	smControlDevice;
+	tSMDevHandle 	smRecogDevice;
 
+	smControlDevice = smd_open_ctl_dev( );
 
+	if (smControlDevice != kSMNullDevHandle)
+	{
+		recogp->channel_ix = -1;
 
+		smRecogDevice = (tSMDevHandle) (tSMDevHandle) smControlDevice;
 
+		result = smd_ioctl_dev_fwapi( 	BESPIO_GET_RECOGNISED_IX, 
+                        				(SMIOCTLU *) recogp,
+										smRecogDevice,
+										sizeof(struct sm_recognised_ix_parms),
+										-1,
+										kFWLIBVersion																								);
+	}
+	else
+    {
+		result = ERR_SM_DEVERR;
+    }
 
-
+	return result;
+}
 
 
 /*
@@ -2509,6 +2555,82 @@ int sm_besp_write_status( struct sm_besp_status_parms* statusp )
 }
 
 
+/*
+ * SM_BESP_READ_STATUS_IX
+ *
+ * Obtain status following read event (channel index version).
+ */
+#ifdef _PROSDLL
+ACUDLL 
+#endif
+int sm_besp_read_status_ix( struct sm_besp_status_ix_parms* statusp )
+{
+	int 			result;
+	tSMDevHandle 	smControlDevice;
+	tSMDevHandle	smStatusDevice;
+
+	smControlDevice = smd_open_ctl_dev( );
+
+	if (smControlDevice != kSMNullDevHandle)
+	{
+		statusp->channel_ix = -1;
+
+		smStatusDevice = (tSMDevHandle) (tSMDevHandle) smControlDevice;
+
+		result = smd_ioctl_dev_fwapi( 	BESPIO_READ_STATUS_IX, 
+                        				(SMIOCTLU *) statusp,
+										smStatusDevice,
+										sizeof(struct sm_besp_status_ix_parms),
+										-1,
+										kFWLIBVersion																								);
+	}
+	else
+    {
+		result = ERR_SM_DEVERR;
+    }
+
+	return result;
+}
+
+
+/*
+ * SM_BESP_WRITE_STATUS_IX
+ *
+ * Obtain status following write event (channel index variant).
+ */
+#ifdef _PROSDLL
+ACUDLL 
+#endif
+int sm_besp_write_status_ix( struct sm_besp_status_ix_parms* statusp )
+{
+	int 			result;
+	tSMDevHandle 	smControlDevice;
+	tSMDevHandle	smStatusDevice;
+
+	smControlDevice = smd_open_ctl_dev( );
+
+	if (smControlDevice != kSMNullDevHandle)
+	{
+		statusp->channel_ix = -1;
+
+		smStatusDevice = (tSMDevHandle) (tSMDevHandle) smControlDevice;
+
+		result = smd_ioctl_dev_fwapi( 	BESPIO_WRITE_STATUS_IX, 
+                        				(SMIOCTLU *) statusp,
+										smStatusDevice,
+										sizeof(struct sm_besp_status_ix_parms),
+										-1,
+										kFWLIBVersion																								);
+	}
+	else
+    {
+		result = ERR_SM_DEVERR;
+    }
+
+	return result;
+}
+
+
 #ifdef _PROSDLL
 ACUDLL 
 #endif
@@ -2573,6 +2695,132 @@ int sm_catsig_listen_for( struct sm_catsig_listen_for_parms* listenp )
 	return result;
 }
 
+
+#ifdef _PROSDLL
+ACUDLL 
+#endif
+int sm_adjust_agc_module_params( struct sm_adjust_agc_module_parms* agc_parms )
+{
+	int											result;
+	tSMDevHandle 								smControlDevice;
+	struct sm_adjust_agc_module_drv_parms		drv_parms;
+	double										blockMult;
+	double										red;
+	double										inc;
+	double										decay;
+	double										adjRed;
+	double										adjInc;
+	double										adjDecay;
+
+	adjInc 		= agc_parms->fp_params[kAdjustAGCFPParamIxMaxIncreseRate];
+	adjRed 		= agc_parms->fp_params[kAdjustAGCFPParamIxMaxDecreaseRate];
+	adjDecay 	= agc_parms->fp_params[kAdjustAGCFPParamIxSensitivity];
+
+	if ((adjInc < 0.0) || (adjInc > 1.0))
+	{
+		result = ERR_SM_BAD_PARAMETER;
+	}
+	else if ((adjRed < 0.0) || (adjRed > 1.0))
+	{
+		result = ERR_SM_BAD_PARAMETER;
+	}
+	else if ((adjDecay < 0.0) || (adjDecay > 1.0))
+	{
+		result = ERR_SM_BAD_PARAMETER;
+	}
+ 	else
+	{
+		smControlDevice = smd_open_ctl_dev( );
+
+		if (smControlDevice != kSMNullDevHandle)
+		{
+			drv_parms.module        = agc_parms->module;
+			drv_parms.is_put		= 0;
+			drv_parms.agc_type		= agc_parms->agc_type;
+
+			result = smd_ioctl_dev_fwapi( 	BESPIO_ADJUST_AGC_PARAMS, 
+				                        	(SMIOCTLU *) &drv_parms,
+											smControlDevice,
+											sizeof(struct sm_adjust_agc_module_drv_parms),
+											drv_parms.module,
+											kFWLIBVersion										);
+
+			if (result == 0)
+			{
+				blockMult = (double)(*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_values[kAdjustAGCDrvFPGetParamIxBlockMult][0])));
+
+				inc 	= 1.0 + adjInc * blockMult;
+				red 	= 1.0 - adjRed * blockMult;
+				decay 	= 1.0 - adjDecay * blockMult;
+
+				*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_values[kAdjustAGCDrvFPPutParamIxLMaxDecay][0])) = 
+					(tSMIEEE32Bit754854Float)decay;
+				*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_values[kAdjustAGCDrvFPPutParamIxGainInc][0])) = 
+					(tSMIEEE32Bit754854Float)(inc);
+				*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_values[kAdjustAGCDrvFPPutParamIxSqrGainInc][0])) = 
+					(tSMIEEE32Bit754854Float)(inc*inc);
+				*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_values[kAdjustAGCDrvFPPutParamIxRecipGainInc][0])) = 
+					(tSMIEEE32Bit754854Float)(1.0/inc);
+				*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_values[kAdjustAGCDrvFPPutParamIxGainRed][0])) = 
+					(tSMIEEE32Bit754854Float)(red);
+				*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_values[kAdjustAGCDrvFPPutParamIxSqrRedOverInc][0])) = 
+					(tSMIEEE32Bit754854Float)((red*red)/(inc*inc));
+
+				drv_parms.is_put = 1;
+
+				result = smd_ioctl_dev_fwapi( 	BESPIO_ADJUST_AGC_PARAMS, 
+					                        	(SMIOCTLU *) &drv_parms,
+												smControlDevice,
+												sizeof(struct sm_adjust_agc_module_drv_parms),
+												drv_parms.module,
+												kFWLIBVersion										);
+			}
+		}
+		else
+	    {
+			result = ERR_SM_DEVERR;
+	    }
+	}
+
+	return result;
+}
+
+
+#ifdef _PROSDLL
+ACUDLL 
+#endif
+int sm_adjust_cond_module_params( struct sm_adjust_cond_module_parms* adjcondp )
+{
+	int										result;
+	tSMDevHandle 							smControlDevice;
+	struct sm_adjust_cond_module_drv_parms	drv_parms;
+
+	smControlDevice = smd_open_ctl_dev( );
+
+	if (smControlDevice != kSMNullDevHandle)
+	{
+		drv_parms.module			= adjcondp->module;
+		drv_parms.conditioning_type	= adjcondp->conditioning_type;
+		drv_parms.parameter_id		= adjcondp->parameter_id;
+
+		*((tSMIEEE32Bit754854Float*) (&drv_parms.fp_value[0])) = (tSMIEEE32Bit754854Float) adjcondp->parameter_value.fp_value;
+
+		drv_parms.int_value = adjcondp->parameter_value.int_value;
+
+		result = smd_ioctl_dev_fwapi( 	BESPIO_ADJUST_COND_PARAMS, 
+			                        	(SMIOCTLU *) &drv_parms,
+										smControlDevice,
+										sizeof(struct sm_adjust_cond_module_drv_parms),
+										drv_parms.module,
+										kFWLIBVersion										);
+	}
+	else
+    {
+		result = ERR_SM_DEVERR;
+    }
+
+	return result;
+}
 
 
 #ifdef SM_CRACK_API
@@ -2792,6 +3040,10 @@ int sm_crack_besp_ioctl( int ioctl, char* buffer )
        		sprintf(buffer, "RECORD_START1");
 			break;
 
+		case BESPIO_RECORD_START2:
+       		sprintf(buffer, "RECORD_START2");
+			break;
+
 		case BESPIO_SET_SIDETONE_CHANNEL1:
        		sprintf(buffer, "SET_SIDETONE_CHANNEL1");
 			break;
@@ -2808,12 +3060,24 @@ int sm_crack_besp_ioctl( int ioctl, char* buffer )
        		sprintf(buffer, "GET_RECOGNISED");
 			break;
 
+		case BESPIO_GET_RECOGNISED_IX:
+       		sprintf(buffer, "GET_RECOGNISED_IX");
+			break;
+
 		case BESPIO_READ_STATUS:
        		sprintf(buffer, "READ_STATUS");
 			break;
 
 		case BESPIO_WRITE_STATUS:
        		sprintf(buffer, "WRITE_STATUS");
+			break;
+
+		case BESPIO_READ_STATUS_IX:
+       		sprintf(buffer, "READ_STATUS_IX");
+			break;
+
+		case BESPIO_WRITE_STATUS_IX:
+       		sprintf(buffer, "WRITE_STATUS_IX");
 			break;
 
 		case BESPIO_PUT_LAST_REPLAY_DATA:
@@ -2826,6 +3090,14 @@ int sm_crack_besp_ioctl( int ioctl, char* buffer )
 
 		case BESPIO_ADJUST_CATSIG_PARAMS:
        		sprintf(buffer, "ADJUST_CATSIG_MODULE_PARAMS");
+			break;
+
+		case BESPIO_ADJUST_AGC_PARAMS:
+       		sprintf(buffer, "ADJUST_AGC_PARAMS");
+			break;
+
+		case BESPIO_ADJUST_COND_PARAMS:
+       		sprintf(buffer, "ADJUST_COND_PARAMS");
 			break;
 
 		default:

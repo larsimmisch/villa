@@ -78,6 +78,41 @@ static tSMDevHandle smdopen( char * smdevnp )
 }
 
 
+static void rootName( char* root, int isEventRootName )
+{
+	OSVERSIONINFO osvi;
+
+	ZeroMemory(&osvi,sizeof(OSVERSIONINFO));
+
+	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+
+	GetVersionEx (&osvi);
+
+	if ( osvi.dwMajorVersion > 4 )
+	{
+		if (isEventRootName)
+		{
+			strcpy(root,"Global\\");
+		}
+		else
+		{
+			strcpy(root,"\\\\.\\Global\\");
+		}
+	}
+	else
+	{
+		if (isEventRootName)
+		{
+			*root = 0;
+		}
+		else
+		{
+			strcpy(root,"\\\\.\\");
+		}
+	}
+}
+
+
 /*
  * SMD_OPEN_CTL_DEV
  *
@@ -91,11 +126,11 @@ static tSMDevHandle smdopen( char * smdevnp )
 tSMDevHandle smd_open_ctl_dev( void )
 {
 	int  isGoodDevice;
-	char controlDeviceName[20];
+	char controlDeviceName[64];
 
 	if (!(isGoodDevice = (smdControlDevHandle != INVALID_HANDLE_VALUE)))
    	{
-		strcpy(&controlDeviceName[0],"\\\\.\\");
+		rootName(&controlDeviceName[0],0);
 
 		strcpy(&controlDeviceName[strlen(&controlDeviceName[0])],kSMDNTDevControlName);
 
@@ -133,7 +168,7 @@ void smd_close_ctl_dev( void )
  */
 tSMDevHandle smd_open_chnl_dev( tSMChannelId channel )
 {
-	char			channelDeviceName[20];
+	char			channelDeviceName[64];
 	tSMChannelId 	result;
 	HANDLE			handle;
 
@@ -145,7 +180,7 @@ tSMDevHandle smd_open_chnl_dev( tSMChannelId channel )
 	 * For the user, the channel id is identified with 
 	 * this new handle.
 	 */
-	strcpy(&channelDeviceName[0],"\\\\.\\");
+	rootName(&channelDeviceName[0],0);
 
 	strcpy(&channelDeviceName[strlen(&channelDeviceName[0])],kSMDNTDevBasisName);
 
@@ -161,6 +196,8 @@ tSMDevHandle smd_open_chnl_dev( tSMChannelId channel )
 	}
 	else
 	{
+		SetHandleInformation(handle,HANDLE_FLAG_INHERIT,0);
+
 		result = (tSMChannelId) handle;
 	}
 
@@ -578,7 +615,7 @@ int smd_ev_create( tSMEventId* eventId, tSMChannelId channelId, int eventType, i
 {
 	int			rc;
 	tSMEventId 	ev;
-	char		eventName[64];
+	char		eventName1[64];
 	tSM_INT 	channelIx;
 
 	rc = 0;
@@ -595,28 +632,30 @@ int smd_ev_create( tSMEventId* eventId, tSMChannelId channelId, int eventType, i
 	
 	if (rc == 0)
 	{
+		rootName(&eventName1[0],1);
+
 		if ((eventType == kSMEventTypeWriteData) || (eventType == kSMEventTypeReadData))
 		{
 			if (sm_get_ev_mech() < 1)
 			{
 				if (eventChannelBinding == kSMChannelSpecificEvent)
 				{
-					sprintf(&eventName[0],"%s%d",kSMDNTDataEvBasisName,channelIx);
+					sprintf(&eventName1[strlen(&eventName1[0])],"%s%d",kSMDNTDataEvBasisName,channelIx);
 				}
 				else
 				{
-					sprintf(&eventName[0],"%s",kSMDNTCtlDataEvBasisName);
+					sprintf(&eventName1[strlen(&eventName1[0])],"%s",kSMDNTCtlDataEvBasisName);
 				}
 			}
 			else
 			{
 				if (eventChannelBinding == kSMChannelSpecificEvent)
 				{
-					sprintf(&eventName[0],"%s%d",(eventType == kSMEventTypeWriteData) ? kSMDNTWrDataEvBasisName : kSMDNTRdDataEvBasisName,channelIx);
+					sprintf(&eventName1[strlen(&eventName1[0])],"%s%d",(eventType == kSMEventTypeWriteData) ? kSMDNTWrDataEvBasisName : kSMDNTRdDataEvBasisName,channelIx);
 				}
 				else
 				{
-					sprintf(&eventName[0],"%s",(eventType == kSMEventTypeWriteData) ? kSMDNTCtlWrDataEvBasisName : kSMDNTCtlRdDataEvBasisName);
+					sprintf(&eventName1[strlen(&eventName1[0])],"%s",(eventType == kSMEventTypeWriteData) ? kSMDNTCtlWrDataEvBasisName : kSMDNTCtlRdDataEvBasisName);
 				}
 			}
 		}
@@ -624,11 +663,11 @@ int smd_ev_create( tSMEventId* eventId, tSMChannelId channelId, int eventType, i
 		{
 			if (eventChannelBinding == kSMChannelSpecificEvent)
 			{
-				sprintf(&eventName[0],"%s%d",kSMDNTRecogEvBasisName,channelIx);
+				sprintf(&eventName1[strlen(&eventName1[0])],"%s%d",kSMDNTRecogEvBasisName,channelIx);
 			}
 			else
 			{
-				sprintf(&eventName[0],"%s",kSMDNTCtlRecogEvBasisName);
+				sprintf(&eventName1[strlen(&eventName1[0])],"%s",kSMDNTCtlRecogEvBasisName);
 			}
 
 		}
@@ -639,7 +678,7 @@ int smd_ev_create( tSMEventId* eventId, tSMChannelId channelId, int eventType, i
 
 		if (rc == 0)
 		{
-			ev = (tSMEventId) OpenEvent(SYNCHRONIZE,FALSE,&eventName[0]);
+			ev = (tSMEventId) OpenEvent(SYNCHRONIZE,FALSE,&eventName1[0]);
 
 			if (ev == NULL)
 			{

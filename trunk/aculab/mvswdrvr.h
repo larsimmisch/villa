@@ -46,6 +46,19 @@
 #define ACUDLL
 #endif
 
+
+/* For Visual Basic Applications define ACU_VB_LIBRARY in the */
+/* 'Preprocessor definitions'. This allows the documented API functions to be   */
+/* exported correctly when building a DLL*/
+#ifndef	ACU_WINAPI
+#ifdef	ACU_VB_LIBRARY
+#define ACU_WINAPI WINAPI
+#else
+#define ACU_WINAPI
+#endif
+#endif
+
+
 #ifdef WIN32
 /*
  * Get definition for HANDLE.
@@ -75,8 +88,9 @@
 #include <sys/ioctl.h>
 #endif
 
-
+#ifndef ACU_SOLARIS_SPARC
 #pragma pack ( 1 )
+#endif
 
 
 /*
@@ -100,7 +114,11 @@ typedef int ACU_INT;
 #endif
 #ifndef _ACU_ULONG_
 #define _ACU_ULONG_
+#ifndef ACU_SOLARIS_SPARC
 typedef unsigned long ACU_ULONG;
+#else
+typedef unsigned int ACU_ULONG;
+#endif
 #endif
 #endif
 
@@ -179,6 +197,7 @@ typedef unsigned long ACU_ULONG;
 #define MC3_RING_STATUS                 _IOWR('m', 0x23, SWMSGBLK)
 #define MC3_EVENT_CRITERIA              _IOWR('m', 0x24, SWMSGBLK)
 #define MC3_RESYNC_RING                 _IOWR('m', 0x25, SWMSGBLK)
+#define MC3_RING_LATCHED_STATUS         _IOWR('m', 0x26, SWMSGBLK)
 
 #else
 
@@ -221,6 +240,7 @@ typedef unsigned long ACU_ULONG;
 #define MC3_RING_STATUS			0x23
 #define MC3_EVENT_CRITERIA		0x24
 #define MC3_RESYNC_RING			0x25
+#define MC3_RING_LATCHED_STATUS 0x26
 
 #endif /* ACU_DIGITAL */
 
@@ -299,6 +319,42 @@ typedef unsigned long ACU_ULONG;
 
 
 /*
+ * E1/T1 cPCI (C2) stream numering.
+ */ 
+#define kSW_LI_C2_NET1		32
+#define kSW_LI_C2_NET2		33
+#define kSW_LI_C2_NET3		34
+#define kSW_LI_C2_NET4		35
+#define kSW_LI_C2_NET5		36
+#define kSW_LI_C2_NET6		37
+#define kSW_LI_C2_NET7		38
+#define kSW_LI_C2_NET8		39
+
+/* Per port CAS DSP streams */
+#define kSW_LI_C2_DSP1_A	40
+#define kSW_LI_C2_DSP2_A	41
+#define kSW_LI_C2_DSP3_A	42
+#define kSW_LI_C2_DSP4_A	43
+#define kSW_LI_C2_DSP5_A	44
+#define kSW_LI_C2_DSP6_A	45
+#define kSW_LI_C2_DSP7_A	46
+#define kSW_LI_C2_DSP8_A	47
+
+/* Per port other func (eg. A-mu) streams */
+#define kSW_LI_C2_DSP1_B	56
+#define kSW_LI_C2_DSP2_B	57
+#define kSW_LI_C2_DSP3_B	58
+#define kSW_LI_C2_DSP4_B	59
+#define kSW_LI_C2_DSP5_B	60
+#define kSW_LI_C2_DSP6_B	61
+#define kSW_LI_C2_DSP7_B	62
+#define kSW_LI_C2_DSP8_B	63
+
+/* Aculab internal production test use only */
+#define kSW_LI_C2_TEST_LINK_1	64
+#define kSW_LI_C2_TEST_LINK_8	71
+
+/*
  * T1 PCI (T1) stream numering.
  */ 
 #define kSW_LI_T1_NET1		32
@@ -328,6 +384,29 @@ typedef unsigned long ACU_ULONG;
 #define kSW_MC3_F1_RING2				33
 #define kSW_MC3_F1_BERT					48
 #define kSW_MC3_F1_TIMESLOTS_IN_RING	2423
+
+
+/*
+ * VoIP PCI H.323 Gateway card (V1) stream numbering.
+ */ 
+#define kSW_LI_V1_NET1		32
+#define kSW_LI_V1_NET2		33
+#define kSW_LI_V1_NET3		34
+#define kSW_LI_V1_NET4		35
+
+#define kSW_LI_V1_DSP1		40
+#define kSW_LI_V1_DSP2		41
+#define kSW_LI_V1_DSP3		42
+#define kSW_LI_V1_DSP4		43
+
+#define kSW_VOIP_V1_MODULE_0 48
+#define kSW_VOIP_V1_MODULE_1 49
+#define kSW_VOIP_V1_MODULE_2 50
+#define kSW_VOIP_V1_MODULE_3 51
+#define kSW_VOIP_V1_MODULE_4 52
+#define kSW_VOIP_V1_MODULE_5 53
+#define kSW_VOIP_V1_MODULE_6 54
+#define kSW_VOIP_V1_MODULE_7 55
 
 
 #define ERR_SW_INVALID_COMMAND     (-200)  		/* Command code is not supported       	*/
@@ -405,6 +484,12 @@ typedef unsigned long ACU_ULONG;
 #define CLOCK_REF_NET3     	0x000C
 #define CLOCK_REF_NET4     	0x000D
 
+#define CLOCK_REF_NET5     	0x0005
+#define CLOCK_REF_NET6     	0x000A
+#define CLOCK_REF_NET7     	0x000B
+#define CLOCK_REF_NET8     	0x000E
+
+
 #define CLOCK_PRIVATE       0x0010
 #define MC3_MVIP_B			0x0020
 #define DRIVE_SCBUS         0x0040
@@ -421,6 +506,10 @@ typedef unsigned long ACU_ULONG;
 #define SEC8K_DRIVEN_BY_OTHER_BUS_SEC8K  	0x0700
 #define SEC8K_DRIVEN_BY_RING1  				0x0800
 #define SEC8K_DRIVEN_BY_RING2  				0x0900
+#define SEC8K_DRIVEN_BY_NET5  				0x0A00
+#define SEC8K_DRIVEN_BY_NET6  				0x0B00
+#define SEC8K_DRIVEN_BY_NET7  				0x0C00
+#define SEC8K_DRIVEN_BY_NET8  				0x0D00
 
 #define IDLE   0x54           /* ccitt Idle Pattern */
 
@@ -434,17 +523,20 @@ typedef struct swver_parms {
 	ACU_INT		buildno1;	
 } SWVER_PARMS;
 
-#define SW_ISADAC_REV4_CARD		1
-#define SW_ISADAC_REV5_CARD		2
-#define SW_ISADAC_BR4_CARD		3
-#define SW_ISADAC_BR8_CARD   	4
-#define SW_ISAMC3_CARD			5
-#define SW_PROSODY_PCI_CARD		0x10
-#define SW_T1_PCI_HALF_CARD		0x11
-#define SW_E1_T1_PCI_TRUNK_CARD	0x12
-#define SW_PCIMC3_CARD			0x13
-#define SW_VOIP_PCI_CARD		0x14
-#define SW_PROSODY_CPCI_CARD	0x20
+#define SW_ISADAC_REV4_CARD				1
+#define SW_ISADAC_REV5_CARD				2
+#define SW_ISADAC_BR4_CARD				3
+#define SW_ISADAC_BR8_CARD   			4
+#define SW_ISAMC3_CARD					5
+#define SW_PROSODY_PCI_CARD				0x10
+#define SW_T1_PCI_HALF_CARD				0x11
+#define SW_E1_T1_PCI_TRUNK_CARD			0x12
+#define SW_E1_T1_PCI_CARD				0x12 /* Alternative name */
+#define SW_PCIMC3_CARD					0x13
+#define SW_VOIP_PCI_H323_GATEWAY_CARD	0x14
+#define SW_PROSODY_CPCI_CARD			0x20
+#define SW_E1_T1_CPCI_CARD				0x21
+#define SW_VOIP_CPCI_H323_GATEWAY_CARD	0x22
 
 #define kSWMaxSerialNoText 12
 
@@ -602,6 +694,9 @@ typedef struct track_313_parms
 #define H100_CHANGEOVER_TO_NETWORK	0x20
 #define H100_CHANGEOVER_TO_NETREF	0x40
 #define H100_CHANGEOVER_TO_NETREF_2	0x80
+#define H100_CHANGEOVER_TO_RING_1         0x100
+#define H100_CHANGEOVER_TO_RING_2         0x200
+#define H100_CHANGEOVER_TO_ALTERNATE_RING 0x400
 
 #define H100_DISABLE_NETREF		0
 #define H100_ENABLE_NETREF		1
@@ -696,6 +791,10 @@ typedef struct mc3_bert_status_parms
 #define MC3_RING_STATUS_OUT_OF_FRAME		4
 #define MC3_RING_STATUS_LOSS_OF_FRAME		5
 #define MC3_RING_STATUS_LOSS_OF_SIGNAL		6
+#define MC3_RING_STATUS_RECEIVE_ALARM_FSA	7
+#define MC3_RING_STATUS_RECEIVE_ALARM_TXPAA	8
+#define MC3_RING_STATUS_RECEIVE_ALARM_PPCE	9
+#define MC3_RING_STATUS_CLOCK_HOLDOVER	   15
 
 typedef struct mc3_ring_status_parms
 {
@@ -783,7 +882,7 @@ extern "C" {
 /*--------- Multiple Driver Functions ---------*/
 /*---------------------------------------------*/
 
-ACUDLL int sw_ver_switch( 
+ACUDLL int ACU_WINAPI sw_ver_switch( 
 	int, struct swver_parms*
 );
 
@@ -791,43 +890,43 @@ ACUDLL int sw_card_info(
 	int, struct swcard_info_parms*
 );
 
-ACUDLL int sw_reset_switch( 
+ACUDLL int ACU_WINAPI sw_reset_switch( 
 	int
 );
 
-ACUDLL int sw_reinit_switch( 
+ACUDLL int ACU_WINAPI sw_reinit_switch( 
 	int 
 );
 
-ACUDLL int sw_query_switch_caps( 
+ACUDLL int ACU_WINAPI sw_query_switch_caps( 
 	int, struct capabilities_parms * 
 );
 
-ACUDLL int sw_set_output( 
+ACUDLL int ACU_WINAPI sw_set_output( 
 	int, struct output_parms * 
 );
 
-ACUDLL int sw_query_output(
+ACUDLL int ACU_WINAPI sw_query_output(
 	int, struct output_parms * 
 );
 
-ACUDLL int sw_sample_input(
+ACUDLL int ACU_WINAPI sw_sample_input(
 	int, struct sample_parms * 
 );
 
-ACUDLL int sw_sample_input0(
+ACUDLL int ACU_WINAPI sw_sample_input0(
 	int, struct sample_parms * 
 );
 
-ACUDLL int sw_clock_control(
+ACUDLL int ACU_WINAPI sw_clock_control(
 	int, int 
 );
 
-ACUDLL int sw_query_clock_control(
+ACUDLL int ACU_WINAPI sw_query_clock_control(
 	int, struct query_clkmode_parms *
 );
 
-ACUDLL int sw_dump_switch(
+ACUDLL int ACU_WINAPI sw_dump_switch(
 	int, struct dump_parms *  
 );
 
@@ -843,23 +942,23 @@ ACUDLL int sw_set_verify(
 	int, int 
 );
 
-ACUDLL int sw_tristate_switch( 
+ACUDLL int ACU_WINAPI sw_tristate_switch( 
 	int, int 
 );
 
-ACUDLL int sw_get_drvrs(
+ACUDLL int ACU_WINAPI sw_get_drvrs(
 	void 
 );
 
-ACUDLL int sw_clock_scbus_master(
+ACUDLL int ACU_WINAPI sw_clock_scbus_master(
 	void 
 );
 
-ACUDLL int sw_switch_override_mode( 
+ACUDLL int ACU_WINAPI sw_switch_override_mode( 
 	int, int 
 );
 
-ACUDLL int sw_mode_switch(
+ACUDLL int ACU_WINAPI sw_mode_switch(
 	int, struct swmode_parms * 
 );
 
@@ -867,19 +966,19 @@ ACUDLL int sw_mode_switch(
 /*--------- H.100 switch functions ------------*/
 /*---------------------------------------------*/
 
-ACUDLL int sw_h100_config_board_clock( 
+ACUDLL int ACU_WINAPI sw_h100_config_board_clock( 
 	int, struct h100_config_board_clock_parms*    	
 );
 
-ACUDLL int sw_h100_config_netref_clock( 
+ACUDLL int ACU_WINAPI sw_h100_config_netref_clock( 
 	int, struct h100_netref_clock_parms*   
 );
 
-ACUDLL int sw_h100_query_board_clock( 
+ACUDLL int ACU_WINAPI sw_h100_query_board_clock( 
 	int, struct h100_query_board_clock_parms*  
 );
 
-ACUDLL int sw_h100_query_netref_clock( 
+ACUDLL int ACU_WINAPI sw_h100_query_netref_clock( 
 	int, struct h100_netref_clock_parms*   
 );
 
@@ -901,6 +1000,10 @@ ACUDLL int sw_mc3_bypass_fibre(
 
 ACUDLL int sw_mc3_resync_ring( 
 	int, int 
+);
+
+ACUDLL int sw_mc3_ring_latched_status( 
+	int, struct mc3_ring_status_parms*
 );
 
 ACUDLL int sw_mc3_ring_status( 
@@ -1004,7 +1107,9 @@ ACUDLL void sw_track_api_calls(
 
 #endif
 
+#ifndef ACU_SOLARIS_SPARC
 #pragma pack ( )
+#endif
 
 #endif
 

@@ -137,6 +137,7 @@
 #define SMIO_FIND_CHANNEL				(SMIO_SUP_GENERIC_BASE+0)
 #define SMIO_CHANNEL_IX_INFO			(SMIO_SUP_GENERIC_BASE+1)
 #define SMIO_SWITCH_CHANNEL_IX			(SMIO_SUP_GENERIC_BASE+2)
+#define SMIO_CHANNEL_IX_DUMP			(SMIO_SUP_GENERIC_BASE+3)
 
 #else
 
@@ -181,6 +182,7 @@
 #define SMIO_FIND_CHANNEL				(int)(SMIO_SUP_GENERIC_BASE+0)
 #define SMIO_CHANNEL_IX_INFO			(int)(SMIO_SUP_GENERIC_BASE+1)
 #define SMIO_SWITCH_CHANNEL_IX			(int)(SMIO_SUP_GENERIC_BASE+2)
+#define SMIO_CHANNEL_IX_DUMP			(int)(SMIO_SUP_GENERIC_BASE+3)
 
 #endif
 
@@ -314,6 +316,7 @@ typedef struct sm_module_info_parms {
 #define kSMChannelCapsALaw				(1<<3)
 #define kSMChannelCapsULaw				(1<<4)
 #define kSMChannelCapsNoCompanding		(1<<5)
+#define kSMChannelCapsNoSwitching		(1<<6)
 
 
 typedef struct sm_channel_alloc_parms {
@@ -401,6 +404,22 @@ typedef struct sm_channel_ix_info_parms {
 	tSM_INT			module;
 } SM_CHANNEL_IX_INFO_PARMS;
 
+#define kSMChIxDumpCmdReadRecogWaiting 		0
+#define kSMChIxDumpCmdReadGenMemLength 		1
+#define kSMChIxDumpCmdReadGenMem 			2
+#define kSMChIxDumpCmdReadFWMemLength 		3
+#define kSMChIxDumpCmdReadFWMem 			4
+#define kSMChIxDumpCmdReadOSInfo 			5
+
+typedef struct sm_channel_ix_dump_parms {
+	tSM_INT			channel_ix;
+	tSM_INT			word_count;		/* Count of 32 bit words to retrive. */
+	tSM_INT			cmd;
+	tSM_INT			use_weak_lock;
+	tSM_UT32		addr;
+	tSM_UT32		data[(kMaxIOCTLSpaceParmsSize - ((4*sizeof(tSM_INT)) + (2*sizeof(tSM_UT32))))/sizeof(tSM_UT32)];
+} SM_CHANNEL_IX_DUMP_PARMS;
+
 
 /*
  * Generic codes - others specific to f/w.
@@ -414,6 +433,13 @@ typedef struct sm_recognised_parms {
     tSM_INT			param0;
 	tSM_INT			param1;
 } SM_RECOGNISED_PARMS;
+
+typedef struct sm_recognised_ix_parms {
+	tSM_INT			channel_ix;
+	tSM_INT			type;
+    tSM_INT			param0;
+	tSM_INT			param1;
+} SM_RECOGNISED_IX_PARMS;
 
 /*
  * SerialNumber/DongleNumber/AlgorithmID/NumLicenses/Checksum
@@ -445,7 +471,9 @@ typedef union {
 	SM_CHANNEL_SET_EVENT_PARMS		channel_set_event_parms;
 	SM_CHANNEL_INFO_PARMS			channel_info_parms;
 	SM_CHANNEL_IX_INFO_PARMS		channel_ix_info_parms;
+	SM_CHANNEL_IX_DUMP_PARMS		channel_ix_dump_parms;
 	SM_RECOGNISED_PARMS				recognised_parms;
+	SM_RECOGNISED_IX_PARMS			recognised_ix_parms;
 	SM_ENABLE_LICENCE_PARMS			enable_licence_parms;
 	tSM_INT							trace_level;
 	void*							usr_space_parms;
@@ -651,6 +679,10 @@ ACUDLL int sm_channel_info(
 
 ACUDLL int sm_channel_ix_info( 
 	struct sm_channel_ix_info_parms*
+);
+
+ACUDLL int sm_channel_ix_dump( 
+	struct sm_channel_ix_dump_parms*
 );
 
 ACUDLL int sm_reset_channel( 

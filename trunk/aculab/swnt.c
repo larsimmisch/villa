@@ -137,7 +137,7 @@ int swioctl ( int function, SWIOCTLU* pioctl, HANDLE swh, int size )
 									sizeof(SXNTIOCTL),
 									&swntioctl, 
 									sizeof(SXNTIOCTL),
-									&bytesReturned,
+									(unsigned long *)&bytesReturned,
 									&overlapped			);
  		if (!ioResult)
 		{
@@ -147,7 +147,7 @@ int swioctl ( int function, SWIOCTLU* pioctl, HANDLE swh, int size )
 		
 				ioResult = GetOverlappedResult(	(HANDLE)opHandle,
 												&overlapped,
-												&bytesReturned,
+												(unsigned long *)&bytesReturned,
 												TRUE				);
 			}
 		}
@@ -297,17 +297,3 @@ int sw_ev_wait( int swdrvr, tSWEventId eventId )
 	return 0;
 }
 
-int __stdcall SWDEVIOCTL(unsigned switchNr, unsigned function, unsigned* parms)
-{
-	int result = swopendev ( );
-
-	if ( result == 0 )
-    {
-		result = swioctl(function, (SWIOCTLU*)parms, swcard[switchNr], sizeof(SWIOCTLU));
-	}
-	else
-	{
-		result = MVIP_DEVICE_ERROR;
-	}
-	return result;
-}

@@ -820,9 +820,9 @@ ACUDLL
 int sm_channel_release
 ( tSMChannelId channel )
 {
-	int 			result;
-	tSMDevHandle 	smControlDevice;
-	tSMChannelId	localChannel;
+	int 						result;
+	tSMDevHandle 				smControlDevice;
+	tSMChannelId				localChannel;
 
 	smControlDevice = smd_open_ctl_dev();
 
@@ -1256,6 +1256,33 @@ int sm_enable_licence
 }
 
 
+#ifdef _PROSDLL
+ACUDLL 
+#endif
+int sm_channel_ix_dump
+( struct sm_channel_ix_dump_parms* dumpp )
+{
+	int 			result;
+	tSMDevHandle 	smControlDevice;
+
+	smControlDevice = smd_open_ctl_dev( );
+
+	if (smControlDevice != kSMNullDevHandle)
+	{
+		result = smd_ioctl_dev_generic( 	SMIO_CHANNEL_IX_DUMP, 
+							                (SMIOCTLU *) dumpp,
+											(tSMDevHandle) smControlDevice,
+											sizeof(struct sm_channel_ix_dump_parms) );	
+	}
+	else
+    {
+		result = ERR_SM_DEVERR;
+    }
+
+	return result;
+}
+
+
 #ifdef SM_CRACK_API
 
 void sm_crack_result( int result, char* buffer )
@@ -1535,6 +1562,10 @@ int sm_crack_generic_ioctl( int ioctl, char* buffer )
 
 		case SMIO_SWITCH_CHANNEL_IX:
         	sprintf(buffer,"SWITCH_CHANNEL_IX");
+			break;
+
+		case SMIO_CHANNEL_IX_DUMP:
+        	sprintf(buffer,"CHANNEL_IX_DUMP");
 			break;
 
 		default:

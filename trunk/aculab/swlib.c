@@ -90,7 +90,7 @@ extern int nswitch;
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_ver_switch( int swdrvr, struct swver_parms * verp )
+int ACU_WINAPI sw_ver_switch( int swdrvr, struct swver_parms * verp )
 {
 	int  result;
 
@@ -153,7 +153,7 @@ int sw_card_info( int swdrvr, struct swcard_info_parms * cardinfop )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_mode_switch( int swdrvr, struct swmode_parms * modep )
+int ACU_WINAPI sw_mode_switch( int swdrvr, struct swmode_parms * modep )
 {
 	int  result;
 
@@ -185,7 +185,7 @@ int sw_mode_switch( int swdrvr, struct swmode_parms * modep )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_reinit_switch( int swdrvr )
+int ACU_WINAPI sw_reinit_switch( int swdrvr )
 {
 	int  result;
 
@@ -217,7 +217,7 @@ int sw_reinit_switch( int swdrvr )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_reset_switch( int swdrvr )
+int ACU_WINAPI sw_reset_switch( int swdrvr )
 {
 	int  result;
 
@@ -249,7 +249,7 @@ int sw_reset_switch( int swdrvr )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_query_switch_caps( int swdrvr, struct capabilities_parms * capabilitiesp )
+int ACU_WINAPI sw_query_switch_caps( int swdrvr, struct capabilities_parms * capabilitiesp )
 {
 	int  result;
 
@@ -281,7 +281,7 @@ int sw_query_switch_caps( int swdrvr, struct capabilities_parms * capabilitiesp 
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_set_output( int swdrvr, struct output_parms * outputp )
+int ACU_WINAPI sw_set_output( int swdrvr, struct output_parms * outputp )
 {
 	int  result;
 
@@ -313,7 +313,7 @@ int sw_set_output( int swdrvr, struct output_parms * outputp )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_query_output( int swdrvr, struct output_parms * queryp ) 
+int ACU_WINAPI sw_query_output( int swdrvr, struct output_parms * queryp ) 
 {
 	int  result;
 
@@ -345,7 +345,7 @@ int sw_query_output( int swdrvr, struct output_parms * queryp )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_sample_input( int swdrvr, struct sample_parms * samplep )
+int ACU_WINAPI sw_sample_input( int swdrvr, struct sample_parms * samplep )
 {
 	int  result;
 
@@ -377,7 +377,7 @@ int sw_sample_input( int swdrvr, struct sample_parms * samplep )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_sample_input0( int swdrvr, struct sample_parms * samplep )
+int ACU_WINAPI sw_sample_input0( int swdrvr, struct sample_parms * samplep )
 {
 	int  result;
 
@@ -409,7 +409,7 @@ int sw_sample_input0( int swdrvr, struct sample_parms * samplep )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_clock_control( int swdrvr, int clockmode )
+int ACU_WINAPI sw_clock_control( int swdrvr, int clockmode )
 {
 	int  	result;
 	ACU_INT	localInt;
@@ -444,7 +444,7 @@ int sw_clock_control( int swdrvr, int clockmode )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_query_clock_control( int swdrvr, struct query_clkmode_parms * qclkmodep )
+int ACU_WINAPI sw_query_clock_control( int swdrvr, struct query_clkmode_parms * qclkmodep )
 {
 	int  result;
    
@@ -476,7 +476,7 @@ int sw_query_clock_control( int swdrvr, struct query_clkmode_parms * qclkmodep )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_tristate_switch( int swdrvr, int tristate )
+int ACU_WINAPI sw_tristate_switch( int swdrvr, int tristate )
 {
 	int  	result;
 	ACU_INT	localInt;
@@ -511,7 +511,7 @@ int sw_tristate_switch( int swdrvr, int tristate )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_dump_switch( int swdrvr, struct dump_parms * dumpp )
+int ACU_WINAPI sw_dump_switch( int swdrvr, struct dump_parms * dumpp )
 {
 	int  result;
 
@@ -543,7 +543,7 @@ int sw_dump_switch( int swdrvr, struct dump_parms * dumpp )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_clock_scbus_master(void)
+int ACU_WINAPI sw_clock_scbus_master(void)
 {
    	int  			result;
    	int  			i;
@@ -695,7 +695,7 @@ int sw_set_verify( int swdrvr, int verifymode )
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_get_drvrs(void)
+int ACU_WINAPI sw_get_drvrs(void)
 {
 	int result;
 
@@ -717,7 +717,7 @@ int sw_get_drvrs(void)
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_switch_override_mode( int swdrvr, int overridemode )
+int ACU_WINAPI sw_switch_override_mode( int swdrvr, int overridemode )
 { 
 	int  	result;
 	ACU_INT	localInt;
@@ -788,7 +788,7 @@ int sw_register_event( 	int 							swdrvr,
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_h100_config_board_clock( int										swdrvr,
+int ACU_WINAPI sw_h100_config_board_clock( int										swdrvr,
 								struct h100_config_board_clock_parms*   setH100ClockParms	)
 {
 	int  result;
@@ -821,7 +821,7 @@ int sw_h100_config_board_clock( int										swdrvr,
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_h100_config_netref_clock(	int								swdrvr,
+int ACU_WINAPI sw_h100_config_netref_clock(	int								swdrvr,
 									struct h100_netref_clock_parms*	setH100NetrefParms	)   
 {
 	int  result;
@@ -854,7 +854,7 @@ int sw_h100_config_netref_clock(	int								swdrvr,
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_h100_query_board_clock(	int										swdrvr,
+int ACU_WINAPI sw_h100_query_board_clock(	int										swdrvr,
 								struct h100_query_board_clock_parms*	queryH100ClockParms	)
 {
 	int  result;
@@ -887,7 +887,7 @@ int sw_h100_query_board_clock(	int										swdrvr,
 #ifdef _ACUSWITCHDLL
 ACUDLL
 #endif
-int sw_h100_query_netref_clock(	int								swdrvr,
+int ACU_WINAPI sw_h100_query_netref_clock(	int								swdrvr,
 								struct h100_netref_clock_parms*	queryH100NetrefParms	)   
 {
 	int  result;
@@ -1071,6 +1071,39 @@ int sw_mc3_ring_status( int 							swdrvr,
 								(SWIOCTLU *) rsparms,
 								swcard[swdrvr],
 								sizeof(MC3_RING_STATUS_PARMS) );
+		}
+		else
+		{
+			result = ERR_SW_INVALID_SWITCH;
+		}
+	}
+	else
+    {
+		result = MVIP_DEVICE_ERROR;
+	}
+
+	return result;
+}
+
+
+#ifdef _ACUSWITCHDLL
+ACUDLL
+#endif
+int sw_mc3_ring_latched_status( int                             swdrvr, 
+                                struct mc3_ring_status_parms*   rsparms ) 
+{
+	int  result;
+
+	result = swopendev ( );
+
+	if (result == 0)
+	{
+		if ((swdrvr < nswitch) && (swdrvr >= 0))
+		{
+			result = swioctl(   MC3_RING_LATCHED_STATUS,
+			                    (SWIOCTLU *) rsparms,
+			                    swcard[swdrvr],
+			                    sizeof(MC3_RING_STATUS_PARMS) );
 		}
 		else
 		{
@@ -1789,6 +1822,8 @@ void sw_track_api_calls( int tracking_on )
 	int					oldestSwitchTraceIx;
 	time_t				long_time;
 	struct tm*			newtime;      
+	int					collectionIx;
+	int					trackParmsCollectionIx[NSWITCH];
 
 	n = sw_get_drvrs();
 
@@ -1796,6 +1831,8 @@ void sw_track_api_calls( int tracking_on )
 	{
 		trackParms[i].is_tracked_data = 0;
 	}
+
+	collectionIx = 0;
 
 	do
 	{
@@ -1811,6 +1848,12 @@ void sw_track_api_calls( int tracking_on )
 				{
 					trackParms[i].is_tracked_data = 0;
 				}
+				else if (trackParms[i].is_tracked_data)
+				{
+					trackParmsCollectionIx[i] = collectionIx;
+
+					collectionIx += 1;
+				}
 			}
 
 			if (trackParms[i].is_tracked_data)
@@ -1820,6 +1863,11 @@ void sw_track_api_calls( int tracking_on )
 					oldestSwitchTraceIx = i;
 				}
 				else if (trackParms[i].timestamp < trackParms[oldestSwitchTraceIx].timestamp)
+				{
+					oldestSwitchTraceIx = i;
+				}
+				else if (	(trackParms[i].timestamp == trackParms[oldestSwitchTraceIx].timestamp)
+						 && (trackParmsCollectionIx[i] < trackParmsCollectionIx[oldestSwitchTraceIx]) )
 				{
 					oldestSwitchTraceIx = i;
 				}

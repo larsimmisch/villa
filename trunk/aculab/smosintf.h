@@ -75,7 +75,9 @@ int smd_ev_abort(int,int,int);
 #ifdef SM_CLONE_UNIX
 
 ACUDLL int smd_ev_create_allkinds_any( tSMEventId* eventId );
+ACUDLL int smd_ev_create_allkinds_specific( tSMEventId* eventId, tSMChannelId channelId );
 ACUDLL int smd_ev_allkinds_any_wait( tSMEventId eventId, int* isWrite, int* isRead, int* isRecog );
+ACUDLL int smd_ev_allkinds_specific_wait( tSMEventId eventId, int* isWrite, int* isRead, int* isRecog );
 
 #endif
 #endif

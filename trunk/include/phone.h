@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.15 2001/09/30 09:51:57 lars Exp $
+	$Id: phone.h,v 1.16 2003/11/22 23:44:46 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -15,26 +15,10 @@
 #include "log.h"
 #include "phoneclient.h"
 #include "switch.h"
+#include "errors.h"
 #include "exc.h"
 
 enum { indefinite = -1 };
-
-enum result  
-{
-	r_ok, 
-	r_timeout, 
-	r_aborted, 
-	r_rejected, 
-	r_disconnected, 
-	r_failed, 
-	r_invalid, 
-	r_busy, 
-	r_not_available,
-	r_no_dialtone,
-	r_empty,
-	r_bad_state,
-	r_number_changed
-};
 
 class Media;
 class MediaClient;
@@ -72,7 +56,10 @@ public:
 	virtual int reject(int cause = 0) = 0;
 	
 	// transfer
-	virtual int transfer(const SAP& remote, unsigned timeout = indefinite) { return r_not_available; }
+	virtual int transfer(const SAP& remote, unsigned timeout = indefinite) 
+	{ 
+		return PHONE_ERROR_NOT_IMPLEMENTED; 
+	}
 
 	// Dissolve a connection
 	virtual int disconnect(int cause = 0) = 0;
@@ -145,7 +132,7 @@ public:
 	};
 
     Sample(unsigned pos = 0) : m_position(pos), m_userData(0), 
-		m_status(r_ok), m_state(idle) {}
+		m_status(PHONE_OK), m_state(idle) {}
     virtual ~Sample() {}
 
     virtual unsigned start(Media* aMedia) = 0;

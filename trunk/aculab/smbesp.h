@@ -1,5 +1,5 @@
 /*------------------------------------------------------------*/
-/* Copyright ACULAB plc. (c) 1996-1997                        */
+/* Copyright ACULAB plc. (c) 1996-2000                        */
 /*------------------------------------------------------------*/
 /*                                                            */
 /*                                                            */
@@ -58,7 +58,6 @@
 #define BESPIO_VOCAB_COMPLETE			(SMIO_FW_MODULE_CONTROL_BASE+9)
 #define BESPIO_ASR_MODULE_PARAMETERS	(SMIO_FW_MODULE_CONTROL_BASE+10)
 
-
 /* Conferencing primitives where subject channel handle are replaced by channel ixs */
 #define BESPIO_CONF_PRIMIX_START		(SMIO_FW_MODULE_CONTROL_BASE+11)
 #define BESPIO_CONF_PRIMIX_ADD			(SMIO_FW_MODULE_CONTROL_BASE+12)
@@ -71,6 +70,8 @@
 
 #define BESPIO_ADJUST_INPUT_TONE_SET	(SMIO_FW_MODULE_CONTROL_BASE+19)
 #define BESPIO_ADJUST_CATSIG_PARAMS		(SMIO_FW_MODULE_CONTROL_BASE+20)
+#define BESPIO_ADJUST_AGC_PARAMS		(SMIO_FW_MODULE_CONTROL_BASE+21)
+#define BESPIO_ADJUST_COND_PARAMS		(SMIO_FW_MODULE_CONTROL_BASE+22)
 
 #define BESPIO_REPLAY_START				(SMIO_FW_CHANNEL_CONTROL_BASE+0)
 #define BESPIO_PUT_REPLAY_DATA			(SMIO_FW_CHANNEL_CONTROL_BASE+1)
@@ -120,6 +121,10 @@
 #define BESPIO_WRITE_STATUS				(SMIO_FW_CHANNEL_CONTROL_BASE+43)
 #define BESPIO_PUT_LAST_REPLAY_DATA		(SMIO_FW_CHANNEL_CONTROL_BASE+44)
 #define BESPIO_CATSIG_LISTEN_FOR		(SMIO_FW_CHANNEL_CONTROL_BASE+45)
+#define BESPIO_READ_STATUS_IX			(SMIO_FW_CHANNEL_CONTROL_BASE+46)
+#define BESPIO_WRITE_STATUS_IX			(SMIO_FW_CHANNEL_CONTROL_BASE+47)
+#define BESPIO_RECORD_START2			(SMIO_FW_CHANNEL_CONTROL_BASE+48)
+#define BESPIO_GET_RECOGNISED_IX		(SMIO_FW_CHANNEL_CONTROL_BASE+49)
 
 
 /*
@@ -129,6 +134,11 @@ typedef struct sm_besp_status_parms {
 	tSMChannelId	channel;
 	tSM_INT			status;
 } SM_BESP_STATUS_PARMS;
+
+typedef struct sm_besp_status_ix_parms {
+	tSM_INT			channel_ix;
+	tSM_INT			status;
+} SM_BESP_STATUS_IX_PARMS;
 
 typedef struct sm_output_freq_parms {
 	tSM_INT		module;
@@ -213,6 +223,8 @@ typedef struct sm_input_tone_set_drv_parms {
 #define kAdjustToneSetFPParamIdTwist 		4
 #define kAdjustToneSetIntParamIdMinOnTime 	5
 #define kAdjustToneSetIntParamIdMinOffTime	6
+#define kAdjustToneSetFPParamIdStartFreq 	7
+#define kAdjustToneSetFPParamIdStopFreq		8
 
 typedef struct sm_adjust_tone_set_drv_parms {
 	tSM_INT		module;
@@ -409,9 +421,21 @@ typedef struct sm_play_digits_status_parms {
 	tSM_INT			status;
 } SM_PLAY_DIGITS_STATUS_PARMS;
 
+#define kSMChannelCapsRecAltDataSourceOnly 	(1<<14)
+
 #define kSMDRecordNoElimination 		0
 #define kSMDRecordSilenceElimination 	1
 #define kSMDRecordToneElimination 		2
+#define kSMDRecordVADInitElimination 	3
+#define kSMDRecordVADNextElimination 	4
+
+
+/*
+ * Values for alt_data_source_type in sm_record_parms.
+ */
+#define kSMRecordAltSourceDefault		0
+#define kSMRecordAltSourceInput			1
+#define kSMRecordAltSourceOutput		2
 
 typedef struct sm_record_parms {
 	tSMChannelId	channel;
@@ -425,6 +449,11 @@ typedef struct sm_record_parms {
 	tSM_UT32		max_octets;
 	tSM_UT32		max_elapsed_time;
 	tSM_UT32  		max_silence;	
+#ifndef _SM_BESP_PRE1P4_
+	tSM_INT			agc;				/* Non-zero if AGC enabled. */
+	tSM_INT			volume;	
+	tSM_INT			alt_data_source_type;
+#endif
 } SM_RECORD_PARMS;
 
 
@@ -791,6 +820,57 @@ typedef struct sm_adjust_catsig_module_parms {
 	} parameter_value;
 } SM_ADJUST_CATSIG_MODULE_PARMS;
 
+#define kSMAGCTypeRecord	0
+#define kSMAGCTypeReplay	1
+
+#define kAdjustAGCFPParamIxMaxIncreseRate 	0
+#define kAdjustAGCFPParamIxMaxDecreaseRate	1
+#define kAdjustAGCFPParamIxSensitivity	 	2
+
+#define kAdjustAGCDrvFPGetParamIxBlockMult	0
+#define kAdjustAGCDrvFPGetParamIxMuLevel	1
+#define kAdjustAGCDrvFPGetParamIxMuEnergy	2
+
+#define kAdjustAGCDrvFPPutParamIxLMaxDecay		0
+#define kAdjustAGCDrvFPPutParamIxGainInc		1
+#define kAdjustAGCDrvFPPutParamIxSqrGainInc		2
+#define kAdjustAGCDrvFPPutParamIxRecipGainInc	3
+#define kAdjustAGCDrvFPPutParamIxGainRed		4
+#define kAdjustAGCDrvFPPutParamIxSqrRedOverInc	5
+
+typedef struct sm_adjust_agc_module_drv_parms {
+	tSM_INT		module;
+	tSM_INT		is_put;
+	tSM_INT		agc_type;
+	tSM_UT8		fp_values[8][4];
+	tSM_INT		int_values[4];
+} SM_ADJUST_AGC_MODULE_DRV_PARMS;
+
+typedef struct sm_adjust_agc_module_parms {
+	tSM_INT		module;
+	tSM_INT		agc_type;
+	double		fp_params[4];
+} SM_ADJUST_AGC_MODULE_PARMS;
+
+typedef struct sm_adjust_cond_module_drv_parms {
+	tSM_INT		module;
+	tSM_INT		conditioning_type;
+	tSM_INT		parameter_id;
+	tSM_UT8		fp_value[4];
+	tSM_INT		int_value;
+} SM_ADJUST_COND_MODULE_DRV_PARMS;
+
+typedef struct sm_adjust_cond_module_parms {
+	tSM_INT		module;
+	tSM_INT		conditioning_type;
+	tSM_INT		parameter_id;
+	union 
+	{
+		double		fp_value;
+		tSM_INT		int_value;
+	} parameter_value;
+} SM_ADJUST_COND_MODULE_PARMS;
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -912,6 +992,14 @@ ACUDLL int sm_besp_write_status(
 	struct sm_besp_status_parms*
 );
 
+ACUDLL int sm_besp_read_status_ix(
+	struct sm_besp_status_ix_parms*
+);
+
+ACUDLL int sm_besp_write_status_ix(
+	struct sm_besp_status_ix_parms*
+);
+
 ACUDLL int sm_listen_for( 
 	struct sm_listen_for_parms*
 );
@@ -1004,6 +1092,10 @@ ACUDLL int sm_get_recognised(
 	struct sm_recognised_parms* 
 );
 
+ACUDLL int sm_get_recognised_ix( 
+	struct sm_recognised_ix_parms* 
+);
+
 ACUDLL int sm_discard_recognised(
 	tSMChannelId
 );
@@ -1022,6 +1114,14 @@ ACUDLL int sm_adjust_catsig_module_params(
 
 ACUDLL int sm_catsig_listen_for(
 	struct sm_catsig_listen_for_parms*
+);
+
+ACUDLL int sm_adjust_agc_module_params(
+	struct sm_adjust_agc_module_parms*
+);
+
+ACUDLL int sm_adjust_cond_module_params(
+	struct sm_adjust_cond_module_parms*
 );
 
 #ifdef SM_CRACK_API

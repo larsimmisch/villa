@@ -70,6 +70,7 @@
  * This is defined for Windows NT applications.
  */
 #ifdef WIN32
+#ifndef UNIX_SYSTEM
 	#define far
 
 	#define tSMCriticalSection CRITICAL_SECTION
@@ -89,6 +90,7 @@
 	#define kSMNullDevHandle 0
 
 	typedef float			tSMIEEE32Bit754854Float;
+#endif
 #endif
 
 #ifdef UNIX_SYSTEM

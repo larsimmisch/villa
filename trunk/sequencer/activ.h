@@ -51,7 +51,7 @@ public:
 	virtual int done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return 1; }
 	virtual int setPos(unsigned aPosition) { return 1; }
 	virtual unsigned getLength()	{ return 0; }
-	virtual unsigned getStatus()	{ return _ok; }
+	virtual unsigned getStatus()	{ return PHONE_OK; }
 
 	virtual int isGrowing() { return 0; }
 
@@ -156,7 +156,7 @@ public:
 
 	virtual int setPos(unsigned pos) { return m_sample->setPos(pos); }
 	virtual unsigned getLength()	{ return m_sample->getLength(); }
-	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? _empty : _ok; }
+	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? PHONE_WARNING_EMPTY : PHONE_OK; }
 
 	virtual int isGrowing() { return 1; }
 
@@ -177,7 +177,7 @@ public:
 
 	virtual int setPos(unsigned pos) { return 1; }
 	virtual unsigned getLength()	{ return m_nBeeps * 250; } // todo fix this
-	virtual unsigned getStatus()	{ return _ok; }
+	virtual unsigned getStatus()	{ return PHONE_OK; }
 
 	virtual void printOn(std::ostream& out)	{ out << "BeepAtom(" << m_nBeeps << ')'; }
 
@@ -216,7 +216,7 @@ public:
 	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
-	virtual unsigned getStatus()	{ return _ok; }
+	virtual unsigned getStatus()	{ return PHONE_OK; }
 
 	virtual void printOn(std::ostream& out)	{ out << "SilenceAtom(" << m_length << ')'; }
 
@@ -242,7 +242,7 @@ public:
 	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos) { return 1; }
 	virtual unsigned getLength()	{ return indefinite; }
-	virtual unsigned getStatus()	{ return _ok; }
+	virtual unsigned getStatus()	{ return PHONE_OK; }
 
 	virtual void printOn(std::ostream& out)	{ out << "ConferenceAtom()"; }
 

@@ -336,10 +336,13 @@ static int unsafe_sm_conference_info( SM_CONFERENCE_INFO_PARMS *info_parms )
  
 static int unsafe_sm_conference_remove_party(tSMConference conf, tSMChannelId channelIn, tSMChannelId channelOut)
 {
-    int result;
-    int party;
-    int leavingParty;
-    
+    int 							result;
+    int 							party;
+    int 							leavingParty;
+	SM_CONF_PRIM_ADJ_INPUT_PARMS 	adjustInputParms;
+    SM_SET_SIDETONE_CHANNEL_PARMS	sidetoneParms;
+	SM_CONDITION_INPUT_PARMS		condParms;
+
 	/* find the party to be removed */
     for (leavingParty=0; ; leavingParty++) {
         if (leavingParty >= conf->Nmembers) {
@@ -354,15 +357,26 @@ static int unsafe_sm_conference_remove_party(tSMConference conf, tSMChannelId ch
         smConfError = "channelOut is not related to channelIn";
         return ERR_SM_BAD_PARAMETER;
     }
+
+	/*
+	 * Mute input from this party during leaving process.
+	 * Avoids leaving burst of noise.
+	 */
+	adjustInputParms.channel = conf->parties[leavingParty].channelIn;
+	adjustInputParms.agc     = 0;
+	adjustInputParms.volume  = kSMConfAdjInputVolumeMute;
+
+	sm_conf_prim_adj_input ( &adjustInputParms );
+
     
-	    /* We now need to do the opposite of joining: delete the
-	     * leaving party from the low-level conferences belonging to
-	     * each of the remaining parties, and delete all parties from
-	     * the low-level conference belonging to the leaving party.
-	     * This second action is automatically performed when we abort
-	     * the low-level conference, so we just have to do the first
-	     * of these.
-		 */
+    /* We now need to do the opposite of joining: delete the
+     * leaving party from the low-level conferences belonging to
+     * each of the remaining parties, and delete all parties from
+     * the low-level conference belonging to the leaving party.
+     * This second action is automatically performed when we abort
+     * the low-level conference, so we just have to do the first
+     * of these.
+	 */
     for (party = 0; party < conf->Nmembers; party++) {
         if (party != leavingParty) {
 	    SM_CONF_PRIM_LEAVE_PARMS parms;
@@ -375,7 +389,43 @@ static int unsafe_sm_conference_remove_party(tSMConference conf, tSMChannelId ch
 	    }
         }
     }
+
     sm_conf_prim_abort(conf->parties[leavingParty].channelOut);
+
+	/*
+	 * Disable EC.
+	 */
+	condParms.channel				= conf->parties[leavingParty].channelIn;
+	condParms.reference				= kSMNullChannelId;
+	condParms.reference_type		= kSMInputCondRefNone;
+	condParms.conditioning_type		= kSMInputCondNone;
+	condParms.conditioning_param	= 0;
+	condParms.alt_data_dest			= 0;
+	condParms.alt_dest_type			= kSMInputCondAltDestNone;
+
+	result = sm_condition_input(&condParms);
+	
+	if (result == ERR_SM_WRONG_FIRMWARE_TYPE)
+	{
+		/*
+		 * Fall back to sidetone suppression.
+		 */
+		sidetoneParms.channel   = conf->parties[leavingParty].channelIn;
+		sidetoneParms.output    = kSMNullChannelId;
+
+		result = sm_set_sidetone_channel ( &sidetoneParms );
+
+		if (result != 0) 
+		{
+            smConfError = "sm_set_sidetone_channel()";
+            return result;
+		}
+	}
+	else if (result != 0)
+	{
+		smConfError = "sm_condition_input()";
+	    return result;
+	}
 
     conf->Nmembers--;
 

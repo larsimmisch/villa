@@ -8,6 +8,8 @@
 #ifndef _RPHONE_H_
 #define _RPHONE_H_
 
+#include "errors.h"
+
 #define interface_port 2104
 
 enum { notify_start = 0x01, notify_stop = 0x02 };
@@ -74,28 +76,6 @@ enum
 	phone_recognition,
 	phone_shutdown,
 	phone_abort
-};
-
-enum
-{
-    _event = -1,
-    _ok,
-    _timeout,
-    _aborted,
-    _rejected,
-	_disconnected,
-	_protocol_violation,
-	_failed,
-	_not_implemented,
-	_invalid, 
-	_busy,
-	_not_available,
-	_network_unreachable,
-    _duplicate,
-    _empty,
-	_server_down,
-	_out_of_service,
-	_syntax_error
 };
 
 enum

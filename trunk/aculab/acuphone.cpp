@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.17 2001/09/26 22:41:57 lars Exp $
+	$Id: acuphone.cpp,v 1.18 2003/11/22 23:44:46 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -422,7 +422,7 @@ bool ProsodyChannel::Beep::stop(Media *phone)
 	m_position = (m_count * sizeof(beep) + p.offset) / 8;
 
 	m_state = stopping;
-	m_status = r_aborted;
+	m_status = PHONE_ERROR_ABORTED;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping beep " << m_beeps << logend();
@@ -547,7 +547,7 @@ bool ProsodyChannel::Touchtones::stop(Media *phone)
 		throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_abort", rc);
 
 	m_state = stopping;
-	m_status = r_aborted;
+	m_status = PHONE_ERROR_ABORTED;
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "touchtones " << m_tt.c_str() << " stopped" << logend();
@@ -723,7 +723,7 @@ bool ProsodyChannel::FileSample::stop(Media *phone)
 	m_position = p.offset * 1000 / m_storage->bytesPerSecond;
 
 	m_state = stopping;
-	m_status = r_aborted;
+	m_status = PHONE_ERROR_ABORTED;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping file sample " << m_name.c_str() << logend();

@@ -113,6 +113,15 @@ void Interface::run()
 						}
 						gConfiguration.unlock();
 
+						// tell all sequencers we have lost the connection
+						const InterfaceConnection::t_calls &calls = ic->get_calls();
+
+						for (InterfaceConnection::t_calls::const_iterator i = calls.begin();
+							i != calls.end(); ++i)
+						{
+							i->second->lost_connection();
+						}
+
 						// force close all conferences opened by this app
 						/*
 						gConferences.lock();
@@ -166,7 +175,8 @@ bool Interface::data(InterfaceConnection *ic)
 			return false;
 		}
 
-		ic->begin() << id.c_str() << " syntax error - expecting id and command" << end();
+		ic->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str()
+			<< " syntax error - expecting id and command" << end();
 
 		return false;
 	}
@@ -177,7 +187,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 		for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
 		{
-			(*ic) << id.c_str() << ' ' << _ok << ' '
+			(*ic) << PHONE_OK << ' ' << id.c_str() << " DESC "
 				<< c.current()->getName() << ' ' 
 				<< c.current()->getNumber() << ' '
 				<< (c.current()->isDigital() ? "digital" : "analog")
@@ -196,11 +206,11 @@ bool Interface::data(InterfaceConnection *ic)
 
 			sprintf(name, "Conf[%d]", conf->getHandle());
 
-			ic->begin() << id.c_str() << " CNFO " << _ok << ' ' << name << end();
+			ic->begin() << PHONE_OK << ' ' << id.c_str() << " CNFO " << name << end();
 		}
 		else
 		{
-			ic->begin() << id.c_str() << " CNFO " << _failed << end();
+			ic->begin() << PHONE_ERROR_NO_RESOURCE << ' ' << id.c_str() << " CNFO " << end();
 		}
 	}
 	else if (command == "CNFC")
@@ -213,7 +223,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			ic->clear();
 
-			ic->begin() << id.c_str() << " CNFC " << _failed << end();
+			ic->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << end();
 
 			return true;
 		}
@@ -224,18 +234,18 @@ bool Interface::data(InterfaceConnection *ic)
 
 		if (!handle)
 		{
-			ic->begin() << id.c_str() << " CFNC " << _syntax_error << end();
+			ic->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() << " CFNC " << end();
 
-			return true;
+			return false;
 		}
 
 		if (gConferences.close(handle))
 		{
-			ic->begin() << id.c_str() << " CNFC " << _ok << end();
+			ic->begin() << PHONE_OK << ' ' << id.c_str() << " CNFC " << end();
 		}
 		else
 		{
-			ic->begin() << id.c_str() << " CNFC " << _failed  << end();
+			ic->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << end();
 		}
 	}
 	else if (command == "LSTN")
@@ -250,11 +260,11 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			ic->clear();
 
-			ic->begin() << id.c_str() << " LSTN " << _syntax_error 
+			ic->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str() << " LSTN " 
 				<< " syntax error - expecting trunk name and DID" 
 				<< end();
 
-			return true;
+			return false;
 		}
 
 		TrunkConfiguration* trunk = 0;
@@ -273,8 +283,8 @@ bool Interface::data(InterfaceConnection *ic)
 					<< "attempted to add listen for invalid trunk " 
 					<< trunkname.c_str() << logend();
 
-				ic->begin() << id.c_str() << " LSTN " << _invalid 
-					<< " invalid trunk " << trunkname.c_str() << end();
+				ic->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() 
+					<< " LSTN unknown trunk: " << trunkname.c_str() << end();
 
 				return true;
 			}
@@ -398,30 +408,32 @@ bool Interface::data(InterfaceConnection *ic)
 	}
 	else
 	{
-		std::string scope;
+		std::string device;
 
-		(*ic) >> scope;
+		(*ic) >> device;
 		if (ic->eof())
 		{
 			ic->clear();
 
-			ic->begin() << id.c_str() << " syntax error - unknown command: " 
+			ic->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - missing device name for: " 
 				<< command << end();
 
 			return false;
 		}
 
-		Sequencer *s = ic->find(scope);
+		Sequencer *s = ic->find(device);
 
 		if (!s)
 		{
-			ic->begin() << id.c_str()
-				<< " error - unknown scope: " << scope.c_str()
+			ic->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str()
+				<< " error - unknown device: " << device.c_str()
 				<< end();
+
+			return false;
 		}
 		else
 		{
-			s->data(ic, id);
+			s->data(ic, command, id);
 		}
 	}
 

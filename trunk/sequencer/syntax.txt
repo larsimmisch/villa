@@ -1,3 +1,30 @@
+error/event codes:
+
+# event codes
+100 - event
+
+# completion codes
+200 - no error
+
+# in progress
+300 - 399 in progress (reserved)
+
+# warnings
+400 - empty
+
+# errors
+500 - unspecified error
+501 - invalid trunk state
+502 - protocol violation
+503 - busy
+504 - out of resources
+505 - not found
+506 - aborted
+
+# fatal errors
+600 - syntax error
+
+
 identifier is an arbitrary string not containing whitespace.
 
 tid := identifier // '-1' is the special unsolicited event tid
@@ -7,16 +34,18 @@ integer := [0-9]+
 // response sent to client
 
 completion := 'LSTN' | 'DISC' | 'ACPT' 
-	     'MLCL' | 'CNFO' | 'CNFC'
+	     'MLCA' | 'MLCD' | 'MLDP' | 'CNFO' | 'CNFC'
 
 // LSTN: listen 
 // DISC: disconnect
 // ACPT: accept
-// MLCL: molecule
+// MLCA: molecule add
+// MLCD: molecule discard
+// MLDP: molecule discard by priority
 // CNFO: conference open
 // CNFC: conference close
 
-event := 'DTMF' | 'DISC'
+event := 'DTMF' | 'RDIS' | 'ABEG' | 'AEND'
 
 data := identifier*
 

@@ -99,10 +99,6 @@ SOURCE=.\text.cpp
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
-SOURCE=..\include\asynctext.h
-# End Source File
-# Begin Source File
-
 SOURCE=..\include\client.h
 # End Source File
 # Begin Source File
@@ -111,19 +107,15 @@ SOURCE=..\include\packet.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\include\sap.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\include\socket.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\include\tcp.h
-# End Source File
-# Begin Source File
-
 SOURCE=..\include\text.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\include\transport.h
 # End Source File
 # End Group
 # End Target

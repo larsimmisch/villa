@@ -71,7 +71,7 @@ public:
     enum { infinite = -1 };
 		
 	Socket(int protocol = PF_INET, int s = -1);
-	~Socket();
+	virtual ~Socket();
 
 	void bind(SAP& local);
 	void listen(int backlog = 5);

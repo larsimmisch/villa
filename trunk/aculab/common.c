@@ -16,7 +16,12 @@
 /* Change History                                             */
 /*                                                            */
 /*                                                            */
-/* rev:  1.15   12/02/2000   labelled for 5.4.0 Release       */
+/* rev:5.8.0    11/10/2001  labelled for 5.8.0 Release        */
+/*              07/09/2001  labelled for 5.7.4B12 beta release*/
+/*              16/08/2001  labelled for 5.7.4B7 beta release */
+/*              09/07/2001  labelled for 5.7.3 Release        */
+/*              13/06/2001  labelled for 5.7.2 Release        */
+/*              27/02/2001  add changes to handle MC3         */
 /*                                                            */
 /*                                                            */
 /*------------------------------------------------------------*/
@@ -58,107 +63,109 @@ ACUDLL int    set_sigsys         ( int );
 
 
 typedef struct ncfg {
-		    int    nettype;
-		    char * typep;
-		    char * namep;
-		    char * filep;
-		    } NCFG;
+                    int    nettype;
+                    char * typep;
+                    char * namep;
+                    char * filep;
+                    } NCFG;
 
 
-		/* E1 ISDN Primary Rate */
+/* E1 ISDN Primary Rate */
 
 NCFG ncfg[] = { S_1TR6,       "S_1TR6",      "1TR6",    "1TR6_USR.RAM",
-		S_1TR6NET,    "S_1TR6NET",   "1TR6NET", "1TR6_NET.RAM",
-		S_AUSTEL,     "S_AUSTEL",    "AUSTEL",  "AUST_USR.RAM",
-		S_AUSTNET,    "S_AUSTNET",   "AUSTNET", "AUST_NET.RAM",
-		S_ETS300,     "S_ETS300",    "ETS300",  "ETS_USR.RAM",
-		S_ETSNET,     "S_ETSNET",    "ETSNET",  "ETS_NET.RAM",
-		S_ETS300_T1,  "S_ETS300_T1", "ETS300 T1","ETSTSUPU.RAM",
-		S_ETSNET_T1,  "S_ETSNET_T1", "ETSNET T1","ETSTSUPN.RAM",
-		S_SWETS300,   "S_SWETS300",  "SWED300", "SWED_USR.RAM",
-		S_SWETSNET,   "S_SWETSNET",  "SWEDNET", "SWED_NET.RAM",
-		S_VN3,        "S_VN3",       "VN3",     "VN3_USR.RAM",
-		S_VN3NET,     "S_VN3NET",    "VN3NET",  "VN3_NET.RAM",
-		S_TNA_NZ,     "S_TNA_NZ",    "TNA_NZ",  "TNA_USR.RAM",
-		S_TNANET,     "S_TNANET",    "TNA_NET", "TNA_NET.RAM",
-		S_FETEX_150,  "S_FETEX_150", "FETX150", "FETX_USR.RAM",
-		S_FETEXNET,   "S_FETEXNET",  "FETXNET", "FETX_NET.RAM",
-		S_ATT,        "S_ATT",       "AT&T",    "ATT_EUSR.RAM",
-		S_ATTNET,     "S_ATTNET",    "AT&TNET", "ATT_ENET.RAM",
-		S_ATT_T1,     "S_ATT_T1",    "ATT1",    "ATT_TUSR.RAM",
-		S_ATTNET_T1,  "S_ATTNET_T1", "ATT1NET", "ATT_TNET.RAM",
-		S_DASS,       "S_DASS",      "DASS2",   "DASS_USR.RAM",
-		S_DASSNET,    "S_DASSNET",   "DASSNET", "DASS_NET.RAM",
-		S_DPNSS,      "S_DPNSS",     "DPNSS",   "M1DPNSS.RAM",
-		S_QSIG,       "S_QSIG",      "QSIG",    "QSIG.RAM",
+                S_1TR6NET,    "S_1TR6NET",   "1TR6NET", "1TR6_NET.RAM",
+                S_AUSTEL,     "S_AUSTEL",    "AUSTEL",  "AUST_USR.RAM",
+                S_AUSTNET,    "S_AUSTNET",   "AUSTNET", "AUST_NET.RAM",
+                S_ETS300,     "S_ETS300",    "ETS300",  "ETS_USR.RAM",
+                S_ETSNET,     "S_ETSNET",    "ETSNET",  "ETS_NET.RAM",
+                S_ETS300_T1,  "S_ETS300_T1", "ETS300 T1","ETSTSUPU.RAM",
+                S_ETSNET_T1,  "S_ETSNET_T1", "ETSNET T1","ETSTSUPN.RAM",
+                S_SWETS300,   "S_SWETS300",  "SWED300", "SWED_USR.RAM",
+                S_SWETSNET,   "S_SWETSNET",  "SWEDNET", "SWED_NET.RAM",
+                S_VN3,        "S_VN3",       "VN3",     "VN3_USR.RAM",
+                S_VN3NET,     "S_VN3NET",    "VN3NET",  "VN3_NET.RAM",
+                S_TNA_NZ,     "S_TNA_NZ",    "TNA_NZ",  "TNA_USR.RAM",
+                S_TNANET,     "S_TNANET",    "TNA_NET", "TNA_NET.RAM",
+                S_FETEX_150,  "S_FETEX_150", "FETX150", "FETX_USR.RAM",
+                S_FETEXNET,   "S_FETEXNET",  "FETXNET", "FETX_NET.RAM",
+                S_ATT,        "S_ATT",       "AT&T",    "ATT_EUSR.RAM",
+                S_ATTNET,     "S_ATTNET",    "AT&TNET", "ATT_ENET.RAM",
+                S_ATT_T1,     "S_ATT_T1",    "ATT1",    "ATT_TUSR.RAM",
+                S_ATTNET_T1,  "S_ATTNET_T1", "ATT1NET", "ATT_TNET.RAM",
+                S_DASS,       "S_DASS",      "DASS2",   "DASS_USR.RAM",
+                S_DASSNET,    "S_DASSNET",   "DASSNET", "DASS_NET.RAM",
+                S_DPNSS,      "S_DPNSS",     "DPNSS",   "M1DPNSS.RAM",
+                S_QSIG,       "S_QSIG",      "QSIG",    "QSIG.RAM",
 
-		/* CAS signalling Systems */
+                /* CAS signalling Systems */
 
-		S_CAS,        "S_CAS",       "R2B2P",   "M1R2P2B.RAM",
-		S_CAS,        "S_CAS",       "CAS",     "M1R2P2B.RAM",
-		S_CAS,        "S_CAS",       "BTCU",    "M1BTCU.RAM",
-		S_CAS,        "S_CAS",       "BTCN",    "M1BTCN.RAM",
-		S_CAS,        "S_CAS",       "PTVU",    "M1PTVU.RAM",
-		S_CAS,        "S_CAS",       "PTVN",    "M1PTVN.RAM",
-		S_CAS,        "S_CAS",       "PD1D",    "M1PD1D.RAM",
-		S_CAS,        "S_CAS",       "PD1U",    "M1PD1U.RAM",
-		S_CAS,        "S_CAS",       "PD1N",    "M1PD1N.RAM",
-		S_CAS,        "S_CAS",       "R2L",     "M1R2L.RAM",
-		S_CAS,        "S_CAS",       "P8",      "M1P8.RAM",
-		S_CAS,        "S_CAS",       "EM",      "M1EM.RAM",
-		S_CAS,        "S_CAS",       "BEZEQ",   "M1BEZEQ.RAM",
+                S_CAS,        "S_CAS",       "R2B2P",   "M1R2P2B.RAM",
+                S_CAS,        "S_CAS",       "CAS",     "M1R2P2B.RAM",
+                S_CAS,        "S_CAS",       "BTCU",    "M1BTCU.RAM",
+                S_CAS,        "S_CAS",       "BTCN",    "M1BTCN.RAM",
+                S_CAS,        "S_CAS",       "PTVU",    "M1PTVU.RAM",
+                S_CAS,        "S_CAS",       "PTVN",    "M1PTVN.RAM",
+                S_CAS,        "S_CAS",       "PD1D",    "M1PD1D.RAM",
+                S_CAS,        "S_CAS",       "PD1U",    "M1PD1U.RAM",
+                S_CAS,        "S_CAS",       "PD1N",    "M1PD1N.RAM",
+                S_CAS,        "S_CAS",       "R2L",     "M1R2L.RAM",
+                S_CAS,        "S_CAS",       "P8",      "M1P8.RAM",
+                S_CAS,        "S_CAS",       "EM",      "M1EM.RAM",
+                S_CAS,        "S_CAS",       "BEZEQ",   "M1BEZEQ.RAM",
 
-		/* tone signalling system */
+                /* tone signalling system */
 
-		S_CAS_TONE,   "S_CAS_TONE",  "R2T",     "M1R2T.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "R2T1",    "M1R2T1.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "ALSU",    "M1ALSUT.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "ALSN",    "M1ALSNT.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "BELGU",   "M1BELGU.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "BELGN",   "M1BELGN.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "EFRAT",   "M1EFRAT.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "EEMA",    "M1EEMA.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "PD1",     "M1PD1.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "PD1DD",   "M1PD1DD.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "PD1UD",   "M1PD1UD.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "PD1ND",   "M1PD1ND.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "BTMC",    "M1BTMC.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "OTE2",    "M1OTE2.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "FMFS",    "M1FMFS.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "SMFS",    "M1SMFS.RAM",
-		S_CAS_TONE,   "S_CAS_TONE",  "I701",    "M1I701.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "R2T",     "M1R2T.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "R2T1",    "M1R2T1.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "ALSU",    "M1ALSUT.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "ALSN",    "M1ALSNT.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "BELGU",   "M1BELGU.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "BELGN",   "M1BELGN.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "EFRAT",   "M1EFRAT.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "EEMA",    "M1EEMA.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "PD1",     "M1PD1.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "PD1DD",   "M1PD1DD.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "PD1UD",   "M1PD1UD.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "PD1ND",   "M1PD1ND.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "BTMC",    "M1BTMC.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "OTE2",    "M1OTE2.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "FMFS",    "M1FMFS.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "SMFS",    "M1SMFS.RAM",
+                S_CAS_TONE,   "S_CAS_TONE",  "I701",    "M1I701.RAM",
 
-		S_SS5_TONE,   "S_SS5_TONE",  "SS5",     "M1SS5.RAM",
+                S_SS5_TONE,   "S_SS5_TONE",  "SS5",     "M1SS5.RAM",
 
-		/* T1 - ISDN Signalling Systems */
+                /* T1 - ISDN Signalling Systems */
 
-		S_IDAP,       "S_IDAP",      "IDAP",    "IDAP_USR.RAM",
-		S_IDAPNET,    "S_IDAPNET",   "IDAPNET", "IDAP_NET.RAM",
-		S_NI2,        "S_NI2",       "NI2",     "NI2_USR.RAM",
-		S_NI2NET,     "S_NI2NET",    "NI2NET",  "NI2_NET.RAM",
+                S_IDAP,       "S_IDAP",      "IDAP",    "IDAP_USR.RAM",
+                S_IDAPNET,    "S_IDAPNET",   "IDAPNET", "IDAP_NET.RAM",
+                S_NI2,        "S_NI2",       "NI2",     "NI2_USR.RAM",
+                S_NI2NET,     "S_NI2NET",    "NI2NET",  "NI2_NET.RAM",
 
-		S_INS,        "S_INS",       "INS",     "INS_USR.RAM",
-		S_INSNET,     "S_INSNET",    "INSNET",  "INS_NET.RAM",
+                S_INS,        "S_INS",       "INS",     "INS_USR.RAM",
+                S_INSNET,     "S_INSNET",    "INSNET",  "INS_NET.RAM",
 
-		/* T1 - CAS tone signalling */
+                /* T1 - CAS tone signalling */
 
-		S_T1CAS_TONE, "S_T1CAS_TONE","F12",     "T1RB_USR.RAM",
+                S_T1CAS_TONE, "S_T1CAS_TONE","F12",     "T1RB_USR.RAM",
 
-		/* Basic Rate Signalling Systems */
+                /* Basic Rate Signalling Systems */
 
-		BR_ETS300,    "BR_ETS300",   "BETS300", "ETS_BUSR.RAM",
-		BR_ETSNET,    "BR_ETSNET",   "BETSNET", "ETS_BNET.RAM",
-		BR_NI1,       "BR_NI1",      "BNI1",    "NI1_BUSR.RAM",
-		BR_NI1NET,    "BR_NI1NET",   "BNI1NET", "NI1_BNET.RAM",
-		BR_ATT,       "BR_ATT",      "BATT",    "ATT_BUSR.RAM",
-		BR_ATTNET,    "BR_ATTNET",   "BATTNET", "ATT_BNET.RAM",
+                BR_ETS300,    "BR_ETS300",   "BETS300", "ETS_BUSR.RAM",
+                BR_ETSNET,    "BR_ETSNET",   "BETSNET", "ETS_BNET.RAM",
+                BR_NI1,       "BR_NI1",      "BNI1",    "NI1_BUSR.RAM",
+                BR_NI1NET,    "BR_NI1NET",   "BNI1NET", "NI1_BNET.RAM",
+                BR_ATT,       "BR_ATT",      "BATT",    "ATT_BUSR.RAM",
+                BR_ATTNET,    "BR_ATTNET",   "BATTNET", "ATT_BNET.RAM",
+                BR_INS,       "BR_INS",      "BINS",    "INS_BUSR.RAM",
+                BR_INSNET,    "BR_INSNET",   "BINSNET", "INS_BNET.RAM",
 
-		/* SS7 signalling */
-		S_ISUP,       "S_ISUP",      "ISUP",    "ISUP.RAM",
+                /* SS7 signalling */
+                S_ISUP,       "S_ISUP",      "ISUP",    "ISUP.RAM",
 
-		/* end of table */
+                /* end of table */
 
-		0,            "",            "",        ""  };      /* end of table */
+                0,            "",            "",        ""  };      /* end of table */
 
 
 
@@ -179,115 +186,125 @@ static int old_clock = 0;
 
 static void v5clkinit( int n )
 {
-	int                         swnum;
-	struct query_clkmode_parms  swqclk_parms;
-	struct sysinfo_xparms       sysinfo;
-	int                         drivingMVIP;
-	int                         drivingSCBus;
-	int                         clockmode;
-	int                         port;
-	int                                                     initialLoneSwitchCount;
-	int                                                     inInitialSwitchRun;
+    int                         swnum;
+    struct query_clkmode_parms  swqclk_parms;
+    struct sysinfo_xparms       sysinfo;
+    int                         drivingMVIP;
+    int                         drivingSCBus;
+    int                         clockmode;
+    int                         port;
+    int                                                     initialLoneSwitchCount;
+    int                                                     inInitialSwitchRun;
 #ifdef SWMODE_SWITCH
-	struct swmode_parms             swmode;
+    struct swmode_parms             swmode;
 #endif
 
-	initialLoneSwitchCount = 0;
-	inInitialSwitchRun     = 1;
+    initialLoneSwitchCount = 0;
+    inInitialSwitchRun     = 1;
 
-	for (swnum = 0; swnum < n; swnum++)
-	{
-		if (inInitialSwitchRun)
-		{
+    for (swnum = 0; swnum < n; swnum++)
+    {
+        if (inInitialSwitchRun)
+        {
 #ifdef SWMODE_SWITCH
-			if (sw_mode_switch(swnum,&swmode) == 0)
-			{
-				if ((swmode.ct_buses & (1<<SWMODE_CTBUS_MC3)) != 0)
-				{
-					initialLoneSwitchCount += 1;
-				}
-				else
-				{
-					inInitialSwitchRun = 0;
-				}
-			}
-			else
-			{
-				inInitialSwitchRun = 0;
-			}
+            if (sw_mode_switch(swnum,&swmode) == 0)
+            {
+                if ((swmode.ct_buses & (1<<SWMODE_CTBUS_MC3)) != 0)
+                {
+                    initialLoneSwitchCount += 1;
+                }
+                else
+                {
+                    inInitialSwitchRun = 0;
+                }
+            }
+            else
+            {
+                inInitialSwitchRun = 0;
+            }
 #else
-			inInitialSwitchRun = 0;
+            inInitialSwitchRun = 0;
 #endif
-		}
+        }
 
-	sw_query_clock_control(swnum,&swqclk_parms);
+        sw_query_clock_control(swnum,&swqclk_parms);
 
-	drivingMVIP  = (      (((swqclk_parms.last_clock_mode & ~DRIVE_SCBUS)) != CLOCK_REF_MVIP)
-			  &&  (((swqclk_parms.last_clock_mode & ~DRIVE_SCBUS)) != CLOCK_PRIVATE)
-			  &&  (((swqclk_parms.last_clock_mode & HI_MVIPCLK))   == 0)                  );
+        drivingMVIP  = (      (((swqclk_parms.last_clock_mode & ~DRIVE_SCBUS)) != CLOCK_REF_MVIP)
+                  &&  (((swqclk_parms.last_clock_mode & ~DRIVE_SCBUS)) != CLOCK_PRIVATE)
+                  &&  (((swqclk_parms.last_clock_mode & HI_MVIPCLK))   == 0)                  );
 
-	drivingSCBus = ((swqclk_parms.last_clock_mode & DRIVE_SCBUS) != 0);
+        drivingSCBus = ((swqclk_parms.last_clock_mode & DRIVE_SCBUS) != 0);
 
-	if (swnum != 0)
-	{
-		if (drivingMVIP || drivingSCBus)
-	    {
-		sw_clock_control ( swnum, CLOCK_PRIVATE );
-	    }
-	}
+        if (swnum != 0)
+        {
+            if (drivingMVIP || drivingSCBus)
+            {
+            sw_clock_control ( swnum, CLOCK_PRIVATE );
+            }
+        }
     }
 
-	if (initialLoneSwitchCount != 0)
-	{
-		call_set_net0_swnum(initialLoneSwitchCount);
-	}
-
-	port = 0;
-
-	for ( swnum = 0; swnum < n; swnum++ )
+    if (initialLoneSwitchCount != 0)
     {
-		sw_query_clock_control(swnum,&swqclk_parms);
+        call_set_net0_swnum(initialLoneSwitchCount);
+    }
 
-	if (swqclk_parms.sysinit_clock_mode == -1)
-	{
-			if (swnum == 0)
-	    {
-		if ( network_side ( 0 ))           /* check for network side protocol */
-		{
-			clockmode = CLOCK_REF_LOCAL;    /* Network supplies clock */
-		}
-		else
-		{
-			clockmode = CLOCK_REF_NET1;     /* User references clock */
-		}
+    port = 0;
 
-		if ( Scbusmode ( ))                /* check if card in SCbus Mode */
-		{
-			clockmode += DRIVE_SCBUS;       /* default to driving the SCbus Clock */
-		}
-	    }
-		else
-	    {
-		clockmode = CLOCK_REF_MVIP;     /* User references clock */
-	    }
-		}
-	else
-	{
-			clockmode = swqclk_parms.sysinit_clock_mode;
-	}
+    for ( swnum = 0; swnum < n; swnum++ )
+    {
+        sw_query_clock_control(swnum,&swqclk_parms);
 
-	sw_clock_control ( swnum, clockmode );  /* set reference the bus */
+        if (swqclk_parms.sysinit_clock_mode == -1)
+        {
+            if (swnum == 0)
+                {
+                if (initialLoneSwitchCount == 0)
+                    {
+                    if ( network_side ( 0 ))           /* check for network side protocol */
+                        {
+                        clockmode = CLOCK_REF_LOCAL;    /* Network supplies clock */
+                        }
+                    else
+                        {
+                        clockmode = CLOCK_REF_NET1;     /* User references clock */
+                        }
 
-	sysinfo.net = port;
+                    if ( Scbusmode ( ))                /* check if card in SCbus Mode */
+                        {
+                        clockmode += DRIVE_SCBUS;       /* default to driving the SCbus Clock */
+                        }
+                    }
+                else
+                {
+                    clockmode = CLOCK_REF_RING1;     /* User references clock */
+                }
+            }
+            else
+            {
+                clockmode = CLOCK_REF_MVIP;     /* User references clock */
+            }
+        }
+        else
+        {
+            clockmode = swqclk_parms.sysinit_clock_mode;
+        }
 
-	call_system_info ( &sysinfo );
+    sw_clock_control ( swnum, clockmode );  /* set reference the bus */
 
-	port += sysinfo.phys_port;
+    if (!((initialLoneSwitchCount != 0) && (swnum < initialLoneSwitchCount)))
+    {
+        sysinfo.net = port;
 
-	sw_reset_switch ( swnum );      /* result all switch drivers */
+        call_system_info ( &sysinfo );
 
-	sw_reinit_switch ( swnum );     /* re-initialise switch */
-	}
+        port += sysinfo.phys_port;
+    }
+
+    sw_reset_switch ( swnum );      /* result all switch drivers */
+
+    sw_reinit_switch ( swnum );     /* re-initialise switch */
+    }
 }
 
 
@@ -303,48 +320,47 @@ ACUDLL void port_init ( int portnum )
 /*------------- system_init -------------*/
 /* initialise switch and call systems    */
 /*                                       */
-ACUDLL int system_init ( void )
+ACUDLL int ACU_WINAPI system_init ( void )
    {
    int                         result;
    int                         portnum;
    int                         nswitch;
    int                         nports;
    struct init_xparms          init_xparms;
-	
+
    init_xparms.ournum[0]    = '\0';
    init_xparms.responsetime = -1;
 
    result = call_init ( &init_xparms );     /* set up the drivers */
 
-
    if ( (result == 0) || ( result==ERR_DRV_CALLINIT ))
-      {
-      result = 0;
-      nswitch = sw_get_drvrs ( );           /* get the number of switch drivers */
+   {
+       result = 0;
+       nswitch = sw_get_drvrs ( );           /* get the number of switch drivers */
 
-      if ( nswitch >= 0  )                  /* check for error */
-	 {
+       if ( nswitch >= 0  )                  /* check for error */
+       {
 
-	 v5clkinit(nswitch);
+          v5clkinit(nswitch);
 
-	 old_clock = 0;                     /* last port used was 0 */
+          old_clock = 0;                     /* last port used was 0 */
 
-	 nports = call_nports ( );          /* get the number of network ports */
+          nports = call_nports ( );          /* get the number of network ports */
 
-	 for ( portnum = 0; portnum < nports; portnum++ )
-	    {
-	    port_init(portnum) ;
-	    }
-	 }
-      else
-	 {
-	 result = nswitch;              /* return error */
-	 }
-      }
+          for ( portnum = 0; portnum < nports; portnum++ )
+          {
+             port_init(portnum) ;
+          }
+       }
+       else
+       {
+          result = nswitch;              /* return error */
+       }
+   }
 
    return ( result );
 
-   }
+}
 /*---------------------------------------*/
 
 
@@ -357,27 +373,28 @@ int network_side ( int portnum )
    {
    switch ( call_type ( portnum ))      /* check for network end */
       {
-      case S_1TR6NET:   
-      case S_AUSTNET:   
+      case S_1TR6NET:
+      case S_AUSTNET:
       case S_ETSNET:
       case S_ETSNET_T1:
-      case S_SWETSNET:  
-      case S_VN3NET:    
-      case S_TNANET:    
-      case S_FETEXNET:  
-      case S_ATTNET:    
-      case S_ATTNET_T1: 
-      case S_DASSNET:   
-      case S_IDAPNET:   
-      case S_NI2NET:    
-      case S_INSNET:    
-      case BR_ETSNET:   
-      case BR_NI1NET:   
-      case BR_ATTNET:   
-	 return TRUE;
+      case S_SWETSNET:
+      case S_VN3NET:
+      case S_TNANET:
+      case S_FETEXNET:
+      case S_ATTNET:
+      case S_ATTNET_T1:
+      case S_DASSNET:
+      case S_IDAPNET:
+      case S_NI2NET:
+      case S_INSNET:
+      case BR_ETSNET:
+      case BR_INSNET:
+      case BR_NI1NET:
+      case BR_ATTNET:
+         return TRUE;
 
       default:
-	 return FALSE;
+         return FALSE;
       }
    }
 /*---------------------------------------*/
@@ -394,40 +411,40 @@ static int Scbusmode ( void )
    struct output_parms query;
 
 #ifdef SWMODE_SWITCH
-    struct swmode_parms swmode;
+   struct swmode_parms swmode;
 
-	if (sw_mode_switch(0,&swmode) == 0)
-	{
-		if ((swmode.ct_buses & (1<<SWMODE_CTBUS_SCBUS)) != 0)
-		{
-			return TRUE;
-		}
-		else
-		{
-			return FALSE;
-		}
-	}
-	else
+   if (sw_mode_switch(0,&swmode) == 0)
+   {
+       if ((swmode.ct_buses & (1<<SWMODE_CTBUS_SCBUS)) != 0)
+       {
+           return TRUE;
+       }
+       else
+       {
+           return FALSE;
+       }
+   }
+   else
 #endif
-	{
+   {
    /* Talk to the switch driver using the SCbus stream        */
    /* If the switch driver returns error then assume PEB mode */
 
-   query.ost  = 24;                        /* use the SCbus Stream */
-   query.ots  =  0;                        /* use any timeslot */
+      query.ost  = 24;                        /* use the SCbus Stream */
+      query.ots  =  0;                        /* use any timeslot */
 
-   error = sw_query_output ( 0, &query );  /* set up switch */
+      error = sw_query_output ( 0, &query );  /* set up switch */
 
-   if ( error == 0 )
+      if ( error == 0 )
       {
-      return ( TRUE );
+         return ( TRUE );
       }
-   else
+      else
       {
-      return ( FALSE );
+         return ( FALSE );
       }
    }
-   }
+}
 /*---------------------------------------*/
 
 /*-----------------------------------------------------*/
@@ -446,7 +463,7 @@ static int Scbusmode ( void )
 /* The function assumes that the clock is*/
 /* always changed using swap_clock()     */
 /*                                       */
-ACUDLL void swap_clock ( int portnum )
+ACUDLL void ACU_WINAPI swap_clock ( int portnum )
    {
    int  new_swdrvr, old_swdrvr;
    int  new_stream;
@@ -459,48 +476,48 @@ ACUDLL void swap_clock ( int portnum )
       old_swdrvr = call_port_2_swdrvr ( old_clock );
 
       if ( new_swdrvr == 0 )
-	 {
-	 if ( new_swdrvr != old_swdrvr )
-	    {
-	    sw_clock_control (old_swdrvr, CLOCK_REF_MVIP);
-	    }
+      {
+         if ( new_swdrvr != old_swdrvr )
+         {
+            sw_clock_control (old_swdrvr, CLOCK_REF_MVIP);
+         }
 
-	 if ( new_stream != kSW_LI_E1_NET2 )
-	    {
-	    sw_clock_control (new_swdrvr, CLOCK_REF_NET1);
-	    }
-	 else
-	    {
-	    sw_clock_control (new_swdrvr, CLOCK_REF_NET2);
-	    }
-	 }
+         if ( new_stream != kSW_LI_E1_NET2 )
+         {
+         sw_clock_control (new_swdrvr, CLOCK_REF_NET1);
+         }
       else
-	 {
-	 if ( new_swdrvr != old_swdrvr )
-	    {
-	    if ( old_swdrvr==0 )
-	       {
-	       sw_clock_control (old_swdrvr, CLOCK_REF_SEC8K);
-	       }
-	    else
-	       {
-	       sw_clock_control (old_swdrvr, CLOCK_REF_MVIP);
-	       }
-	    }
-
-	 if ( new_stream != kSW_LI_E1_NET2 )
-	    {
-	    sw_clock_control (new_swdrvr, SEC8K_DRIVEN_BY_NET1);
-	    }
-	 else
-	    {
-	    sw_clock_control (new_swdrvr, SEC8K_DRIVEN_BY_NET2);
-	    }
-	 }
+         {
+         sw_clock_control (new_swdrvr, CLOCK_REF_NET2);
+         }
       }
+      else
+      {
+         if ( new_swdrvr != old_swdrvr )
+         {
+            if ( old_swdrvr==0 )
+            {
+                sw_clock_control (old_swdrvr, CLOCK_REF_SEC8K);
+            }
+            else
+            {
+                sw_clock_control (old_swdrvr, CLOCK_REF_MVIP);
+            }
+         }
+
+         if ( new_stream != kSW_LI_E1_NET2 )
+         {
+            sw_clock_control (new_swdrvr, SEC8K_DRIVEN_BY_NET1);
+         }
+         else
+         {
+            sw_clock_control (new_swdrvr, SEC8K_DRIVEN_BY_NET2);
+         }
+      }
+   }
 
    old_clock = portnum;                 /* update new source */
-   }
+}
 /*---------------------------------------*/
 
 /*-----------------------------------------------------*/
@@ -537,83 +554,83 @@ ACUDLL int set_sigsys ( int portnum )
       {
       case C_PM4:
 
-	 /* first get the stream number from the   */
-	 /* port number, and then get the switch   */
-	 /* driver number from network port number */
+     /* first get the stream number from the   */
+     /* port number, and then get the switch   */
+     /* driver number from network port number */
 
-	 swdrvr = call_port_2_swdrvr ( portnum );           /* get switch number */
-	 stream = call_port_2_stream ( portnum );           /* get stream number 16, 18 */
+     swdrvr = call_port_2_swdrvr ( portnum );           /* get switch number */
+     stream = call_port_2_stream ( portnum );           /* get stream number 16, 18 */
 
 
-	 /* Now see if the driver can tell us which timeslot to use for the d-channel */
-	 /* or if we should default it.... */
-	 tsinfo.net = portnum;
-	 tsinfo.modify = 0;
+     /* Now see if the driver can tell us which timeslot to use for the d-channel */
+     /* or if we should default it.... */
+     tsinfo.net = portnum;
+     tsinfo.modify = 0;
 
-	 if (call_tsinfo(&tsinfo) == 0) 
-	    {
-	    validvector = tsinfo.validvector ;
-	    signalvector = tsinfo.signalvector ;
-	    }
+     if (call_tsinfo(&tsinfo) == 0)
+        {
+        validvector = tsinfo.validvector ;
+        signalvector = tsinfo.signalvector ;
+        }
 
-	 if (signalvector) /* Firmware has requested specific signal vector */
-	    {
-	    for (sig_ts = 0 ; sig_ts < 32 ; sig_ts++)
-	       if (signalvector & 1)
-		  break;
-	       else
-		   signalvector>>= 1;
-	    }
+     if (signalvector) /* Firmware has requested specific signal vector */
+        {
+        for (sig_ts = 0 ; sig_ts < 32 ; sig_ts++)
+           if (signalvector & 1)
+              break;
+           else
+              signalvector>>= 1;
+        }
 
-	 switch ( call_line ( portnum ) )
-	    {
-	    /* setup for T1 - ISDN cards */
+     switch ( call_line ( portnum ) )
+        {
+        /* setup for T1 - ISDN cards */
 
-	    case L_T1_ISDN:
-	       break;
+        case L_T1_ISDN:
+           break;
 
-	    /* setup for T1 - ISDN cards */
+        /* setup for T1 - ISDN cards */
 
-	    case L_T1_CAS:
-	       break;
+        case L_T1_CAS:
+           break;
 
-	    /* setup for E1 cards */
+        /* setup for E1 cards */
 
-	    case L_E1:
+        case L_E1:
 
-	       for ( ts = 1; ts < 32 && result == 0; ts++ )
-		  {
-		  int x_ts;
+           for ( ts = 1; ts < 32 && result == 0; ts++ )
+              {
+              int x_ts;
 
-		  /* Check for Timeslot 16 OR */
-		  /* check if tone signalling */
+              /* Check for Timeslot 16 OR */
+              /* check if tone signalling */
 
-		  if ( ts == 16)
-		     continue;      /* Skip HDLC channel for PM4 */
-		  else if (is_tone ( portnum ))
-		     x_ts = ts;
-		  else
-		     continue;
+              if ( ts == 16)
+                 continue;      /* Skip HDLC channel for PM4 */
+              else if (is_tone ( portnum ))
+                 x_ts = ts;
+              else
+                 continue;
 
-		  output.ost  = (ACU_INT) stream;
-		  output.ots  = (ACU_INT) ts;
-		  output.ist  = (ACU_INT) stream + 8;          /* network stream number */
-		  output.its  = (ACU_INT) x_ts;                /* network timeslot number */
-		  output.mode = CONNECT_MODE;                  /* connect a timeslot */
-		  result = sw_set_output ( swdrvr, &output );  /* set up switch */
+              output.ost  = (ACU_INT) stream;
+              output.ots  = (ACU_INT) ts;
+              output.ist  = (ACU_INT) stream + 8;          /* network stream number */
+              output.its  = (ACU_INT) x_ts;                /* network timeslot number */
+              output.mode = CONNECT_MODE;                  /* connect a timeslot */
+              result = sw_set_output ( swdrvr, &output );  /* set up switch */
 
-		  /* now to make a bi-directional connection */
+              /* now to make a bi-directional connection */
 
-		  output.ost  = (ACU_INT) stream + 8;          /* network stream number */
-		  output.ots  = (ACU_INT) x_ts;                /* network timeslot number */
-		  output.ist  = (ACU_INT) stream;
-		  output.its  = (ACU_INT) ts;
-		  output.mode = CONNECT_MODE;
-		  result |= sw_set_output ( swdrvr, &output ); /* set up switch */
+          output.ost  = (ACU_INT) stream + 8;          /* network stream number */
+          output.ots  = (ACU_INT) x_ts;                /* network timeslot number */
+          output.ist  = (ACU_INT) stream;
+          output.its  = (ACU_INT) ts;
+          output.mode = CONNECT_MODE;
+          result |= sw_set_output ( swdrvr, &output ); /* set up switch */
 
-		  }
-	    break;
-	    }
+          }
+        break;
+        }
       break;
 
       case C_REV4:
@@ -621,141 +638,141 @@ ACUDLL int set_sigsys ( int portnum )
       case C_BR4:
       case C_BR8:
 
-	 /* first get the stream number from the   */
-	 /* port number, and then get the switch   */
-	 /* driver number from network port number */
+     /* first get the stream number from the   */
+     /* port number, and then get the switch   */
+     /* driver number from network port number */
 
-	 swdrvr = call_port_2_swdrvr ( portnum );           /* get switch number */
-	 stream = call_port_2_stream ( portnum );           /* get stream number 16, 18 */
+     swdrvr = call_port_2_swdrvr ( portnum );           /* get switch number */
+     stream = call_port_2_stream ( portnum );           /* get stream number 16, 18 */
 
 
-	 /* Now see if the driver can tell us which timeslot to use for the d-channel */
-	 /* or if we should default it.... */
-	 tsinfo.net = portnum;
-	 tsinfo.modify = 0;
-	 if ( (call_tsinfo(&tsinfo) == 0) && tsinfo.signalvector)
-	    {
-	    unsigned long vector = tsinfo.signalvector ;
-	    /* Use the lowest bit set in signal vector as the sig channel */
+     /* Now see if the driver can tell us which timeslot to use for the d-channel */
+     /* or if we should default it.... */
+     tsinfo.net = portnum;
+     tsinfo.modify = 0;
+     if ( (call_tsinfo(&tsinfo) == 0) && tsinfo.signalvector)
+        {
+        unsigned long vector = tsinfo.signalvector ;
+        /* Use the lowest bit set in signal vector as the sig channel */
 
-	    for (sig_ts = 0 ; sig_ts < 32 ; sig_ts++)
-	       if (vector & 1)
-		  break;
-	       else
-		   vector>>= 1;
-	    }
+        for (sig_ts = 0 ; sig_ts < 32 ; sig_ts++)
+           if (vector & 1)
+          break;
+           else
+           vector>>= 1;
+        }
 
-	 switch ( call_line ( portnum ) )
-	    {
-	    /* setup for T1 - ISDN cards */
+     switch ( call_line ( portnum ) )
+        {
+        /* setup for T1 - ISDN cards */
 
-	    case L_T1_ISDN:
+        case L_T1_ISDN:
 
-	       /* If we haven't yet got a signalling timeslot, and ts 23 is
-	       available (not used as a bearer), then use ts 23 for signalling 
-	       else it must be an NFAS bearer-only trunk with no sig. ts.  */
+           /* If we haven't yet got a signalling timeslot, and ts 23 is
+           available (not used as a bearer), then use ts 23 for signalling
+           else it must be an NFAS bearer-only trunk with no sig. ts.  */
 
-	       if ( (sig_ts <0) && ( !(validvector & (1L << 23))))
-		 sig_ts = 23 ;
+           if ( (sig_ts <0) && ( !(validvector & (1L << 23))))
+               sig_ts = 23 ;
 
-	       output.ost  = (ACU_INT) stream;
-	       output.ots  = (ACU_INT) sig_ts;
-	       output.ist  = (ACU_INT) stream + 1;              /* network stream number */
-	       output.its  = (ACU_INT) 16;                      /* network timeslot number */
-	       output.mode = CONNECT_MODE;                  /* connect a timeslot */
-	       result = sw_set_output ( swdrvr, &output );  /* set up switch */
+           output.ost  = (ACU_INT) stream;
+           output.ots  = (ACU_INT) sig_ts;
+           output.ist  = (ACU_INT) stream + 1;              /* network stream number */
+           output.its  = (ACU_INT) 16;                      /* network timeslot number */
+           output.mode = CONNECT_MODE;                  /* connect a timeslot */
+           result = sw_set_output ( swdrvr, &output );  /* set up switch */
 
-	       /* now to make a bi-directional connection */
+           /* now to make a bi-directional connection */
 
-	       output.ost  = (ACU_INT) stream + 1;              /* network stream number */
-	       output.ots  = (ACU_INT) 16;                      /* network timeslot number */
-	       output.ist  = (ACU_INT) stream;
-	       output.its  = (ACU_INT) sig_ts;
-	       output.mode = CONNECT_MODE;
-	       result |= sw_set_output ( swdrvr, &output ); /* set up switch */
-	    break;
+           output.ost  = (ACU_INT) stream + 1;              /* network stream number */
+           output.ots  = (ACU_INT) 16;                      /* network timeslot number */
+           output.ist  = (ACU_INT) stream;
+           output.its  = (ACU_INT) sig_ts;
+           output.mode = CONNECT_MODE;
+           result |= sw_set_output ( swdrvr, &output ); /* set up switch */
+        break;
 
-	    /* setup for T1 - CAS cards */
+        /* setup for T1 - CAS cards */
 
-	    case L_T1_CAS:
-	       for ( ts = 0, dspts = 0; ts < 24 && result == 0; ts++ )
-		  {
-		  if ( is_tone ( portnum ))
-		     {
-		     dspts = ts;
+        case L_T1_CAS:
+           for ( ts = 0, dspts = 0; ts < 24 && result == 0; ts++ )
+          {
+          if ( is_tone ( portnum ))
+             {
+             dspts = ts;
 
-		     if ( ts >= 16 )
-			{
-			dspts++;
-			}
+             if ( ts >= 16 )
+            {
+            dspts++;
+            }
 
-		     output.ost  = (ACU_INT) stream;
-		     output.ots  = (ACU_INT) ts;
-		     output.ist  = (ACU_INT) stream + 1;              /* network stream number */
-		     output.its  = (ACU_INT) dspts;                   /* network timeslot number */
-		     output.mode = CONNECT_MODE;                  /* connect a timeslot */
-		     result = sw_set_output ( swdrvr, &output );  /* set up switch */
+             output.ost  = (ACU_INT) stream;
+             output.ots  = (ACU_INT) ts;
+             output.ist  = (ACU_INT) stream + 1;              /* network stream number */
+             output.its  = (ACU_INT) dspts;                   /* network timeslot number */
+             output.mode = CONNECT_MODE;                  /* connect a timeslot */
+             result = sw_set_output ( swdrvr, &output );  /* set up switch */
 
-		     /* now to make a bi-directional connection */
+             /* now to make a bi-directional connection */
 
-		     output.ost  = (ACU_INT) stream + 1;              /* network stream number */
-		     output.ots  = (ACU_INT) dspts;                   /* network timeslot number */
-		     output.ist  = (ACU_INT) stream;
-		     output.its  = (ACU_INT) ts;
-		     output.mode = CONNECT_MODE;
-		     result |= sw_set_output ( swdrvr, &output ); /* set up switch */
-		     }
-		  }
-	    break;
+             output.ost  = (ACU_INT) stream + 1;              /* network stream number */
+             output.ots  = (ACU_INT) dspts;                   /* network timeslot number */
+             output.ist  = (ACU_INT) stream;
+             output.its  = (ACU_INT) ts;
+             output.mode = CONNECT_MODE;
+             result |= sw_set_output ( swdrvr, &output ); /* set up switch */
+             }
+          }
+        break;
 
-	    /* setup for E1 cards */
+        /* setup for E1 cards */
 
-	    case L_E1:
-	       /* If we haven't yet got a signalling timeslot, and ts 16 is
-	       available (not used as a bearer), then use ts 16 for signalling 
-	       else it must be an NFAS bearer-only trunk with no sig. ts.  */
+        case L_E1:
+           /* If we haven't yet got a signalling timeslot, and ts 16 is
+           available (not used as a bearer), then use ts 16 for signalling
+           else it must be an NFAS bearer-only trunk with no sig. ts.  */
 
-	       if ( (sig_ts <0) && ( !(validvector & (1L << 16))))
-		 sig_ts = 16 ;
+           if ( (sig_ts <0) && ( !(validvector & (1L << 16))))
+              sig_ts = 16 ;
 
-	       for ( ts = 1; ts < 32 && result == 0; ts++ )
-		  {
-		  int x_ts;
+           for ( ts = 1; ts < 32 && result == 0; ts++ )
+           {
+              int x_ts;
 
-		  /* Check for Timeslot 16 OR */
-		  /* check if tone signalling */
+              /* Check for Timeslot 16 OR */
+              /* check if tone signalling */
+    
+              if ( ts == sig_ts)
+                  x_ts = 16;  /* HDLC channel */
+              else if (is_tone ( portnum ))
+                  x_ts = ts ;
+              else
+                 continue;
+    
+              output.ost  = (ACU_INT) stream;
+              output.ots  = (ACU_INT) ts;
+              output.ist  = (ACU_INT) stream + 1;              /* network stream number */
+              output.its  = (ACU_INT) x_ts;                      /* network timeslot number */
+              output.mode = CONNECT_MODE;                  /* connect a timeslot */
+              result = sw_set_output ( swdrvr, &output );  /* set up switch */
+    
+              /* now to make a bi-directional connection */
+    
+              output.ost  = (ACU_INT) stream + 1;              /* network stream number */
+              output.ots  = (ACU_INT) x_ts;                      /* network timeslot number */
+              output.ist  = (ACU_INT) stream;
+              output.its  = (ACU_INT) ts;
+              output.mode = CONNECT_MODE;
+              result |= sw_set_output ( swdrvr, &output ); /* set up switch */
+           }
+        break;
 
-		  if ( ts == sig_ts)
-		      x_ts = 16;  /* HDLC channel */
-		  else if (is_tone ( portnum ))
-		      x_ts = ts ;
-		  else
-		     continue;
+        /* basic rate */
 
-		  output.ost  = (ACU_INT) stream;
-		  output.ots  = (ACU_INT) ts;
-		  output.ist  = (ACU_INT) stream + 1;              /* network stream number */
-		  output.its  = (ACU_INT) x_ts;                      /* network timeslot number */
-		  output.mode = CONNECT_MODE;                  /* connect a timeslot */
-		  result = sw_set_output ( swdrvr, &output );  /* set up switch */
-
-		  /* now to make a bi-directional connection */
-
-		  output.ost  = (ACU_INT) stream + 1;              /* network stream number */
-		  output.ots  = (ACU_INT) x_ts;                      /* network timeslot number */
-		  output.ist  = (ACU_INT) stream;
-		  output.its  = (ACU_INT) ts;
-		  output.mode = CONNECT_MODE;
-		  result |= sw_set_output ( swdrvr, &output ); /* set up switch */
-		  }
-	    break;
-
-	    /* basic rate */
-
-	    case L_BASIC_RATE:
-	       result = 0;
-	    break;
-	    }
+        case L_BASIC_RATE:
+           result = 0;
+        break;
+        }
       }
 
    return ( result );
@@ -775,9 +792,9 @@ ACUDLL int set_idle ( int portnum )
    for ( ts = 0; ts < 32; ts++ )
       {
       if ( timeslot_valid ( portnum, ts ))   /* check if valid timeslot */
-	 {
-	 idle_net_ts ( portnum, ts );
-	 }
+         {
+         idle_net_ts ( portnum, ts );
+         }
       }
 
    return ( result );
@@ -794,7 +811,7 @@ ACUDLL int set_idle ( int portnum )
 /* The nailup stream may be either the   */
 /* MVIP or PEB bus streams               */
 /*                                       */
-ACUDLL int nailup ( int portnum, int nailup_stream )
+ACUDLL int ACU_WINAPI nailup ( int portnum, int nailup_stream )
    {
    struct output_parms output;          /* switch structure      */
    int  ts;                             /* timeslot number       */
@@ -805,34 +822,34 @@ ACUDLL int nailup ( int portnum, int nailup_stream )
 
    net_st = call_port_2_stream ( portnum );    /* get network stream number */
 
-   if ( net_st < 0 )                           /* check for errors  */ 
+   if ( net_st < 0 )                           /* check for errors  */
       {
-      result = net_st;                         /* pick up the error code */ 
+      result = net_st;                         /* pick up the error code */
       }
    else
       {
       swdrvr = call_port_2_swdrvr ( portnum ); /* get network switch number */
 
-      if ( swdrvr < 0 )                        /* check for errors  */ 
-	 {
-	 result = swdrvr;                      /* pick up the error code */
-	 }
+      if ( swdrvr < 0 )                        /* check for errors  */
+         {
+         result = swdrvr;                      /* pick up the error code */
+         }
       else
-	 {
-	 for ( ts = 0; ts < 32; ts++ )
-	    {
-	    if ( timeslot_valid ( portnum, ts ))
-	       {
-	       output.ost  = nailup_stream;    /* PEB or MVIP stream  */
-	       output.ots  = ts;               /* associated timeslot */
-	       output.ist  = net_st;           /* network port stream */
-	       output.its  = ts;               /* associated timeslot */
-	       output.mode = CONNECT_MODE;     /* make a connection   */
+         {
+         for ( ts = 0; ts < 32; ts++ )
+            {
+            if ( timeslot_valid ( portnum, ts ))
+               {
+               output.ost  = nailup_stream;    /* PEB or MVIP stream  */
+               output.ots  = ts;               /* associated timeslot */
+               output.ist  = net_st;           /* network port stream */
+               output.its  = ts;               /* associated timeslot */
+               output.mode = CONNECT_MODE;     /* make a connection   */
 
-	       sw_set_output ( swdrvr, &output );
-	       }
-	    }
-	 }
+               sw_set_output ( swdrvr, &output );
+               }
+            }
+         }
       }
 
    return ( result );
@@ -844,7 +861,7 @@ ACUDLL int nailup ( int portnum, int nailup_stream )
 /*do the connection of the digital switch*/
 /*MVIP bus only*/
 /*                                       */
-ACUDLL void handle_switch ( struct detail_xparms * detailsp, int your_mvip_stream, int your_mvip_timeslot )
+ACUDLL void ACU_WINAPI handle_switch ( struct detail_xparms * detailsp, int your_mvip_stream, int your_mvip_timeslot )
    {
    struct output_parms output;
    int  swdrvr;
@@ -878,7 +895,7 @@ ACUDLL void handle_switch ( struct detail_xparms * detailsp, int your_mvip_strea
 /*-------------- idle_net_ts ------------*/
 /*now idle the network stream            */
 /*                                       */
-ACUDLL void idle_net_ts ( int portnum, int timeslot )
+ACUDLL void ACU_WINAPI idle_net_ts ( int portnum, int timeslot )
    {
    struct output_parms   output;
    struct sysinfo_xparms sysinfo;
@@ -898,21 +915,21 @@ ACUDLL void idle_net_ts ( int portnum, int timeslot )
    switch (sysinfo.cardtype)
       {
       case C_PM4:
-	 dspstreamoffset= 8;
-	 idle_pattern = IDLE;
+         dspstreamoffset= 8;
+         idle_pattern = IDLE;
       break;
 
       case C_BR4:
       case C_BR8:
-	 dspstreamoffset= 1;
-	 idle_pattern = 0xff;           /* basic rate idle pattern (0xff) */
+         dspstreamoffset= 1;
+         idle_pattern = 0xff;           /* basic rate idle pattern (0xff) */
       break;
 
       case C_REV4:
       case C_REV5:
       default:
-	 dspstreamoffset= 1;
-	 idle_pattern = IDLE;           /* idle pattern (ccitt 0x54) */
+         dspstreamoffset= 1;
+         idle_pattern = IDLE;           /* idle pattern (ccitt 0x54) */
       break;
       }
 
@@ -929,62 +946,64 @@ ACUDLL void idle_net_ts ( int portnum, int timeslot )
       /* otherwise send the idle pattern               */
 
       switch ( call_type ( portnum ) )
-	 {
-	 /* T1 CAS Tone Signalling */
+         {
+         /* T1 CAS Tone Signalling */
 
-	 case S_T1CAS_TONE:
-	    dspts = timeslot;
+         case S_T1CAS_TONE:
+            dspts = timeslot;
 
-	    if ( timeslot >= 16 )
-	       {
-	       dspts++;
-	       }
-
-	    output.ost  = stream;
-	    output.ots  = timeslot;
-	    output.ist  = stream + dspstreamoffset;          /* network stream number */
-	    output.its  = dspts;                             /* network timeslot number */
-	    output.mode = CONNECT_MODE;                      /* connect a timeslot */
-	    sw_set_output ( swdrvr, &output );               /* set up switch */
-
-	    /* now to make a bi-directional connection */
-
-	    output.ost  = stream + dspstreamoffset;          /* network stream number */
-	    output.ots  = dspts;                             /* network timeslot number */
-	    output.ist  = stream;
-	    output.its  = timeslot;
-	    output.mode = CONNECT_MODE;
-	    sw_set_output ( swdrvr, &output ); /* set up switch */
-	 break;
+            /* If using DSP65, use ts16 */
+            if ( sysinfo.boardtype != B_C2_PCI )
+            {
+               if ( timeslot >= 16 ) dspts++;
+            }
 
 
-	 case S_CAS_TONE:
-	 case S_SS5_TONE:
-	    output.ost  = stream;
-	    output.ots  = timeslot;
-	    output.ist  = stream + dspstreamoffset;          /* network stream number */
-	    output.its  = timeslot;                          /* network timeslot number */
-	    output.mode = CONNECT_MODE;                      /* connect a timeslot */
-	    sw_set_output ( swdrvr, &output );               /* set up switch */
+            output.ost  = stream;
+            output.ots  = timeslot;
+            output.ist  = stream + dspstreamoffset;          /* network stream number */
+            output.its  = dspts;                             /* network timeslot number */
+            output.mode = CONNECT_MODE;                      /* connect a timeslot */
+            sw_set_output ( swdrvr, &output );               /* set up switch */
 
-	    /* now to make a bi-directional connection */
+            /* now to make a bi-directional connection */
 
-	    output.ost  = stream + dspstreamoffset;          /* network stream number */
-	    output.ots  = timeslot;                          /* network timeslot number */
-	    output.ist  = stream;
-	    output.its  = timeslot;
-	    output.mode = CONNECT_MODE;
-	    sw_set_output ( swdrvr, &output );               /* set up switch */
-	 break;
+            output.ost  = stream + dspstreamoffset;          /* network stream number */
+            output.ots  = dspts;                             /* network timeslot number */
+            output.ist  = stream;
+            output.its  = timeslot;
+            output.mode = CONNECT_MODE;
+            sw_set_output ( swdrvr, &output ); /* set up switch */
+         break;
 
-	 default:
-	    output.ost  = stream;                            /* network stream number */
-	    output.ots  = timeslot;                          /* network timeslot number */
-	    output.mode = PATTERN_MODE;                      /* connect a timeslot */
-	    output.pattern = idle_pattern;                   /* idle pattern */
-	    sw_set_output ( swdrvr, &output );               /* set up switch */
-	 break;
-	 }
+
+         case S_CAS_TONE:
+         case S_SS5_TONE:
+            output.ost  = stream;
+            output.ots  = timeslot;
+            output.ist  = stream + dspstreamoffset;          /* network stream number */
+            output.its  = timeslot;                          /* network timeslot number */
+            output.mode = CONNECT_MODE;                      /* connect a timeslot */
+            sw_set_output ( swdrvr, &output );               /* set up switch */
+
+            /* now to make a bi-directional connection */
+
+            output.ost  = stream + dspstreamoffset;          /* network stream number */
+            output.ots  = timeslot;                          /* network timeslot number */
+            output.ist  = stream;
+            output.its  = timeslot;
+            output.mode = CONNECT_MODE;
+            sw_set_output ( swdrvr, &output );               /* set up switch */
+         break;
+
+         default:
+            output.ost  = stream;                            /* network stream number */
+            output.ots  = timeslot;                          /* network timeslot number */
+            output.mode = PATTERN_MODE;                      /* connect a timeslot */
+            output.pattern = idle_pattern;                   /* idle pattern */
+            sw_set_output ( swdrvr, &output );               /* set up switch */
+         break;
+         }
       }
    }
 /*---------------------------------------*/
@@ -1012,23 +1031,23 @@ ACUDLL int verify_ddi ( char * ddip )
 ACUDLL int is_tone ( int portnum )
    {
    int  result;
-   
+
    result = call_type ( portnum );
-   
+
    if ( result >= 0 )
       {
-      if ( result == S_CAS_TONE   || 
-	   result == S_T1CAS_TONE ||
-	   result == S_SS5_TONE )
-	 {
-	 result = TRUE;
-	 }
+      if ( result == S_CAS_TONE   ||
+           result == S_T1CAS_TONE ||
+           result == S_SS5_TONE )
+         {
+         result = TRUE;
+         }
       else
-	 {
-	 result = FALSE;
-	 }
+         {
+         result = FALSE;
+         }
       }
-   
+
    return ( result );
    }
 /*---------------------------------------*/
@@ -1037,33 +1056,32 @@ ACUDLL int is_tone ( int portnum )
 /* return the file name for the network  */
 /* port                                  */
 /*                                       */
-ACUDLL char * port_2_filename ( int portnum )
+ACUDLL char * ACU_WINAPI port_2_filename ( int portnum )
    {
    int  type, line;
    int  i;
-   static char noname[] = { "" };
-   char * filep = noname;
+   char * filep = NULL;
 
 
    type = call_type ( portnum );               /* get network type */
    line = call_line ( portnum );
 
-   if ( type != S_CAS        && 
-	type != S_CAS_TONE   &&
-	type != S_SS5_TONE   &&
-	type != S_T1CAS      &&
-	type != S_T1CAS_TONE &&
-	type != S_BASE       &&
-	line != L_BASIC_RATE )
+   if ( type != S_CAS        &&
+        type != S_CAS_TONE   &&
+        type != S_SS5_TONE   &&
+        type != S_T1CAS      &&
+        type != S_T1CAS_TONE &&
+        type != S_BASE       &&
+        line != L_BASIC_RATE )
       {
       for ( i = 0; ncfg[i].nettype != 0; i++ ) /* scan for type */
-	 {
-	 if ( ncfg[i].nettype == type )
-	    {
-	    filep = ncfg[i].filep;             /* pick up the filename */
-	    break;
-	    }
-	 }
+         {
+         if ( ncfg[i].nettype == type )
+            {
+            filep = ncfg[i].filep;             /* pick up the filename */
+            break;
+            }
+         }
       }
    else
       {
@@ -1075,9 +1093,9 @@ ACUDLL char * port_2_filename ( int portnum )
       /*------------------------------------------------*/
 
       if ( verbose )
-	 {
-	 printf ( "\r\nMvcldnld cannot determine the file to load, please specify" );
-	 }
+         {
+         printf ( "\r\nMvcldnld cannot determine the file to load, please specify" );
+         }
       }
 
    return ( filep );
@@ -1090,7 +1108,7 @@ ACUDLL char * port_2_filename ( int portnum )
 /* return a string representing the      */
 /* sigtype running on the card           */
 /*                                       */
-ACUDLL char * sigtype_2_string ( int sigtype )
+ACUDLL char * ACU_WINAPI sigtype_2_string ( int sigtype )
    {
    char * typep = "Unknown Type";
    int  i;
@@ -1099,10 +1117,10 @@ ACUDLL char * sigtype_2_string ( int sigtype )
    for ( i = 0; ncfg[i].nettype != 0; i++ ) /* scan for type */
       {
       if ( ncfg[i].nettype == sigtype )
-	 {
-	 typep = ncfg[i].typep;             /* pick up the filename */
-	 break;
-	 }
+         {
+         typep = ncfg[i].typep;             /* pick up the filename */
+         break;
+         }
       }
 
    return ( typep );
@@ -1125,13 +1143,13 @@ static int timeslot_valid ( int portnum, int timeslot )
    if ( result == 0 )
       {
       if ( info[portnum].validvector & (1L << timeslot ))
-	 {
-	 result = TRUE;
-	 }
+         {
+         result = TRUE;
+         }
       else
-	 {
-	 result = FALSE;
-	 }
+         {
+         result = FALSE;
+         }
       }
    else
       {
@@ -1152,15 +1170,15 @@ static int get_info ( void )
    int  result = 0;
    static int  info_available = FALSE;
 
-   
+
    if ( ! info_available )
       {
       result = call_signal_info ( &info[0] );  /* get signalling information */
 
       if ( result == 0 )
-	 {
-	 info_available = TRUE;
-	 }
+         {
+         info_available = TRUE;
+         }
       }
 
    return ( result );
@@ -1170,148 +1188,180 @@ static int get_info ( void )
 /*------------error_2_string-------------*/
 /* convert error code to string          */
 /*                                       */
-ACUDLL char * error_2_string( int error )
+ACUDLL char * ACU_WINAPI error_2_string( int error )
 {
-	char* error_string;
+    char* error_string;
+    static char temperror[50];
 
-	switch(error)
+    switch(error)
        {
        /************************/
        /* Miscellaneous Errors */
        /************************/
        case ERR_HANDLE:
-	  error_string="ERR_HANDLE - Illegal handle, or out of handles";
+          error_string="ERR_HANDLE - Illegal handle, or out of handles";
        break;
        case ERR_COMMAND:
-	  error_string="ERR_COMMAND - Illegal command";
+          error_string="ERR_COMMAND - Illegal command";
        break;
        case ERR_NET:
-	  error_string="ERR_NET - Illegal network number";
+          error_string="ERR_NET - Illegal network number";
        break;
        case ERR_PARM:
-	  error_string="ERR_PARM - Illegal parameter";
+          error_string="ERR_PARM - Illegal parameter";
        break;
        case ERR_RESPONSE:
-	  error_string="ERR_RESPONSE - ";
+          error_string="ERR_RESPONSE - ";
        break;
        case ERR_NOCALLIP:
-	  error_string="ERR_NOCALLIP - No call in progress";
+          error_string="ERR_NOCALLIP - No call in progress";
        break;
        case ERR_TSBAR:
-	  error_string="ERR_TSBAR - Timeslot barred";
+          error_string="ERR_TSBAR - Timeslot barred";
        break;
        case ERR_TSBUSY:
-	  error_string="ERR_TSBUSY - Timeslot busy";
+          error_string="ERR_TSBUSY - Timeslot busy";
        break;
        case ERR_CFAIL:
-	  error_string="ERR_CFAIL - Command failed to execute";
+          error_string="ERR_CFAIL - Command failed to execute";
        break;
        case ERR_SERVICE:
-	  error_string="ERR_SERVICE - Invalid service code";
+          error_string="ERR_SERVICE - Invalid service code";
        break;
        case ERR_BUFF_FAIL:
-	  error_string="ERR_BUFF_FAIL - Out of buffer resources";
+          error_string="ERR_BUFF_FAIL - Out of buffer resources";
        break;
        /*******************/
        /* Download Errors */
        /*******************/
        case ERR_DNLD_ZAP:
-	  error_string="ERR_DNLD_ZAP - Debug monitor running";
+          error_string="ERR_DNLD_ZAP - Debug monitor running";
        break;
        case ERR_DNLD_NOCMD:
-	  error_string="ERR_DNLD_NOCMD - Firmware not loaded - command denied";
+          error_string="ERR_DNLD_NOCMD - Firmware not loaded - command denied";
        break;
        case ERR_DNLD_NODNLD:
-	  error_string="ERR_DNLD_NODNLD - Firmware installed - download denied";
+          error_string="ERR_DNLD_NODNLD - Firmware installed - download denied";
        break;
        case ERR_DNLD_GEN:
-	  error_string="ERR_DNLD_GEN - General failure during download";
+          error_string="ERR_DNLD_GEN - General failure during download";
        break;
        case ERR_DNLD_NOSIG:
-	  error_string="ERR_DNLD_NOSIG - Download firmware failed to start";
+          error_string="ERR_DNLD_NOSIG - Download firmware failed to start";
        break;
        case ERR_DNLD_NOEXEC:
-	  error_string="ERR_DNLD_NOEXEC - Download firmware is not executing";
+          error_string="ERR_DNLD_NOEXEC - Download firmware is not executing";
        break;
        case ERR_DNLD_NOCARD:
-	  error_string="ERR_DNLD_NOCARD - Download firmware is not executing";
+          error_string="ERR_DNLD_NOCARD - Download firmware is not executing";
        break;
        case ERR_DNLD_SYSTAT:
-	  error_string="ERR_DNLD_SYSTAT - Download firmware detected an error";
+          error_string="ERR_DNLD_SYSTAT - Download firmware detected an error";
        break;
        case ERR_DNLD_BADTLS:
-	  error_string="ERR_DNLD_BADTLS - Driver does not support the firmware";
+          error_string="ERR_DNLD_BADTLS - Driver does not support the firmware";
        break;
        case ERR_DNLD_POST:
-	  error_string="ERR_DNLD_POST - Board failed power on self test";
+          error_string="ERR_DNLD_POST - Board failed power on self test";
        break;
        case ERR_DNLD_SW:
-	  error_string="ERR_DNLD_SW - Switch setup error";
+          error_string="ERR_DNLD_SW - Switch setup error";
        break;
        case ERR_DNLD_MEM:
-	  error_string="ERR_DNLD_MEM - Could not allocate memory for download";
+          error_string="ERR_DNLD_MEM - Could not allocate memory for download";
        break;
        case ERR_DNLD_FILE:
-	  error_string="ERR_DNLD_FILE - Could not find the file to download";
+         error_string="ERR_DNLD_FILE - Could not find the file to download";
        break;
        case ERR_DNLD_TYPE:
-	  error_string="ERR_DNLD_TYPE - The file is not downloadable";
+          error_string="ERR_DNLD_TYPE - The file is not downloadable";
+       break;
+       case ERR_DRV_CALLINIT:
+          error_string="ERR_DRV_CALLINIT - other processes are accessing the driver";
        break;
        /************************/
        /* Compatibility Errors */
        /************************/
        case ERR_LIB_INCOMPAT:
-	  error_string="ERR_LIB_INCOMPAT - Incompatible library used";
+          error_string="ERR_LIB_INCOMPAT - Incompatible library used";
        break;
        case ERR_DRV_INCOMPAT:
-	  error_string="ERR_DRV_INCOMPAT - Incompatible driver used(pre v4.0)";
+          error_string="ERR_DRV_INCOMPAT - Incompatible driver used(pre v4.0)";
+       break;
+       /***************/
+       /* VoIP Errors */
+       /***************/
+       case ERR_INVALID_ADDR:
+          error_string="ERR_INVALID_ADDR - Tried to access invalid address";
+       break;
+       case ERR_INVALID_PORT:
+          error_string="ERR_INVALID_PORT - Tried to access invalid port";
+       break;
+       case ERR_MANAGEMENT_RPC:
+          error_string="ERR_MANAGEMENT_RPC - Failed to start management RPC session";
+       break;
+       case ERR_SESSION_RPC:
+          error_string="ERR_SESSION_RPC - Failed to start session RPC session";
+       break;
+       case ERR_NO_SERVICE:
+          error_string="ERR_NO_SERVICE - Failed to communicate with service";
+       break;
+       case ERR_NO_BOARD:
+          error_string="ERR_NO_BOARD - Failed to communicate with VoIP board";
+       break;
+       case ERR_BOARD_UNLOADED:
+          error_string="ERR_BOARD_UNLOADED - Firmware not downloaded to VoIP board";
+       break;
+       case ERR_BOARD_VERSION:
+          error_string="ERR_BOARD_VERSION - Incorrect VoIP firmware version found";
        break;
        /************************/
        /* Switch Driver Errors */
        /************************/
        case MVIP_INVALID_COMMAND:
-	  error_string="MVIP_INVALID_COMMAND - Command code is not supported";
-	  break;
+          error_string="MVIP_INVALID_COMMAND - Command code is not supported";
+       break;
        case MVIP_DEVICE_ERROR:
-	  error_string="MVIP_DEVICE_ERROR - An error was returned from a device called by this driver";
-	  break;
+          error_string="MVIP_DEVICE_ERROR - An error was returned from a device called by this driver";
+       break;
        case MVIP_NO_RESOURCES:
-	  error_string="MVIP_NO_RESOURCES - An internal driver resource has been exhausted";
-	  break;
+          error_string="MVIP_NO_RESOURCES - An internal driver resource has been exhausted";
+       break;
        case MVIP_INVALID_STREAM:
-	  error_string="MVIP_INVALID_STREAM - Stream number in parameter list is out of range";
-	  break;
+          error_string="MVIP_INVALID_STREAM - Stream number in parameter list is out of range";
+       break;
        case MVIP_INVALID_TIMESLOT:
-	  error_string="MVIP_INVALID_TIMESLOT - Timeslot in parameter list is out of range";
-	  break;
+          error_string="MVIP_INVALID_TIMESLOT - Timeslot in parameter list is out of range";
+       break;
        case MVIP_INVALID_CLOCK_PARM:
-	  error_string="MVIP_INVALID_CLOCK_PARM - Invalid clock configuration parameter";
-	  break;
+          error_string="MVIP_INVALID_CLOCK_PARM - Invalid clock configuration parameter";
+       break;
        case MVIP_INVALID_MODE:
-	  error_string="MVIP_INVALID_MODE - Incorrect SET_OUTPUT or QUERY_OUTPUT mode";
-	  break;
+          error_string="MVIP_INVALID_MODE - Incorrect SET_OUTPUT or QUERY_OUTPUT mode";
+       break;
        case MVIP_INVALID_MINOR_SWITCH:
-	  error_string="MVIP_INVALID_MINOR_SWITCH - Minor(internal) switch error";
-	  break;
+          error_string="MVIP_INVALID_MINOR_SWITCH - Minor(internal) switch error";
+       break;
        case MVIP_INVALID_PARAMETER:
-	  error_string="MVIP_INVALID_PARAMETER - General invalid parameter error";
-	  break;
+          error_string="MVIP_INVALID_PARAMETER - General invalid parameter error";
+       break;
        case MVIP_NO_PATH:
-	  error_string="MVIP_NO_PATH - Connection cannot be made due to blocking or other switch limitation";
-	  break;
+          error_string="MVIP_NO_PATH - Connection cannot be made due to blocking or other switch limitation";
+       break;
        case MVIP_NO_SCBUS_CLOCK:
-	  error_string="MVIP_NO_SCBUS_CLOCK - No card driving SCbus clock";
-	  break;
+          error_string="MVIP_NO_SCBUS_CLOCK - No card driving SCbus clock";
+       break;
        case MVIP_OTHER_SCBUS_CLOCK:
-	  error_string="MVIP_OTHER_SCBUS_CLOCK - Another non-MVSWDEV controlled card";
-	  break;
+          error_string="MVIP_OTHER_SCBUS_CLOCK - Another non-MVSWDEV controlled card";
+       break;
 
        default:
-	  error_string="ERR_UNKNOWN - Unknown error value";
+          sprintf(temperror, "ERR_UNKNOWN - Unknown error value:%d", error);
+          error_string=temperror;
        break;
-	}
+    }
 
-	return error_string;
+    return error_string;
 
 }
 

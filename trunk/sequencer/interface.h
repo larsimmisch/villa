@@ -42,8 +42,7 @@ public:
 	{
 		clear();
 
-		begin() << id.c_str() << ' ' << _syntax_error
-			<< " syntax error - ";
+		begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - ";
 
 		return *this;
 
@@ -63,10 +62,14 @@ public:
 
 	omni_mutex& getMutex()	{ return m_mutex; }
 
+	typedef std::map<std::string,Sequencer*> t_calls;
+
+	const t_calls& get_calls() { return m_calls; }
+
 protected:
 
 	omni_mutex m_mutex;
-	std::map<std::string,Sequencer*> m_calls;
+	t_calls m_calls;
 };
 
 class Interface
