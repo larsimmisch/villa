@@ -406,26 +406,28 @@ bool ProsodyChannel::Beep::stop(Media *phone, unsigned status)
 {
 	struct sm_replay_abort_parms p;
 
-	omni_mutex_lock l(m_prosody->m_mutex);
-
-	if (m_state != active)
 	{
-		log(log_debug+1, "phone", phone->getName()) 
-			<< "stopping beep " << m_beeps << " - not active" << logend();
+		omni_mutex_lock l(m_prosody->m_mutex);
 
-		return false;
+		if (m_state != active)
+		{
+			log(log_debug+1, "phone", phone->getName()) 
+				<< "stopping beep " << m_beeps << " - not active" << logend();
+
+			return false;
+		}
+
+		p.channel = m_prosody->m_channel;
+
+		m_state = stopping;
+		m_status = status;
+		
+		int rc = sm_replay_abort(&p);
+		if (rc)
+			throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
+
+		m_position = (m_count * sizeof(beep) + p.offset) / 8;
 	}
-
-	p.channel = m_prosody->m_channel;
-
-	m_state = stopping;
-	m_status = status;
-	
-	int rc = sm_replay_abort(&p);
-	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
-
-	m_position = (m_count * sizeof(beep) + p.offset) / 8;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping beep " << m_beeps << logend();
@@ -459,18 +461,20 @@ int ProsodyChannel::Beep::process(Media *phone)
 					<< "beep " << m_beeps << " done [" << result_name(m_status) 
 					<< ',' << m_position << ']' << logend();
 
-				m_state = idle;
-				p->m_sending = 0;
-				p->m_mutex.unlock();
+				{
+					omni_mutex_lock lock(p->m_mutex);
+					m_state = idle;
+					p->m_sending = 0;
+				}
 				phone->completed(this);
-				p->m_mutex.lock();
 			}
 			else
 			{
-				m_offset = 0;
-				m_prosody->m_mutex.unlock();
+				{
+					omni_mutex_lock lock(p->m_mutex);
+					m_offset = 0;
+				}
 				start(phone);
-				m_prosody->m_mutex.lock();
 			}
 
 				return replay.status;
