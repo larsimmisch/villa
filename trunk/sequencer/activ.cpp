@@ -399,8 +399,13 @@ void Activity::remove(Molecule* aMolecule)
 		return;
 	}
 
-	if (aMolecule->prev == 0)	removeFirst();
-	else removeAfter(aMolecule->prev);
+	if (aMolecule->prev == 0)	
+		removeFirst();
+	else 
+		removeAfter(aMolecule->prev);
+
+	if (getSize() == 0)
+		setState(idle);
 
 	delete aMolecule;
 }
