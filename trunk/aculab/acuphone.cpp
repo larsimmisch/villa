@@ -364,16 +364,18 @@ unsigned ProsodyChannel::Beep::start(Media *phone)
 	start.type = kSMDataFormat8KHzALawPCM;
 	start.data_length = sizeof(beep);
 
-	omni_mutex_lock(m_prosody->m_mutex);
-
-	int rc = sm_replay_start(&start);
-	if (rc)
 	{
-		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
-	}
+		omni_mutex_lock(m_prosody->m_mutex);
 
-	m_state = active;
-	m_prosody->m_sending = this;
+		int rc = sm_replay_start(&start);
+		if (rc)
+		{
+			throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
+		}
+
+		m_state = active;
+		m_prosody->m_sending = this;
+	}
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "beep " << m_beeps << " started" << logend();
@@ -511,16 +513,18 @@ unsigned ProsodyChannel::Touchtones::start(Media *phone)
 			<< logend();
 	}
 
-	omni_mutex_lock(m_prosody->m_mutex);
-
-	int rc = sm_play_digits(&digits);
-	if (rc)
 	{
-		throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
-	}
+		omni_mutex_lock(m_prosody->m_mutex);
 
-	m_state = active;
-	m_prosody->m_sending = this;
+		int rc = sm_play_digits(&digits);
+		if (rc)
+		{
+			throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
+		}
+
+		m_state = active;
+		m_prosody->m_sending = this;
+	}
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "touchtones " << m_tt.c_str() << " started" << logend();
@@ -575,11 +579,14 @@ int ProsodyChannel::Touchtones::process(Media *phone)
 			<< "touchtones " << m_tt.c_str() << " done [" 
 			<< result_name(m_status) << ',' << m_position << ']' << logend();
 
-		m_state = idle;
-		p->m_sending = 0;
-		p->m_mutex.unlock();
+		{
+			omni_mutex_lock lock(p->m_mutex);
+
+			m_state = idle;
+			p->m_sending = 0;
+		}
+
 		phone->completed(this);
-		p->m_mutex.lock();
 	}
 
 	return tone.status;
@@ -679,16 +686,18 @@ unsigned ProsodyChannel::FileSample::start(Media *phone)
 
 	m_storage->setPos(offset);
 
-	omni_mutex_lock(m_prosody->m_mutex);
-
-	int rc = sm_replay_start(&start);
-	if (rc)
 	{
-		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
-	}
+		omni_mutex_lock(m_prosody->m_mutex);
 
-	m_state = active;
-	m_prosody->m_sending = this;
+		int rc = sm_replay_start(&start);
+		if (rc)
+		{
+			throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
+		}
+
+		m_state = active;
+		m_prosody->m_sending = this;
+	}
 
 	process(phone);
 
@@ -773,14 +782,16 @@ int ProsodyChannel::FileSample::process(Media *phone)
 				<< result_name(m_status) << ',' << m_position << ']' 
 				<< logend();
 
-			m_state = idle;
-			p->m_sending = 0;
-			p->m_mutex.unlock();
+			{
+				omni_mutex_lock lock(p->m_mutex);
+				m_state = idle;
+				p->m_sending = 0;
+			}
 			phone->completed(this);
-			p->m_mutex.lock();
 			return replay.status;
 		case kSMReplayStatusUnderrun:
 			log(log_error, "phone", phone->getName()) << "underrun!" << logend();
+			break;
 		case kSMReplayStatusHasCapacity:
 			if (!submit(phone))
 			{
@@ -816,16 +827,18 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 	record.max_elapsed_time = m_maxTime;
 	record.max_silence = m_maxSilence;
 
-	omni_mutex_lock(m_prosody->m_mutex);
-
-	int rc = sm_record_start(&record);
-	if (rc)
 	{
-		throw ProsodyError(__FILE__, __LINE__, "sm_record_start", rc);
-	}
+		omni_mutex_lock(m_prosody->m_mutex);
 
-	m_state = active;
-	m_prosody->m_receiving = this;
+		int rc = sm_record_start(&record);
+		if (rc)
+		{
+			throw ProsodyError(__FILE__, __LINE__, "sm_record_start", rc);
+		}
+
+		m_state = active;
+		m_prosody->m_receiving = this;
+	}
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "recording " << m_name.c_str() << " started" << logend();
@@ -912,9 +925,12 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 				<< result_name(m_status) << ',' << m_position << ']' 
 				<< logend();
 
-			m_state = idle;
-			p->m_receiving = 0;
-			p->m_mutex.unlock();
+			{
+				omni_mutex_lock lock(p->m_mutex);
+
+				m_state = idle;
+				p->m_receiving = 0;
+			}
 			
 			/* Retain status codes in the range of successful completions - 
 			   m_status may have been set in stop() */
@@ -923,6 +939,8 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 				rc = sm_record_how_terminated(&how);
 				if (rc)
 					throw ProsodyError(__FILE__, __LINE__, "sm_record_how_terminated", rc);
+
+				omni_mutex_lock lock(p->m_mutex);
 
 				switch(how.termination_reason)
 				{
@@ -943,7 +961,6 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 			}
 
 			phone->completed(this);
-			p->m_mutex.lock();
 			return record.status;
 		case kSMRecordStatusOverrun:
 			log(log_error, "phone", phone->getName()) << "overrun!" << logend();

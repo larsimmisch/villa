@@ -1148,8 +1148,11 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 				<< getName() << end();
 		}
 
-		m_id.erase();
-		release();
+		{
+			omni_mutex_lock l(m_mutex);
+			m_id.erase();
+			release();
+		}
 
 		delete this;
 	}
