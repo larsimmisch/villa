@@ -79,9 +79,10 @@ public:
 		if (m_gpos >= m_gsize)
 			return 0;
 
-		int m = l > m_gsize - m_gpos ? m_gsize - m_gpos : l;
+		int x = m_gsize - m_gpos;
+		int m = l > x ? x : l;
 
-		memcpy(s, &m_gbuf[m_gpos], m);
+		memmove(s, m_gbuf + m_gpos, m);
 
 		m_gpos += m;
 

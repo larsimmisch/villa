@@ -118,6 +118,7 @@ void Sequencer::release()
 
 unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 {
+	bool error = false;
 	unsigned channel;
 	unsigned mode;
 	unsigned priority;
@@ -260,34 +261,40 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 		{
 			log(log_error, "sequencer") << "Exception in addMolecule: " << e << logend();
 			atom = 0;
-
-			return sendMLCA(id, V3_ERROR_FAILED, molecule->getPos(), molecule->getLength());
+			error = true;
 		}
 		catch (const FileDoesNotExist &e)
 		{
 			log(log_error, "sequencer") << e << logend();
 			atom = 0;
-
-			return sendMLCA(id, V3_ERROR_NOT_FOUND, molecule->getPos(), molecule->getLength());
-
+			error = true;
 		}
 		catch (const Exception &e)
 		{
 			log(log_error, "sequencer") << e << logend();
 			atom = 0;
-
-			return sendMLCA(id.c_str(), V3_ERROR_FAILED, molecule->getPos(), molecule->getLength());
+			error = true;
 		}
-
-		molecule->add(*atom);
+		
+		if (!error)
+			molecule->add(*atom);
 
 		(*server) >> type;
+	}
+
+	if (error)
+	{
+		delete molecule;
+
+		return sendMLCA(id, V3_ERROR_FAILED, 0, 0);
 	}
 
 	if (molecule->getSize() == 0)
 	{
 		log(log_warning, "sequencer") << "Molecule is empty. will not be added." 
 			<< logend();
+
+		delete molecule;
 
 		return V3_WARNING_SILENCE;
 	}
