@@ -40,7 +40,7 @@ Timer Sequencer::timer;
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
   :	m_activity(this), m_configuration(aConfiguration), m_connectComplete(0),
-	m_clientSpec(0), m_disconnecting(false), m_interface(0),
+	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), m_interface(0),
 	m_callref(INVALID_CALLREF)
 {
 	Timeslot receive = gBus->allocate();
@@ -304,10 +304,11 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 		else
 		{
 			discarded++;
-			m_activity.remove(molecule);
 			
-			log(log_debug, "sequencer") << "removed molecule "  
+			log(log_debug, "sequencer") << "removing molecule "  
 				<< molecule->getId() << logend();
+
+			m_activity.remove(molecule);
 		}
 	}
 
@@ -430,7 +431,6 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 		return PHONE_ERROR_PROTOCOL_VIOLATION;
 	}
 
-	m_disconnecting = true;
 	m_id = id;
 	unlock();
 
@@ -450,6 +450,7 @@ int Sequencer::disconnect(int cause)
 	int rc = PHONE_OK;
 
 	omni_mutex_lock l(m_mutex);
+	m_disconnecting = m_callref;
 
 	if (m_activity.getState() == Activity::active)
 	{
@@ -468,9 +469,6 @@ int Sequencer::disconnect(int cause)
 		m_media->disconnected(m_trunk);
 		rc = m_trunk->disconnect(m_callref, cause);
 	}
-	else
-		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - stopping activity" << logend();
-
 
 	return rc;
 }
@@ -651,7 +649,8 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	checkCompleted();
 
 	// notify client unless already disconnecting or still stopping
-	if (m_interface && !m_disconnecting && m_activity.getState() == Activity::idle)
+	if (m_interface && m_disconnecting != INVALID_CALLREF 
+		&& m_activity.getState() == Activity::idle)
 	{
 		m_interface->begin() << PHONE_EVENT << " RDIS " << m_trunk->getName() 
 			<< end();
@@ -677,7 +676,7 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 
 	m_id.erase();
 
-	m_disconnecting = false;
+	m_disconnecting = INVALID_CALLREF;
 	m_callref = INVALID_CALLREF;
 }
 
@@ -839,14 +838,14 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	}
 
 	// handle the various disconnect conditions
-	if (m_disconnecting)
+	if (m_disconnecting != INVALID_CALLREF)
 	{
 		sendMoleculeDone(id.c_str(), PHONE_ERROR_DISCONNECTED, pos, length);
 
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
 
 		m_media->disconnected(m_trunk);
-		m_trunk->disconnect(m_callref);
+		m_trunk->disconnect(m_disconnecting);
 
 		return;
 	}
