@@ -91,6 +91,10 @@ SOURCE=.\asynctcp.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\asynctext.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=..\packet\packet.cpp
 # End Source File
 # Begin Source File
@@ -101,6 +105,10 @@ SOURCE=.\socket.cpp
 
 SOURCE=.\tcp.cpp
 # End Source File
+# Begin Source File
+
+SOURCE=.\text.cpp
+# End Source File
 # End Group
 # Begin Group "Header Files"
 
@@ -108,6 +116,10 @@ SOURCE=.\tcp.cpp
 # Begin Source File
 
 SOURCE=..\include\asynctcp.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\asynctext.h
 # End Source File
 # Begin Source File
 
@@ -124,6 +136,10 @@ SOURCE=..\include\socket.h
 # Begin Source File
 
 SOURCE=..\include\tcp.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\text.h
 # End Source File
 # Begin Source File
 
