@@ -123,7 +123,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 		return V3_FATAL_SYNTAX;
 	}
 
-	Molecule* molecule = new Molecule(mode, priority, id);
+	Molecule* molecule = new Molecule(channel, mode, priority, id);
 
 	std::string type;
 	
@@ -141,7 +141,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 			
 				(*server) >> file;
 
-				atom = new PlayAtom(this, file.c_str());
+				atom = new PlayAtom(channel, this, file.c_str());
 			}
 			else if (type == "rec")
 			{
@@ -151,7 +151,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 				(*server) >> file;
 				(*server) >> max;
 
-				atom = new RecordAtom(this, file.c_str(), max);
+				atom = new RecordAtom(channel, this, file.c_str(), max);
 			}
 			else if (type == "dtmf")
 			{
@@ -159,7 +159,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 				(*server) >> tt;
 
-				atom = new TouchtoneAtom(this, tt.c_str());
+				atom = new TouchtoneAtom(channel, this, tt.c_str());
 			}
 			else if (type == "beep")
 			{
@@ -167,7 +167,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 				(*server) >> count;
 
-				atom = new BeepAtom(this, count);
+				atom = new BeepAtom(channel, this, count);
 
 			}
 			else if (type == "slnc")
@@ -176,7 +176,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 				(*server) >> len;
 
-				atom = new SilenceAtom(len);
+				atom = new SilenceAtom(channel, len);
 			}
 			else if (type == "conf")
 			{
@@ -196,7 +196,19 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 					return V3_FATAL_SYNTAX;
 				}
 
-				atom = new ConferenceAtom(handle, Conference::duplex);
+				std::string s;
+				Conference::mode mode(Conference::duplex);
+
+				(*server) >> s;
+
+				if (s == "listen")
+					mode = Conference::listen;
+				else if (s == "speak")
+					mode = Conference::speak;
+				else if (s == "duplex")
+					mode = Conference::duplex;
+
+				atom = new ConferenceAtom(channel, handle, mode);
 			}
 
 			std::string notifications;

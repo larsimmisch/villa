@@ -44,11 +44,11 @@ class Atom : public DList::DLink
 {
 public:
 
-	Atom() : m_sample(0), m_channel(0), m_notifications(0) {}
+	Atom(unsigned channel = 0) : m_sample(0), m_channel(channel), m_notifications(0) {}
 	virtual ~Atom() {}
 
 	/* channel is the index of the parallel job */
-	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
+	virtual bool start(Sequencer* sequencer);
 	virtual bool stop(Sequencer* sequencer);
 
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return true; }
@@ -99,10 +99,10 @@ public:
 		stopped = 0x04 
 	};
 
-	Molecule(unsigned mode, int aPriority, const std::string &id);
+	Molecule(unsigned channel, unsigned mode, int aPriority, const std::string &id);
 	virtual ~Molecule();	
 
-	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
+	virtual bool start(Sequencer* sequencer);
 	virtual bool stop(Sequencer* sequencer);
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason);
 	virtual bool setPos(unsigned aPosition);
@@ -159,7 +159,7 @@ class PlayAtom : public Atom
 {
 public:
 
-	PlayAtom(Sequencer* sequencer, const char* aFile);
+	PlayAtom(unsigned channel, Sequencer* sequencer, const char* aFile);
 	virtual ~PlayAtom() { delete m_file; delete m_sample; }
 
 	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
@@ -177,7 +177,7 @@ class RecordAtom : public Atom
 {
 public:
 
-	RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime);
+	RecordAtom(unsigned channel, Sequencer* sequencer, const char* aFile, unsigned aTime);
 	virtual ~RecordAtom() { delete m_file; delete m_sample; }
 
 	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
@@ -197,7 +197,7 @@ class BeepAtom : public Atom
 {
 public:
 
-	BeepAtom(Sequencer* sequencer, unsigned count);
+	BeepAtom(unsigned channel, Sequencer* sequencer, unsigned count);
 	virtual ~BeepAtom() { delete m_sample; }
 
 	virtual bool setPos(unsigned pos) { return true; }
@@ -216,7 +216,7 @@ class TouchtoneAtom : public Atom
 {
 public:
 
-	TouchtoneAtom(Sequencer* sequencer, const char* att);
+	TouchtoneAtom(unsigned channel, Sequencer* sequencer, const char* att);
 	virtual ~TouchtoneAtom() { delete m_sample; delete m_tt; }
 
 	virtual bool setPos(unsigned pos) { return true; }
@@ -236,10 +236,10 @@ class SilenceAtom: public Atom, public TimerClient
 public:
 
 	// time is in milliseconds, as always
-	SilenceAtom(unsigned aLength) : m_length(aLength) {}
+	SilenceAtom(unsigned channel, unsigned aLength) : Atom(channel), m_length(aLength) {}
 	virtual ~SilenceAtom() {}
 
-	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
+	virtual bool start(Sequencer* sequencer);
 	virtual bool stop(Sequencer* sequencer);
 	virtual bool setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
@@ -266,10 +266,10 @@ class ConferenceAtom : public Atom //, public Termination
 {
 public:
 
-	ConferenceAtom(unsigned handle, Conference::mode m);
+	ConferenceAtom(unsigned channel, unsigned handle, Conference::mode m);
 	virtual ~ConferenceAtom() {}
 
-	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
+	virtual bool start(Sequencer* sequencer);
 	virtual bool stop(Sequencer* sequencer);
 	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return INDEFINITE; }

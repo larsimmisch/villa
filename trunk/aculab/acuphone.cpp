@@ -1101,3 +1101,9 @@ void AculabMedia::onRecog(tSMEventId id)
 		break;
 	}
 }
+
+void AculabMedia::loopback()
+{
+	m_sw.listen(Timeslot(m_info.ist, m_info.its), 
+				Timeslot(m_info.ost, m_info.ots));
+}

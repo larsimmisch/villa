@@ -260,11 +260,21 @@ bool Interface::data(InterfaceConnection *ic)
 	else if (command == "BGRO")
 	{
 		Sequencer *s = new Sequencer(ic);
-		std::string name = s->getName();
+		if (!s || !s->getMedia())
+		{
+			ic->begin() << V3_ERROR_NO_RESOURCE << ' ' << id.c_str() << end();
+		}
+		else
+		{
+			std::string name = s->getName();
 
-		ic->add(name, s);
+			// loop Prosody channel output to input for conference backgrounds
+			s->getMedia()->loopback();
 
-		ic->begin() << V3_OK << ' ' << id.c_str() << " BGRO " << name << end();
+			ic->add(name, s);
+
+			ic->begin() << V3_OK << ' ' << id.c_str() << " BGRO " << name << end();
+		}
 	}
 	else if (command == "BGRC")
 	{

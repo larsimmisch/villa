@@ -20,9 +20,8 @@ char* copyString(const char* aString)
 	return s;
 }
 
-bool Atom::start(Sequencer *sequencer, unsigned channel)
+bool Atom::start(Sequencer *sequencer)
 {
-	m_channel = channel;
 	m_sample->start(sequencer->getMedia());
 
 	return true;
@@ -33,32 +32,34 @@ bool Atom::stop(Sequencer *sequencer)
 	return m_sample->stop(sequencer->getMedia());
 }
 
-PlayAtom::PlayAtom(Sequencer* sequencer, const char* aFile)
+PlayAtom::PlayAtom(unsigned channel, Sequencer* sequencer, 
+				   const char* aFile) : Atom(channel)
 { 
 	m_file = copyString(aFile);
 	m_sample = sequencer->getMedia()->createFileSample(aFile);
 }
  
-RecordAtom::RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime)
-	: m_time(aTime)
+RecordAtom::RecordAtom(unsigned channel, Sequencer* sequencer, 
+					   const char* aFile, unsigned aTime) : Atom(channel), m_time(aTime)
 {
 	m_file = copyString(aFile); 
 
 	m_sample = sequencer->getMedia()->createRecordFileSample(aFile, aTime);
 }
 
-BeepAtom::BeepAtom(Sequencer* sequencer, unsigned count) : m_nBeeps(count) 
+BeepAtom::BeepAtom(unsigned channel, Sequencer* sequencer, 
+				   unsigned count) : Atom(channel), m_nBeeps(count) 
 {
 	m_sample = sequencer->getMedia()->createBeeps(count);
 }
 
-ConferenceAtom::ConferenceAtom(unsigned aConference, Conference::mode m)
- : m_mode(m), m_conference(0), m_data(0)
+ConferenceAtom::ConferenceAtom(unsigned channel, unsigned aConference, Conference::mode m)
+ : Atom(channel), m_mode(m), m_conference(0), m_data(0)
 {
 	m_conference = gConferences[aConference];
 }
 
-bool ConferenceAtom::start(Sequencer* sequencer, unsigned channel)
+bool ConferenceAtom::start(Sequencer* sequencer)
 {
 	if (!m_conference)
 		return false;
@@ -84,14 +85,15 @@ bool ConferenceAtom::stop(Sequencer* sequencer)
 	return true;
 }
 
-TouchtoneAtom::TouchtoneAtom(Sequencer* sequencer, const char* att)
+TouchtoneAtom::TouchtoneAtom(unsigned channel, Sequencer* sequencer, 
+							 const char* att) : Atom(channel)
 {
 	m_tt = copyString(att);
 
 	m_sample = sequencer->getMedia()->createTouchtones(att);
 }
 
-bool SilenceAtom::start(Sequencer* sequencer, unsigned channel)
+bool SilenceAtom::start(Sequencer* sequencer)
 {
 	/* preserve m_timer_m_data */
 	m_timer = sequencer->getTimer().add(m_length, this, m_timer.m_data);
@@ -140,8 +142,8 @@ bool SilenceAtom::setPos(unsigned pos)
 	return true;
 }
 
-Molecule::Molecule(unsigned aMode, int aPriority, const std::string &id) 
-	: DList(), m_mode(aMode), m_priority(aPriority), m_id(id), m_flags(0), 
+Molecule::Molecule(unsigned channel, unsigned aMode, int aPriority, const std::string &id) 
+	: Atom(channel), m_mode(aMode), m_priority(aPriority), m_id(id), m_flags(0), 
 	m_current(0), m_pos(0), m_status(0), m_length(0), m_nCurrent(0)
 {
 	m_timeStopped.now();
@@ -158,11 +160,9 @@ void Molecule::freeLink(List::Link* anAtom)
 	delete (Atom*)anAtom;
 }
 
-bool Molecule::start(Sequencer* sequencer, unsigned channel)
+bool Molecule::start(Sequencer* sequencer)
 {
 	bool started(false);
-
-	m_channel = channel;
 
 	if (!isStopped())
 	{
@@ -210,7 +210,7 @@ bool Molecule::start(Sequencer* sequencer, unsigned channel)
 	if (m_current)
 	{
 		m_current->setUserData(this);
-		started = m_current->start(sequencer, channel);
+		started = m_current->start(sequencer);
 	}
 
 	m_flags &= ~stopped;

@@ -44,12 +44,17 @@ void Conference::add(ProsodyChannel *channel, mode m)
 		 * Add the new party to the other parties' low-level conferences. 
 		 */
 		for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
-			i->first->conferenceAdd(channel);
+		{
+			if (i->second & listen)
+			{
+				i->first->conferenceAdd(channel);
+			}
+		}
  
-		m_parties.insert(t_party_set::value_type(channel, m));
-
 		channel->conferenceEC();
 	}
+
+	m_parties.insert(t_party_set::value_type(channel, m));
 
 	unlock();
 }
@@ -83,7 +88,10 @@ void Conference::remove(ProsodyChannel *channel)
 
 		for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
 		{
-			i->first->conferenceLeave(channel);
+			if (i->second & listen)
+			{
+				i->first->conferenceLeave(channel);
+			}
 		}
 	}
 

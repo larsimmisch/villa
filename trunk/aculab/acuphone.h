@@ -294,6 +294,9 @@ public:
 	virtual void startEnergyDetector(unsigned qualTime) { ProsodyChannel::startEnergyDetector(qualTime); }
 	virtual void stopEnergyDetector() { ProsodyChannel::stopEnergyDetector(); }
 
+	/* listen to our own output */
+	void loopback();
+
 	virtual const char* getName() { return m_trunk ? m_trunk->getName() : m_name; }
 
 	static void start() { s_dispatcher.start(); }
