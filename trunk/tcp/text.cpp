@@ -114,7 +114,7 @@ void SocketStream::grow_rbuf()
 	char *newbuf = new char[m_rmax*2];
 	memcpy(newbuf, m_rbuf, m_rsize);
 	m_rmax *= 2;
-	delete m_rbuf;
+	delete[] m_rbuf;
 	m_rbuf = newbuf;
 
 	log(log_info, "text") << m_remote << " growing read buffer to " << m_rmax << logend();

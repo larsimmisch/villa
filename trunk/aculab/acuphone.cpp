@@ -1094,10 +1094,6 @@ void AculabMedia::onWrite(tSMEventId id)
 	{
 		log(log_error, "phone", getName()) << e << logend();
 	}
-	catch (...)
-	{
-		log(log_error, "phone", getName()) << "unknown exception" << logend();
-	}
 }
 
 void AculabMedia::onRecog(tSMEventId id)
