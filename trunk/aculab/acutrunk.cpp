@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.11 2001/07/03 23:13:02 lars Exp $
+	$Id: acutrunk.cpp,v 1.12 2001/07/16 20:34:17 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -522,12 +522,12 @@ void AculabTrunk::onIdle()
 		m_state = disconnecting;
 		break;
 	case disconnecting:
-		release();
 		m_client->disconnectDone(this, r_ok);
+		release();
 		break;
 	case accepting:
-		release();
 		m_client->acceptDone(this, cause);
+		release();
 		break;
 	default:
 		release();

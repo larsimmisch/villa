@@ -376,7 +376,7 @@ void Sequencer::sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status
 
 void Sequencer::sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned pos, unsigned length)
 {
-	log(log_debug + 2, "sequencer")
+	log(log_debug + 2, "sequencer", phone->getName())
 		<< "send molecule done for: 0." << syncMinor << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
 
@@ -402,7 +402,7 @@ int Sequencer::connect(ConnectCompletion* complete)
 
 	if (connectComplete	|| phone->getState() != Trunk::listening)
 	{
-		log(log_debug, "sequencer")
+		log(log_debug, "sequencer", phone->getName())
 			<< "connect failed - invalid state: " 
 			<< phone->getState() << logend();
 
@@ -528,7 +528,7 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 
 	m_id = id;
 
-	log(log_debug, "sequencer") << "disconnecting" << logend();
+	log(log_debug, "sequencer", phone->getName()) << "disconnecting" << logend();
 
 	phone->disconnect(c);
 
@@ -569,7 +569,8 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 	clientSpec = configuration->dequeue(local);
 	if (clientSpec)
 	{
-		log(log_debug, "sequencer") << "found client matching: " << local 
+		log(log_debug, "sequencer", phone->getName()) 
+			<< "found client matching: " << local 
 			<< " id: " << clientSpec->m_id << logend();
 	}
 	else
@@ -584,7 +585,8 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 			clientSpec = gClientQueue.dequeue();
 			if (clientSpec)
 			{
-				log(log_debug, "sequencer") << "found client in global queue, remote: " 
+				log(log_debug, "sequencer", phone->getName()) 
+					<< "found client in global queue, remote: " 
 					<< clientSpec->m_id << logend();
 			}
 		}
@@ -609,13 +611,15 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 	{
 		if (!contained)
 		{
-			log(log_debug, "sequencer") << "no client found. rejecting call." << logend(); 
+			log(log_debug, "sequencer", phone->getName()) 
+				<< "no client found. rejecting call." << logend(); 
 
 			phone->reject(0);
 		}
 		else
 		{
-			log(log_debug, "sequencer") << "received partial local address: " << local 
+			log(log_debug, "sequencer", phone->getName()) 
+				<< "received partial local address: " << local 
 				<< logend();
 		}
 	}
@@ -629,7 +633,7 @@ void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remot
 	{
 		phone->reject();
 
-		log(log_debug, "sequencer") 
+		log(log_debug, "sequencer", phone->getName()) 
 			<< "rejecting request because of outstanding outgoing call" << logend();
 	}
 	else
@@ -638,7 +642,8 @@ void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remot
 
 		if (!connectComplete)
 		{
-			log(log_debug, "sequencer") << "telephone connect request from: " 
+			log(log_debug, "sequencer", phone->getName()) 
+				<< "telephone connect request from: " 
 				<< remote << " , " << local	<< " [" << server->getTimeslot() << ']' 
 				<< logend();
 		}
@@ -649,7 +654,7 @@ void Sequencer::connectRequestFailed(Trunk* server, int cause)
 {
 	if (cause == _aborted && connectComplete)
 	{
-		log(log_debug, "sequencer") << "connecting to " 
+		log(log_debug, "sequencer", phone->getName()) << "connecting to " 
 			<< connectComplete->m_id.c_str() 
 			<< " for dialout" << logend();
 
@@ -660,7 +665,8 @@ void Sequencer::connectRequestFailed(Trunk* server, int cause)
 	}
 	else
 	{
-		log(log_debug, "sequencer") << "connect request failed with " << cause 
+		log(log_debug, "sequencer", phone->getName()) 
+			<< "connect request failed with " << cause 
 			<< logend();
 
 		phone->listen();
@@ -669,7 +675,8 @@ void Sequencer::connectRequestFailed(Trunk* server, int cause)
 
 void Sequencer::connectDone(Trunk* server, int result)
 {
-	log(log_debug, "sequencer") << "telephone connect done: " << result << logend();
+	log(log_debug, "sequencer", phone->getName()) 
+		<< "telephone connect done: " << result << logend();
 
 	// good. we got through
 
@@ -691,7 +698,8 @@ void Sequencer::connectDone(Trunk* server, int result)
 
 void Sequencer::transferDone(Trunk *server)
 {
-	log(log_debug, "sequencer") << "telephone transfer succeeded" << logend();
+	log(log_debug, "sequencer", phone->getName()) 
+		<< "telephone transfer succeeded" << logend();
 
 	activity.setASAP();
 	activity.stop();
@@ -714,7 +722,8 @@ void Sequencer::transferDone(Trunk *server)
 
 void Sequencer::transferFailed(Trunk *server, int cause)
 {
-	log(log_warning, "sequencer") << "telephone transfer failed: " << cause << logend();
+	log(log_warning, "sequencer", phone->getName()) 
+		<< "telephone transfer failed: " << cause << logend();
 
 /* Todo
 
@@ -731,7 +740,8 @@ void Sequencer::transferFailed(Trunk *server, int cause)
 
 void Sequencer::disconnectRequest(Trunk *server, int cause)
 {
-	log(log_debug, "sequencer") << "telephone disconnect request" << logend();
+	log(log_debug, "sequencer", phone->getName()) 
+		<< "telephone disconnect request" << logend();
 
 	server->disconnectAccept();
 
@@ -754,19 +764,23 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 
 void Sequencer::disconnectDone(Trunk *server, unsigned result)
 {
-	log(log_debug, "sequencer") << "call disconnected" << logend();
+	log(log_debug, "sequencer", server->getName()) 
+		<< "call disconnected" << logend();
 
-	(*m_interface) << m_id.c_str() << ' ' << result << " disconnect-done\r\n";
+	(*m_interface) << m_id.c_str() << ' ' << result << ' '
+		<< phone->getName() << " disconnect-done\r\n";
 
 	m_id.erase();
+
+	server->listen();
 }
 
 void Sequencer::acceptDone(Trunk *server, unsigned result)
 {
 	if (result == r_ok)
-		log(log_debug, "sequencer") << "call accepted" << logend();
+		log(log_debug, "sequencer", server->getName()) << "call accepted" << logend();
 	else
-		log(log_debug, "sequencer") << "call accept failed: " 
+		log(log_debug, "sequencer", server->getName()) << "call accept failed: " 
 		<< result << logend();
 
 	(*m_interface) << m_id.c_str() << ' ' << result << " accept-done\r\n";
@@ -791,7 +805,8 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 		phone->connect(connectComplete->m_local, connectComplete->m_remote, 
 			connectComplete->m_timeout);
 
-		log(log_debug, "sequencer") << "connecting to: " << connectComplete->m_remote 
+		log(log_debug, "sequencer", server->getName()) 
+			<< "connecting to: " << connectComplete->m_remote 
 			<< " timeout: " << connectComplete->m_timeout 
 			<< " as: " << connectComplete->m_local << logend();
 	}
@@ -800,9 +815,11 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 		delete clientSpec;
 		clientSpec = 0;
 
-		log(log_debug, "sequencer") << "call rejected" << logend();
+		log(log_debug, "sequencer", server->getName()) 
+			<< "call rejected" << logend();
 
-		(*m_interface) << m_id.c_str() << ' ' << result << " accept-done\r\n";
+		(*m_interface) << m_id.c_str() << ' ' << result << server->getName() 
+			<< " reject-done\r\n";
 
 		m_id.erase();
 
@@ -813,15 +830,16 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 
 void Sequencer::details(Trunk *server, const SAP& local, const SAP& remote)
 {
-	log(log_debug, "sequencer") << "telephone details: " << local << " " << remote 
-		<< logend();
+	log(log_debug, "sequencer", server->getName()) 
+		<< "telephone details: " << local << " " << remote << logend();
 
 	onIncoming(server, local, remote);
 }
 
 void Sequencer::remoteRinging(Trunk *server)
 {
-	log(log_debug, "sequencer") << "telephone remote end ringing" << logend();
+	log(log_debug, "sequencer", server->getName()) 
+		<< "telephone remote end ringing" << logend();
 
 /* Todo
 
@@ -842,7 +860,7 @@ void Sequencer::started(Telephone *server, Sample *aSample)
 
 	if (m->notifyStart())
 	{
-		log(log_debug, "sequencer") << "sent atom_started for 0, " 
+		log(log_debug, "sequencer", server->getName()) << "sent atom_started for 0, " 
 			<< m->getSyncMinor() << ", " 
 			<< m->currentAtom() << logend();
  
@@ -863,15 +881,6 @@ void Sequencer::started(Telephone *server, Sample *aSample)
 
 void Sequencer::completed(Telephone *server, Sample *aSample, unsigned msecs)
 {
-#ifdef __RECOGNIZER__
-	if (aSample->isOutgoing() && recognizer)
-	{
-		log(log_debug, "sequencer") << "ec stopped" << logend();
-
-		recognizer->playbackStopped();
-	}
-#endif
-
 	completed(server, (Molecule*)(aSample->getUserData()), msecs, aSample->getStatus());
 }
 
@@ -897,7 +906,8 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 
 		if (notifyStop)
 		{
-			log(log_debug, "sequencer") << "sent atom_done for 0, " 
+			log(log_debug, "sequencer", server->getName()) 
+				<< "sent atom_done for 0, " 
 				<< ", " << aMolecule->getSyncMinor() 
 				<< ", " << nAtom << std::endl << *aMolecule << logend();
 
@@ -908,14 +918,16 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 		{
 			if (done) 
 			{
-				log(log_debug+2, "sequencer") << "removing " << *aMolecule << logend();
+				log(log_debug+2, "sequencer", server->getName()) 
+					<< "removing " << *aMolecule << logend();
 			}
 
 			activity.remove(aMolecule);
 		}
 		else
 		{
-			log(log_debug+2, "sequencer") << "done " << *aMolecule << logend();
+			log(log_debug+2, "sequencer", server->getName()) 
+				<< "done " << *aMolecule << logend();
 		}
  
 		// start the new activity before sending packets to minimize delay
@@ -985,7 +997,8 @@ void Sequencer::disconnectRequest(Transport* server, Packet* finalPacket)
 
 void Sequencer::fatal(Telephone* server, const char* e)
 {
-	log(log_error, "sequencer") << "fatal Telephone exception: " << e << std::endl
+	log(log_error, "sequencer", server->getName()) 
+		<< "fatal Telephone exception: " << e << std::endl
 		<< "terminating" << logend();
 
 	exit(5);
@@ -993,7 +1006,8 @@ void Sequencer::fatal(Telephone* server, const char* e)
 
 void Sequencer::fatal(Telephone* server, Exception& e)
 {
-	log(log_error, "sequencer") << "fatal Telephone exception: " << e << std::endl
+	log(log_error, "sequencer", server->getName()) 
+		<< "fatal Telephone exception: " << e << std::endl
 		<< "terminating" << logend();
 
 	exit(5);
