@@ -347,11 +347,10 @@ int Sequencer::connect(ConnectCompletion* complete)
 {
 	omni_mutex_lock lock(m_mutex);
 
-	if (m_connectComplete || m_trunk->getState() != Trunk::listening)
+	if (m_connectComplete)
 	{
 		log(log_debug, "sequencer", m_trunk->getName())
-			<< "connect failed - invalid state: " 
-			<< m_trunk->getState() << logend();
+			<< "connect failed - busy" << logend();
 
 		return PHONE_ERROR_BUSY;
 	}
@@ -407,16 +406,14 @@ int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
 
 int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 {
-	int cause;
+	int cause(0);
 
 	(*server) >> cause;
 
 	// cause is optional
-	if (!server->good())
+	if (server->eof())
 	{
-		server->syntax_error(id);
-
-		return PHONE_FATAL_SYNTAX;
+		server->clear();
 	}
 
 	omni_mutex_lock l(m_mutex);
@@ -467,15 +464,6 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 {
 	int contained; 
 
-	if (server->getState() != Trunk::collecting_details)
-	{
-		log(log_warning, "sequencer", m_trunk->getName()) 
-			<< " got details in state: " 
-			<< Trunk::stateName(server->getState()) << logend();
-
-		return;
-	}
-
 	omni_mutex_lock lock(m_mutex);
 
 	// do we have an exact match?
@@ -518,7 +506,7 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 				<< " LSTN " << m_trunk->getName()
 				<< " \"" << m_remote.getAddress() << "\" \""
 				<< m_configuration->getNumber() << "\" \""
-				<< m_local.getService() << "\" "
+				<< m_local.getAddress() << "\" "
 				<< server->getTimeslot().ts << end();
 		}
 	}
@@ -529,7 +517,7 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 			log(log_warning, "sequencer", m_trunk->getName()) 
 				<< "no client found. rejecting call." << logend(); 
 
-			m_trunk->reject(0);
+			m_trunk->disconnect(0);
 		}
 		else
 		{
@@ -546,7 +534,7 @@ void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remot
 {
 	if (m_connectComplete)
 	{
-		m_trunk->reject();
+		m_trunk->disconnect();
 
 		log(log_debug, "sequencer", m_trunk->getName()) 
 			<< "rejecting request because of outstanding outgoing call" << logend();
@@ -902,14 +890,9 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 		return;
 	}
 
-	if (m_trunk->getState() == Trunk::remote_disconnect)
+	if (m_trunk->remoteDisconnect())
 	{
 		sendMoleculeDone(id.c_str(), PHONE_ERROR_DISCONNECTED, pos, length);
-
-		if (m_interface)
-		{
-			m_interface->begin() << PHONE_EVENT << " RDIS " << server->getName() << end();
-		}
 
 		return;
 	}

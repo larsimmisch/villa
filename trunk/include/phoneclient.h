@@ -1,7 +1,7 @@
 /*
 	phoneclient.h
 
-	$Id: phoneclient.h,v 1.7 2001/09/26 22:41:57 lars Exp $
+	$Id: phoneclient.h,v 1.8 2003/11/26 00:09:28 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -41,9 +41,6 @@ public:
 
 	// accept completion
 	virtual void acceptDone(Trunk* server, unsigned result) = 0;
-
-	// reject completion
-	virtual void rejectDone(Trunk* server, unsigned result) = 0;
 
     // called whenever additional dialling information comes in (caller finishes dialling)
     virtual void details(Trunk* server, const SAP& local, const SAP& remote)   {}

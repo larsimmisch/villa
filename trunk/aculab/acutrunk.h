@@ -1,7 +1,7 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.7 2001/09/30 09:51:57 lars Exp $
+	$Id: acutrunk.h,v 1.8 2003/11/26 00:09:28 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -60,14 +60,10 @@ public:
 	
 	// must be called by client after a t_connect_request
 	virtual int accept();
-	virtual int reject(int cause = 0);
 	
 	// Dissolve a connection
 	virtual int disconnect(int cause = 0);
-	
-	// must be called by client after a disconnectRequest
-	virtual int disconnectAccept();
-	
+		
 	// forces the state to idle
     virtual void abort();
 	

@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.16 2003/11/22 23:44:46 lars Exp $
+	$Id: phone.h,v 1.17 2003/11/26 00:09:28 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -28,22 +28,16 @@ class Trunk
 {
 public:
 
-    enum states  { 
-		idle, 
-		listening, 
-		connecting, 
-		connected, 
-		remote_disconnect,
-		disconnecting,
-		transferring, 
-		waiting, 
-		collecting_details, 
-		accepting, 
-		rejecting 
+    enum TrunkCommand  { 
+		t_none, 
+		t_connect, 
+		t_disconnect,
+		t_transfer, 
+		t_accept 
 	};
 
 	Trunk(TrunkClient* aClient) 
-		: m_client(aClient), m_state(idle) {}
+		: m_client(aClient), m_cmd(t_none), m_remote_disconnect(false) {}
     virtual ~Trunk() {}
 
 	// Connection establishment 
@@ -53,7 +47,6 @@ public:
 	// must be called by client after a t_connect_request
 	// after acceptDone is called, the call is connected if the result is r_ok or else idle
 	virtual int accept() = 0;
-	virtual int reject(int cause = 0) = 0;
 	
 	// transfer
 	virtual int transfer(const SAP& remote, unsigned timeout = indefinite) 
@@ -63,9 +56,6 @@ public:
 
 	// Dissolve a connection
 	virtual int disconnect(int cause = 0) = 0;
-	
-	// must be called by client after a disconnectRequest
-	virtual int disconnectAccept() = 0;
 	
 	// forces the state to idle - synchronous
     virtual void abort() = 0;
@@ -79,45 +69,36 @@ public:
 	void setName(const char* s) { m_name = std::string(s); }
 	const char* getName() { return m_name.c_str(); }
 
-	virtual states getState() { return m_state; }
+	bool remoteDisconnect() { return m_remote_disconnect; }
 
-	static const char* stateName(states state)
+	virtual TrunkCommand getCommand() { return m_cmd; }
+
+	static const char* commandName(TrunkCommand cmd)
 	{
-		switch (state)
+		switch (cmd)
 		{
-		case idle:
-			return "idle";
-		case listening:
-			return "listening";
-		case connecting:
-			return "connecting";
-		case connected:
-			return "connected";
-		case disconnecting:
-			return "disconnecting";
-		case remote_disconnect:
-			return "remote_disconnect";
-		case transferring:
-			return "transferring";
-		case waiting:
-			return "waiting";
-		case collecting_details:
-			return "collecting_details";
-		case accepting:
-			return "accepting";
-		case rejecting:
-			return "rejecting";
+		case t_none:
+			return "none";
+		case t_connect:
+			return "connect";
+		case t_disconnect:
+			return "disconnect";
+		case t_transfer:
+			return "transfer";
+		case t_accept:
+			return "accept";
 		default:
-			return "illegal state";
+			return "unknown command";
 		}
 	}
 
 protected:
 
-	volatile states m_state;
+	volatile TrunkCommand m_cmd;
 	Timeslot m_timeslot;
 	TrunkClient* m_client;
 	std::string m_name;
+	bool m_remote_disconnect;
 };
 
 class Sample

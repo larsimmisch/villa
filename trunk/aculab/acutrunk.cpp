@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.18 2003/11/22 23:44:46 lars Exp $
+	$Id: acutrunk.cpp,v 1.19 2003/11/26 00:09:28 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -144,8 +144,6 @@ int AculabTrunk::listen()
 
 	lock();
 	m_stopped = false;
-	m_state = waiting;
-
 	incoming.net = m_port;
 	unlock();
 
@@ -185,17 +183,16 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 
 	lock();
 
-	if (m_state != idle)
+	if (m_cmd != t_none)
 	{
 		unlock();
 
 		return PHONE_ERROR_INVALID_STATE;
 	}
 
-	unlock();
-
     if (remote.getAddress() == 0)   
 	{
+		unlock();
 		return PHONE_ERROR_INVALID_ARGUMENT;
 	}
 
@@ -254,8 +251,7 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 		throw Exception(__FILE__, __LINE__, "AculabTrunk::connect()", "invalid signalling system");
 	}
 
-	lock();
-	m_state = connecting;
+	m_cmd = t_connect;
 	unlock();
 
 	// we must lock the global dispatcher before we enter call_openout
@@ -287,14 +283,14 @@ int AculabTrunk::accept()
 {
 	lock();
 
-	if (m_state != collecting_details)
+	if (m_cmd != t_none)
 	{
 		unlock();
 
 		return PHONE_ERROR_INVALID_STATE;
 	}
 
-	m_state = accepting;
+	m_cmd = t_accept;
 	unlock();
 
 	int rc = call_accept(m_handle);
@@ -312,31 +308,6 @@ int AculabTrunk::accept()
 	return PHONE_OK;
 }
 
-int AculabTrunk::reject(int cause)
-{
-	CAUSE_XPARMS xcause;
-
-	memset(&xcause, 0, sizeof(xcause));
-
-	xcause.handle = m_handle;
-	xcause.cause = cause;
-
-	lock();
-	m_state = rejecting;
-	unlock();
-
-	int rc = call_disconnect(&xcause);
-	if (rc)
-	{
-		log(log_error, "trunk", getName()) 
-			<< "call_disconnect failed: " << rc << logend();
-
-		return PHONE_ERROR_FAILED;
-	}
-
-	return PHONE_OK;
-}
-
 int AculabTrunk::disconnect(int cause)
 {
 	CAUSE_XPARMS xcause;
@@ -347,15 +318,7 @@ int AculabTrunk::disconnect(int cause)
 	xcause.cause = cause;
 
 	lock();
-	if (m_state == idle)
-	{
-		unlock();
-		m_client->disconnectDone(this, PHONE_OK);
-
-		return PHONE_OK;
-	}
-
-	m_state = disconnecting;
+	m_cmd = t_disconnect;
 	unlock();
 
 	int rc = call_disconnect(&xcause);
@@ -366,13 +329,6 @@ int AculabTrunk::disconnect(int cause)
 
 		return PHONE_ERROR_FAILED;
 	}
-
-	return PHONE_OK;
-}
-	
-int AculabTrunk::disconnectAccept()
-{
-	disconnect();
 
 	return PHONE_OK;
 }
@@ -385,15 +341,11 @@ void AculabTrunk::release()
 
 	xcause.handle = m_handle;
 
-	lock();
-	m_state = idle;
-	unlock();
-
 	int rc = call_release(&xcause);
 	if (rc)
 	{
 		log(log_error, "trunk", getName()) << "call_release failed: " << rc 
-			<< " in state " << stateName(m_state) << logend();
+			<< " in command " << commandName(m_cmd) << logend();
 	}
 
 	s_dispatcher.lock();
@@ -418,8 +370,8 @@ int AculabTrunk::getCause()
 	if (rc != 0)
 	{
 		log(log_error, "trunk", getName()) 
-			<< "call_getcause failed: " << rc << " in state " 
-			<< stateName(m_state) << logend();
+			<< "call_getcause failed: " << rc << " in command " 
+			<< commandName(m_cmd) << logend();
 
 		return PHONE_ERROR_FAILED;
 	}
@@ -518,69 +470,49 @@ void AculabTrunk::onIdle()
 {
 	int cause = getCause();
 
-	bool restart(false);
-
 	// stopTimer();
 
-	switch (m_state)
-	{
-	case connecting:
-		// outgoing failed or stopped
-		release();
-		m_client->connectDone(this, m_stopped ? PHONE_ERROR_ABORTED : cause);
-		lock();
-		setName(-1);
-		m_stopped = false;
-		unlock();
-		listen();
-		break;
-	case connected:
-		lock();
-		m_state = idle;
-		unlock();
-		m_client->disconnectRequest(this, cause);
-		break;
-	case disconnecting:
-		release();
-		m_client->disconnectDone(this, PHONE_OK);
-		lock();
-		setName(-1);
-		unlock();
-		listen();
-		break;
-	case rejecting:
-		release();
-		m_client->rejectDone(this, PHONE_OK);
-		lock();
-		setName(-1);
-		unlock();
-		listen();
-		break;
-	case accepting:
-		release();
-		m_client->acceptDone(this, cause);
-		lock();
-		setName(-1);
-		unlock();
-		listen();
-		break;
-	default:
-		log(log_warning, "trunk", getName()) 
-			<< "call went idle in state " << stateName(m_state) << logend();
+	TrunkCommand cmd;
+	bool remote_disconnect;
 
-		// restart automatically
-		release();
-		lock();
-		setName(-1);
-		unlock();
-		listen();
-		break;
+	lock();
+	cmd = m_cmd;
+	remote_disconnect = m_remote_disconnect;
+	unlock();
+
+	if (!remote_disconnect)
+	{
+		switch (cmd)
+		{
+		case t_connect:
+			// outgoing failed or stopped
+			m_client->connectDone(this, m_stopped ? PHONE_ERROR_ABORTED : cause);
+			break;
+		case t_disconnect:
+			m_client->disconnectDone(this, PHONE_OK);
+			break;
+		case t_accept:
+			m_client->acceptDone(this, cause);
+			break;
+		default:
+			m_client->disconnectRequest(this, cause);
+			break;
+		}
 	}
+
+	lock();
+	setName(-1);
+	m_remote_disconnect = false;
+	m_stopped = false;
+	m_cmd = t_none;
+	unlock();
+
+	release();
+	listen();
 }
 
 void AculabTrunk::onWaitForIncoming()
 {
-	m_state = waiting;
 }
 
 void AculabTrunk::onIncomingCallDetected()
@@ -615,7 +547,6 @@ void AculabTrunk::onIncomingCallDetected()
 	setName(details.ts);
 	m_timeslot.st = details.stream;
 	m_timeslot.ts = details.ts;
-	m_state = collecting_details;
 	unlock();
 
 	m_client->connectRequest(this, local, remote);
@@ -637,8 +568,6 @@ void AculabTrunk::onCallConnected()
 		return;
 	}
 
-	m_state = connected;
-
 	if (details.calltype == INCOMING)
 	{
 		m_client->acceptDone(this, PHONE_OK);
@@ -659,25 +588,33 @@ void AculabTrunk::onOutgoingRinging()
 
 void AculabTrunk::onRemoteDisconnect()
 {
-	switch (m_state)
+	TrunkCommand cmd;
+
+	lock();
+	cmd = m_cmd;
+	m_cmd = t_none;
+	m_remote_disconnect = true;
+	unlock();
+
+	switch (cmd)
 	{
-	case disconnecting:
-		break;
-	case connected:
-		m_state = remote_disconnect;
+	case t_none:
 		m_client->disconnectRequest(this, getCause());
 		break;
-	case accepting:
-		m_state = idle;
-		m_client->acceptDone(this, getCause());
+	case t_disconnect:
+		m_client->disconnectDone(this, PHONE_OK);
+		break;
+	case t_connect:
+		m_client->connectDone(this, PHONE_ERROR_REJECTED);
 		disconnect();
 		break;
-	case collecting_details:
-		m_client->disconnectRequest(this, getCause());
+	case t_accept:
+		m_client->acceptDone(this, PHONE_ERROR_REJECTED);
+		disconnect();
 		break;
 	default:
-		log(log_error, "trunk", getName()) << "unhandled state " 
-			<< stateName(m_state) << " in onRemoteDisconnect" << logend();
+		log(log_error, "trunk", getName()) << "unhandled command " 
+			<< commandName(cmd) << " in onRemoteDisconnect" << logend();
 		break;
 	}
 }
