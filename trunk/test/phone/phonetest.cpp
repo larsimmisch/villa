@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.12 2001/06/20 09:33:17 lars Exp $
+	$Id: phonetest.cpp,v 1.13 2001/06/20 12:50:18 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -134,7 +134,7 @@ public:
 	{
 		try
 		{
-			Sample* sample = server->createFileSample("startrek.al");
+			Sample* sample = server->createFileSample("sitrtoot.al");
 
 			sample->start(server);
 
