@@ -260,7 +260,7 @@ public:
 
 	enum e_state { idle, active, stopping };
 
-	Activity(Sequencer* sequencer) : m_sequencer(sequencer), m_state(active) {}
+	Activity(Sequencer* sequencer) : m_sequencer(sequencer), m_state(idle) {}
 	virtual ~Activity();
 
 	virtual Molecule* add(Molecule& newMolecule);
