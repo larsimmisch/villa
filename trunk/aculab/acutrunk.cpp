@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.5 2001/05/27 21:15:20 lars Exp $
+	$Id: acutrunk.cpp,v 1.6 2001/06/07 12:58:25 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -153,6 +153,8 @@ int AculabTrunk::listen()
 {
 	IN_XPARMS incoming;
 
+	memset(&incoming, 0, sizeof(incoming));
+
 	omni_mutex_lock l(mutex);
 
 	incoming.net = port;
@@ -187,6 +189,8 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 {
     OUT_XPARMS outdetail;
 
+	memset(&outdetail, 0, sizeof(outdetail));
+
 	omni_mutex_lock l(mutex);
 
 	if (state != idle)
@@ -201,10 +205,8 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 
 	int sigsys = call_type(port);
 
-	memset(&outdetail, 0, sizeof(outdetail));
-
     outdetail.net = port;
-    outdetail.ts = 1;
+    outdetail.ts = -1;
 	outdetail.cnf = CNF_REM_DISC | CNF_CALL_CHARGE;
 	outdetail.sending_complete = 1;
 
@@ -336,7 +338,7 @@ int AculabTrunk::disconnect(int cause)
 	
 int AculabTrunk::disconnectAccept()
 {
-	release();
+	disconnect();
 
 	return r_ok;
 }
@@ -597,13 +599,18 @@ void AculabTrunk::onOutgoingRinging()
 
 void AculabTrunk::onRemoteDisconnect()
 {
+	int cause;
+
 	switch (state)
 	{
 	case connected:
 		state = disconnecting;
-		client->disconnectRequest(this, getCause());
+	
+		cause = getCause();
+
+		client->disconnectRequest(this, cause);
 		if (phone)
-			phone->disconnected(this, getCause());
+			phone->disconnected(this, cause);
 		break;
 	case accepting:
 		client->acceptDone(this, getCause());

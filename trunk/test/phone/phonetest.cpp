@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.6 2001/05/20 20:02:44 lars Exp $
+	$Id: phonetest.cpp,v 1.7 2001/06/07 12:58:25 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -14,7 +14,8 @@
 #include "getopt.h"
 #include "log.h"
 #include "aculab/acuphone.h"
-#include "scbus.h"
+#include "aculab/mvswdrvr.h"
+#include "ctbus.h"
 
 using namespace std;
 
@@ -105,9 +106,9 @@ public:
 		s[0] = tt;
 		s[1] = '\0';
 
-		Sample *touchtones = server->createTouchtones(s);
+		// Sample *touchtones = server->createTouchtones(s);
 
-		touchtones->start(server);
+		// touchtones->start(server);
 	}
 
 	virtual void started(Telephone *server, Sample *sample)
@@ -132,14 +133,7 @@ public:
 
 	virtual void completed(Telephone *server, Sample *sample, unsigned msecs)
 	{
-		if (sample->getUserData() == (void*)1)
-		{
-			Sample* echo = server->createFileSample("test.al");
-
-			echo->start(server);
-		}
-
-		delete sample;
+		server->disconnect();
 	}
 };
 
@@ -157,7 +151,7 @@ int main(int argc, char* argv[])
 	set_log_instance(&cout_log);
 	set_log_level(4);
 
-	SCbus scbus;
+	CTbus *bus;
 	Application app;
 	int count = 1;
 	int port = 0;
@@ -187,6 +181,31 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	struct swmode_parms swmode;
+
+	int rc = sw_mode_switch(sw, &swmode);
+
+	if (rc)
+	{
+		log(log_error, "app") << "sw_mode_switch("<< sw << ") failed: " << rc
+			<< logend();
+
+		return rc;
+	}
+
+	if (swmode.ct_buses & 1 << SWMODE_CTBUS_H100)
+	{
+		bus = new H100;
+
+		log(log_debug, "app") << "using H.100 for switching" << logend();
+	}
+	else if (swmode.ct_buses & 1 << SWMODE_CTBUS_SCBUS)
+	{
+		bus = new SCbus;
+
+		log(log_debug, "app") << "using SCbus for switching" << logend();
+	}
+
 	vector<AculabTrunk*> trunks;
 	vector<AculabPhone*> phones;
 
@@ -195,8 +214,8 @@ int main(int argc, char* argv[])
 
 	for (int i = 0; i < count; ++i)
 	{
-		Timeslot receive = scbus.allocate();
-		Timeslot transmit = scbus.allocate();
+		Timeslot receive = bus->allocate();
+		Timeslot transmit = bus->allocate();
 
 		trunks[i] = new AculabTrunk(&app, port);
 		phones[i] = new AculabPhone(&app, trunks[i], sw, receive, transmit);

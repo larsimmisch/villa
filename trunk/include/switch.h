@@ -3,7 +3,7 @@
 
 	Copyright 1995-2001 Lars Immisch
 
-	$Id: switch.h,v 1.3 2001/05/20 20:02:44 lars Exp $
+	$Id: switch.h,v 1.4 2001/06/07 12:58:25 lars Exp $
 
 	Author: Lars Immisch <lars@ibp.de>
 */
@@ -77,7 +77,7 @@ class Timeslot
 {
 public:
 
-	Timeslot(int stream = 0, int timeslot = 0) : st(stream), ts(timeslot) {}
+	Timeslot(unsigned stream = 0, unsigned timeslot = 0) : st(stream), ts(timeslot) {}
 	~Timeslot() {}
 		
 	void listenTo(Timeslot& b, Switch& aSwitch)		{ aSwitch.listen(*this, b);  }
