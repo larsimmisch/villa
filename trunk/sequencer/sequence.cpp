@@ -67,9 +67,11 @@ void Sequencer::lost_connection()
 
 int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 {
+	std::string jobid;
 	unsigned mode;
 	unsigned priority;
 
+	(*server) >> jobid;
 	(*server) >> mode;
 	(*server) >> priority;
 
@@ -77,12 +79,12 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 	{
 		server->clear();
 
-		server->syntax_error(id) << "expecting mode and priority" << end(); 
+		server->syntax_error(id) << "expecting jobid, mode and priority" << end(); 
 
 		return PHONE_FATAL_SYNTAX;
 	}
 
-	Molecule* molecule = new Molecule(mode, priority, id);
+	Molecule* molecule = new Molecule(mode, priority, id, jobid);
 
 	std::string type;
 	
@@ -170,9 +172,9 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 			if (m_interface)
 			{
-				m_interface->begin() << PHONE_ERROR_FAILED << ' ' << id << ' ' 
-					<< m_trunk->getName() << " MLCA "
-					<< 0 << ' ' << molecule->getLength() << end();
+				m_interface->begin() << PHONE_ERROR_FAILED << ' ' << id
+					<< " MLCA " << m_trunk->getName() << ' '
+					<< molecule->getJobId() << " 0 " << molecule->getLength() << end();
 			}
 
 			return PHONE_ERROR_FAILED;
@@ -184,9 +186,9 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 			if (m_interface)
 			{
-				m_interface->begin() << PHONE_ERROR_FAILED << ' ' << id << ' ' 
-					<< m_trunk->getName() << " MLCA " 
-					<< 0 << ' ' << molecule->getLength() << end();
+				m_interface->begin() << PHONE_ERROR_FAILED << ' ' << id  
+					<< " MLCA " << m_trunk->getName() << ' ' << molecule->getJobId() 
+					<< " 0 " << molecule->getLength() << end();
 			}
 
 			return PHONE_ERROR_FAILED;
@@ -322,21 +324,24 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 	return PHONE_OK;
 }
 
-void Sequencer::sendAtomDone(const char *id, unsigned nAtom, unsigned status, unsigned msecs)
+void Sequencer::sendAtomDone(const char *id, const char *jobid, unsigned nAtom, 
+							 unsigned status, unsigned msecs)
 {
 	if (m_interface)
 	{
-		m_interface->begin() <<  PHONE_EVENT << ' ' << id << " atom-done " 
+		m_interface->begin() <<  PHONE_EVENT << " ATOM " 
+			<< m_trunk->getName() << ' ' << id << ' ' << jobid << ' '
 			<< nAtom << ' ' << status << ' ' << msecs << end();
 	}
 }
 
-void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned length)
+void Sequencer::sendMoleculeDone(const char *id, const char *jobid, unsigned status, 
+								 unsigned pos, unsigned length)
 {
 	if (m_interface)
 	{
 		m_interface->begin() << status << ' ' << id << " MLCA " << m_trunk->getName()
-			<< ' ' << pos << ' ' << length << end();
+			<< ' ' << jobid << ' ' << pos << ' ' << length << end();
 	}
 
 	log(log_debug, "sequencer", m_trunk->getName())
@@ -810,6 +815,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	int done, atEnd, notifyStop;
 	unsigned pos, length, nAtom;
 	std::string id;
+	std::string jobid;
 
 	omni_mutex_lock lock(m_mutex);
 
@@ -821,6 +827,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	atEnd = molecule->atEnd();
 	notifyStop = molecule->notifyStop();
 	id = molecule->getId();
+	jobid = molecule->getJobId();
 	done = molecule->done(this, msecs, status);
 	pos = molecule->getPos();
 	length = molecule->getLength();
@@ -833,7 +840,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 			<< ", " << id.c_str() << ", " << nAtom << std::endl 
 			<< *molecule << logend();
 
-		sendAtomDone(id.c_str(), nAtom, status, msecs);
+		sendAtomDone(id.c_str(), molecule->getJobId(), nAtom, status, msecs);
 	}
 
 	if (m_activity.getState() == Activity::stopping || done)
@@ -852,7 +859,8 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	// handle the various disconnect conditions
 	if (m_disconnecting)
 	{
-		sendMoleculeDone(id.c_str(), PHONE_ERROR_DISCONNECTED, pos, length);
+		sendMoleculeDone(id.c_str(), jobid.c_str(),
+			PHONE_ERROR_DISCONNECTED, pos, length);
 
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
 
@@ -864,7 +872,8 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	if (m_trunk->remoteDisconnect())
 	{
-		sendMoleculeDone(id.c_str(), PHONE_ERROR_DISCONNECTED, pos, length);
+		sendMoleculeDone(id.c_str(), jobid.c_str(), 
+			PHONE_ERROR_DISCONNECTED, pos, length);
 
 		return;
 	}
@@ -874,7 +883,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	if (atEnd)
 	{
-		sendMoleculeDone(id.c_str(), status, pos, length);
+		sendMoleculeDone(id.c_str(), jobid.c_str(), status, pos, length);
 	}
 }
 
