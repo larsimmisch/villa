@@ -50,17 +50,17 @@ public:
 
 	virtual int stop(Sequencer* sequencer);
 
-	virtual int done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return 1; }
-	virtual int setPos(unsigned aPosition) { return 1; }
+	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return true; }
+	virtual bool setPos(unsigned aPosition) { return true; }
 	virtual unsigned getLength()	{ return 0; }
 	virtual unsigned getStatus()	{ return V3_OK; }
 
-	virtual int isGrowing() { return 0; }
+	virtual bool isGrowing() { return false; }
 
 	void setNotifications(int notify)	{ m_notifications = notify; }
 
-	int notifyStart() const { return m_notifications & NOTIFY_START; }
-	int notifyStop() const { return m_notifications & NOTIFY_STOP; }
+	bool notifyStart() const { return (m_notifications & NOTIFY_START) != 0; }
+	bool notifyStop() const { return (m_notifications & NOTIFY_STOP) != 0; }
 
 	virtual void printOn(std::ostream& out)  { out << "abstract atom"; }
 
@@ -97,14 +97,14 @@ public:
 
 	virtual int start(Sequencer* sequencer, void* userData = 0);
 	virtual int stop(Sequencer* sequencer);
-	virtual int done(Sequencer* sequencer, unsigned msecs, unsigned reason);
-	virtual int setPos(unsigned aPosition);
+	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason);
+	virtual bool setPos(unsigned aPosition);
 	unsigned getPos() const { return m_pos; }
 	virtual unsigned getLength() const { return m_length; }
 
 	// atEnd is slightly different than done. 
 	// atEnd returns true at the end of a looped sample, which done doesn't
-	int atEnd() const { return m_current == tail; }
+	bool atEnd() const { return m_current == tail; }
 
 	unsigned getPriority() const { return m_priority; }
 
@@ -115,14 +115,14 @@ public:
 	void add(Atom& atom)		 { addLast(&atom); m_length += atom.getLength(); }
 	void remove(Atom* atom)	 { m_length -= atom->getLength(); DList::remove(atom); }
 
-	int isActive() const { return m_flags & active; }
-	int needRewind() const { return m_flags & need_rewind; }
-	int isStopped() const { return m_flags & stopped; }
+	bool isActive() const { return (m_flags & active) != 0; }
+	bool needRewind() const { return (m_flags & need_rewind) != 0; }
+	bool isStopped() const { return (m_flags & stopped) != 0; }
 
 	const char *getId() { return m_id.c_str(); }
 
-	int notifyStart() const	 { return m_current ? m_current->notifyStart() : 0; }
-	int notifyStop() const { return m_current ? m_current->notifyStop() : 0;	}
+	bool notifyStart() const	 { return m_current ? m_current->notifyStart() : false; }
+	bool notifyStop() const { return m_current ? m_current->notifyStop() : false;	}
 
 	unsigned currentAtom() const { return m_nCurrent; }
 	
@@ -152,7 +152,7 @@ public:
 	PlayAtom(Sequencer* sequencer, const char* aFile);
 	virtual ~PlayAtom() { delete m_file; delete m_sample; }
 
-	virtual int setPos(unsigned pos) { return m_sample->setPos(pos); }
+	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
 	virtual unsigned getLength()	{ return m_sample->getLength(); }
 
 	virtual void printOn(std::ostream& out)  { out << "PlayAtom(" << m_file << ")"; }
@@ -169,11 +169,11 @@ public:
 	RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime);
 	virtual ~RecordAtom() { delete m_file; delete m_sample; }
 
-	virtual int setPos(unsigned pos) { return m_sample->setPos(pos); }
+	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
 	virtual unsigned getLength()	{ return m_sample->getLength(); }
 	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? V3_WARNING_EMPTY : V3_OK; }
 
-	virtual int isGrowing() { return 1; }
+	virtual bool isGrowing() { return true; }
 
 	virtual void printOn(std::ostream& out)  { out << "RecordAtom(" << m_file << ", " << time << ')'; }
 
@@ -190,7 +190,7 @@ public:
 	BeepAtom(Sequencer* sequencer, unsigned count);
 	virtual ~BeepAtom() { delete m_sample; }
 
-	virtual int setPos(unsigned pos) { return 1; }
+	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return m_nBeeps * 250; } // todo fix this
 	virtual unsigned getStatus()	{ return V3_OK; }
 
@@ -208,7 +208,7 @@ public:
 	TouchtoneAtom(Sequencer* sequencer, const char* att);
 	virtual ~TouchtoneAtom() { delete m_sample; delete m_tt; }
 
-	virtual int setPos(unsigned pos) { return 1; }
+	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return strlen(m_tt) * 80; } // this is a rough guess
 	virtual unsigned getStatus()	{ return m_sample->getStatus(); }
 
@@ -229,7 +229,7 @@ public:
 
 	virtual int start(Sequencer* sequencer, void* userData = 0);
 	virtual int stop(Sequencer* sequencer);
-	virtual int setPos(unsigned pos);
+	virtual bool setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
 	virtual unsigned getStatus()	{ return V3_OK; }
 
@@ -255,7 +255,7 @@ public:
 
 	virtual int start(Sequencer* sequencer, void* userData = 0);
 	virtual int stop(Sequencer* sequencer);
-	virtual int setPos(unsigned pos) { return 1; }
+	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return INDEFINITE; }
 	virtual unsigned getStatus()	{ return V3_OK; }
 

@@ -135,11 +135,11 @@ void SilenceAtom::on_timer(const Timer::TimerID &id)
 	m_pos = 0;
 }
 
-int SilenceAtom::setPos(unsigned pos)
+bool SilenceAtom::setPos(unsigned pos)
 {
 	m_length = m_length > pos ? m_length - pos : 0;
 
-	return 1;
+	return true;
 }
 
 Molecule::Molecule(unsigned aMode, int aPriority, const std::string &id) 
@@ -230,7 +230,7 @@ int Molecule::stop(Sequencer* sequencer)
 	return m_current ? m_current->stop(sequencer) : 0;
 }
 
-int Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
+bool Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 {
 	m_current->done(sequencer, msecs, status);
 	if (m_current->isGrowing())	
@@ -253,9 +253,9 @@ int Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 	if (isStopped())
 	{
 		if (m_mode & discard)
-			return 1;
+			return true;
 
-		return 0;
+		return false;
 	}
 	else
 	{
@@ -273,16 +273,16 @@ int Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 				m_pos = 0;
 				m_current = (Atom*)head;
  
-				return 0;
+				return false;
 			}
-			return 1;
+			return true;
 		}
 
-		return 0;
+		return false;
 	}
 }
 
-int Molecule::setPos(unsigned aPos)
+bool Molecule::setPos(unsigned aPos)
 {
 	unsigned sum = 0;
 	unsigned atomarLength;
@@ -290,7 +290,7 @@ int Molecule::setPos(unsigned aPos)
 	if (m_mode & loop)
 		aPos %= m_length;
 	else if (aPos >= m_length) 
-		return 0;
+		return false;
 
 	m_pos = aPos;
 	m_nCurrent = 0;
@@ -305,7 +305,7 @@ int Molecule::setPos(unsigned aPos)
 		sum += atomarLength;
 	}
  
-	return 0;
+	return false;
 }
 
 std::ostream& operator<<(std::ostream& out, Molecule& m)  

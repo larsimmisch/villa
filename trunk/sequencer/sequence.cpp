@@ -42,25 +42,28 @@ Timer Sequencer::timer;
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
   :	m_activity(this), m_configuration(aConfiguration), m_connectComplete(0),
 	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), m_interface(0),
-	m_callref(INVALID_CALLREF), m_media(0)
+	m_callref(INVALID_CALLREF), m_trunk(0), m_media(0), m_closing(false)
 {
 	m_receive = gBus->allocate();
 	m_transmit = gBus->allocate();
 
-	if (aConfiguration)
-	{
-		m_trunk = aConfiguration->getTrunk(this);
+	m_trunk = aConfiguration->getTrunk(this);
 		
-		m_trunk->listen();
-	}
-	else
-	{
-		m_media = gMediaPool.allocate(this);
-		if (!m_media)
-		{
-			throw Exception(__FILE__, __LINE__, "Sequencer::Sequencer()", "no media resources");
-		}
+	m_trunk->listen();
+}
 
+Sequencer::Sequencer(InterfaceConnection *server) 
+  :	m_activity(this), m_configuration(0), m_connectComplete(0),
+	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), m_interface(server),
+	m_callref(INVALID_CALLREF), m_trunk(0), m_media(0), m_closing(false)
+{
+	m_receive = gBus->allocate();
+	m_transmit = gBus->allocate();
+
+	m_media = gMediaPool.allocate(this);
+	if (!m_media)
+	{
+		throw Exception(__FILE__, __LINE__, "Sequencer::Sequencer()", "no media resources");
 	}
 }
 
@@ -70,7 +73,14 @@ void Sequencer::lost_connection()
 	m_interface = 0;
 	unlock();
 
-	disconnect(m_callref);
+	if (m_callref != INVALID_CALLREF)
+	{
+		disconnect(m_callref);
+	}
+	else if (!m_trunk)
+	{
+		close(std::string(""));
+	}
 }
 
 #pragma warning(default : 4355)
@@ -181,7 +191,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 			if (m_interface)
 			{
 				m_interface->begin() << V3_ERROR_FAILED << ' ' << id
-					<< " MLCA " << m_trunk->getName() << " 0 " 
+					<< " MLCA " << getName() << " 0 " 
 					<< molecule->getLength() << end();
 			}
 
@@ -195,7 +205,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 			if (m_interface)
 			{
 				m_interface->begin() << V3_ERROR_NOT_FOUND << ' ' << id  
-					<< " MLCA " << m_trunk->getName() << " 0 " << molecule->getLength() << end();
+					<< " MLCA " << getName() << " 0 " << molecule->getLength() << end();
 			}
 
 			return V3_ERROR_FAILED;
@@ -208,7 +218,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 			if (m_interface)
 			{
 				m_interface->begin() << V3_ERROR_FAILED << ' ' << id  
-					<< " MLCA " << m_trunk->getName() << " 0 " << molecule->getLength() << end();
+					<< " MLCA " << getName() << " 0 " << molecule->getLength() << end();
 			}
 
 			return V3_ERROR_FAILED;
@@ -341,7 +351,7 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 	if (done)
 	{
 		server->begin() << V3_OK << ' ' << id.c_str()
-			<< " MLDP " << m_trunk->getName() << end();
+			<< " MLDP " << getName() << end();
 	}
 
 	return V3_OK;
@@ -353,7 +363,7 @@ void Sequencer::sendAtomDone(const char *id, unsigned nAtom,
 	if (m_interface)
 	{
 		m_interface->begin() << V3_EVENT << " ATOM " 
-			<< m_trunk->getName() << ' ' << id << ' '
+			<< getName() << ' ' << id << ' '
 			<< nAtom << ' ' << status << ' ' << msecs << end();
 	}
 }
@@ -363,11 +373,11 @@ void Sequencer::sendMoleculeDone(const char *id, unsigned status,
 {
 	if (m_interface)
 	{
-		m_interface->begin() << status << ' ' << id << " MLCA " << m_trunk->getName()
+		m_interface->begin() << status << ' ' << id << " MLCA " << getName()
 			<< ' ' << pos << ' ' << length << end();
 	}
 
-	log(log_debug, "sequencer", m_trunk->getName())
+	log(log_debug, "sequencer", getName())
 		<< "sent molecule done for: " << id << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
 }
@@ -378,7 +388,7 @@ int Sequencer::connect(ConnectCompletion* complete)
 
 	if (m_connectComplete)
 	{
-		log(log_debug, "sequencer", m_trunk->getName())
+		log(log_debug, "sequencer", getName())
 			<< "connect failed - busy" << logend();
 
 		return V3_ERROR_BUSY;
@@ -387,7 +397,7 @@ int Sequencer::connect(ConnectCompletion* complete)
 	m_media = gMediaPool.allocate(this);
 	if (!m_media)
 	{
-		log(log_warning, "sequencer", m_trunk->getName()) 
+		log(log_warning, "sequencer", getName()) 
 			<< "connect failed - could no allocate media channel." << logend(); 
 
 		return V3_ERROR_NO_RESOURCE;
@@ -488,7 +498,7 @@ int Sequencer::disconnect(int cause)
 
 	if (m_activity.getState() == Activity::active)
 	{
-		log(log_debug, "sequencer", m_trunk->getName()) 
+		log(log_debug, "sequencer", getName()) 
 			<< "disconnect - stopping activity" << logend();
 
 		m_activity.stop();
@@ -498,13 +508,63 @@ int Sequencer::disconnect(int cause)
 
 	if (m_activity.getState() == Activity::idle)
 	{
-		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
+		log(log_debug, "sequencer", getName()) << "disconnect - activity idle" << logend();
 
 		m_media->disconnected(m_trunk);
 		rc = m_trunk->disconnect(m_callref, cause);
 	}
 
 	return rc;
+}
+
+int Sequencer::close(const std::string &id)
+{
+	bool idle(false);
+
+	lock();
+
+	m_closing = true;
+
+	if (m_id.size())
+	{
+		unlock();
+ 		m_interface->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
+			<< " BGRC " << m_media->getName() << end();
+
+		return V3_ERROR_PROTOCOL_VIOLATION;
+	}
+
+	if (m_activity.getState() == Activity::active)
+	{
+		log(log_debug, "sequencer", m_media->getName()) 
+			<< "close - stopping activity" << logend();
+
+		m_activity.stop();
+	}
+
+	checkCompleted();
+
+	if (m_activity.getState() == Activity::idle)
+	{
+		idle = true;
+		gMediaPool.release(m_media);
+		m_media = 0;
+		log(log_debug, "sequencer", m_media->getName()) << "close - activity idle" << logend();
+	}
+
+	m_id = id;
+	unlock();
+
+	if (idle)
+	{
+		m_interface->begin() << V3_OK << ' ' << id.c_str() << " BGRC " << m_media->getName() 
+			<< end();
+
+		delete this;
+
+	}
+
+	return V3_OK;
 }
 
 void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, const SAP& remote)
@@ -517,7 +577,7 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 
 	if (!m_media)
 	{
-		log(log_warning, "sequencer", m_trunk->getName()) 
+		log(log_warning, "sequencer", getName()) 
 			<< "could no allocate media channel. rejecting call." << logend(); 
 
 		m_trunk->disconnect(m_callref);
@@ -530,7 +590,7 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 	m_clientSpec = m_configuration->dequeue(local);
 	if (m_clientSpec)
 	{
-		log(log_debug, "sequencer", m_trunk->getName()) 
+		log(log_debug, "sequencer", getName()) 
 			<< "id: " << m_clientSpec->m_id
 			<< " found client matching: " << local << logend();
 	}
@@ -546,7 +606,7 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 			m_clientSpec = gClientQueue.dequeue();
 			if (m_clientSpec)
 			{
-				log(log_debug, "sequencer", m_trunk->getName()) 
+				log(log_debug, "sequencer", getName()) 
 					<< "id: " << m_clientSpec->m_id
 					<< " found client in global queue" << logend();
 			}
@@ -555,7 +615,7 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 	if (m_clientSpec)
 	{
 		m_interface = m_clientSpec->m_interface;
-		m_interface->add(m_trunk->getName(), this);
+		m_interface->add(getName(), this);
 
 		m_local = local;
 		m_remote = remote;
@@ -563,7 +623,7 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 		if (m_interface)
 		{
 			m_interface->begin() << V3_OK << ' ' << m_clientSpec->m_id.c_str() 
-				<< " LSTN " << m_trunk->getName()
+				<< " LSTN " << getName()
 				<< " '" << m_remote.getAddress() << "' '"
 				<< m_configuration->getNumber() << "' '"
 				<< m_local.getAddress() << "' "
@@ -574,14 +634,14 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 	{
 		if (!contained)
 		{
-			log(log_warning, "sequencer", m_trunk->getName()) 
+			log(log_warning, "sequencer", getName()) 
 				<< "no client found. rejecting call." << logend(); 
 
 			m_trunk->disconnect(m_callref);
 		}
 		else
 		{
-			log(log_debug, "sequencer", m_trunk->getName()) 
+			log(log_debug, "sequencer", getName()) 
 				<< "received partial local address: " << local 
 				<< logend();
 		}
@@ -597,7 +657,7 @@ void Sequencer::connectRequest(Trunk* server, unsigned callref,
 	{
 		m_trunk->disconnect(callref);
 
-		log(log_debug, "sequencer", m_trunk->getName()) 
+		log(log_debug, "sequencer", getName()) 
 			<< "rejecting request because of outstanding outgoing call" << logend();
 	}
 	else
@@ -606,7 +666,7 @@ void Sequencer::connectRequest(Trunk* server, unsigned callref,
 
 		if (!m_connectComplete)
 		{
-			log(log_debug, "sequencer", m_trunk->getName()) 
+			log(log_debug, "sequencer", getName()) 
 				<< "connect request from: " 
 				<< remote << " , " << local	<< " [" << server->getTimeslot() << ']' 
 				<< logend();
@@ -616,7 +676,7 @@ void Sequencer::connectRequest(Trunk* server, unsigned callref,
 
 void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 {
-	log(log_debug, "sequencer", m_trunk->getName()) 
+	log(log_debug, "sequencer", getName()) 
 		<< "connect done: " << result << logend();
 
 	if (result == V3_OK)
@@ -654,7 +714,7 @@ void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 
 void Sequencer::transferDone(Trunk *server, unsigned callref, int result)
 {
-	log(log_debug, "sequencer", m_trunk->getName()) 
+	log(log_debug, "sequencer", getName()) 
 		<< "transfer succeeded" << logend();
 
 	m_activity.stop();
@@ -677,7 +737,7 @@ void Sequencer::transferDone(Trunk *server, unsigned callref, int result)
 
 void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 {
-	log(log_debug, "sequencer", m_trunk->getName()) 
+	log(log_debug, "sequencer", getName()) 
 		<< "disconnect request" << logend();
 	
 	omni_mutex_lock lock(m_mutex);
@@ -685,7 +745,7 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	// if we are active, stop
 	if (m_activity.getState() == Activity::active)
 	{
-		log(log_debug, "sequencer", m_trunk->getName()) 
+		log(log_debug, "sequencer", getName()) 
 			<< "disconnect request - stopping activity" << logend();
 
 		m_activity.stop();
@@ -697,7 +757,7 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	if (m_interface && m_disconnecting != INVALID_CALLREF 
 		&& m_activity.getState() == Activity::idle)
 	{
-		m_interface->begin() << V3_EVENT << " RDIS " << m_trunk->getName() 
+		m_interface->begin() << V3_EVENT << " RDIS " << getName() 
 			<< end();
 	}
 }
@@ -716,7 +776,7 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 		assert(m_id.size());
 
 		m_interface->begin() << result << ' ' << m_id.c_str() << " DISC "
-			<< m_trunk->getName() << end();
+			<< getName() << end();
 	}
 
 	gMediaPool.release(m_media);
@@ -766,7 +826,7 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 		if (m_interface)
 		{
 			m_interface->begin() << V3_OK << ' ' << m_id.c_str() << " ACPT " 
-				<< m_trunk->getName() << end();
+				<< getName() << end();
 		}
 
 		lock();
@@ -844,12 +904,12 @@ void Sequencer::completed(Media *server, Sample *aSample, unsigned msecs)
 
 void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, unsigned status)
 {
-	int done, atEnd, notifyStop;
+	bool done, atEnd, notifyStop, start(true);
 	unsigned pos, length, nAtom;
 	std::string id;
 	std::string jobid;
 
-	omni_mutex_lock lock(m_mutex);
+	lock();
 
 	assert(molecule);
 
@@ -887,38 +947,56 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 			<< "done " << *molecule << logend();
 	}
 
-	// handle the various disconnect conditions
+	// handle the various disconnect/close conditions
+
+	// active DISC
 	if (m_disconnecting != INVALID_CALLREF)
 	{
 		sendMoleculeDone(id.c_str(), V3_ERROR_DISCONNECTED, pos, length);
 
-		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
+		log(log_debug, "sequencer", getName()) << "disconnect - activity idle" << logend();
 
 		m_media->disconnected(m_trunk);
 		m_trunk->disconnect(m_disconnecting);
 
-		return;
+		start = false;
 	}
-
-	if (m_trunk->remoteDisconnect())
+	else if (m_trunk && m_trunk->remoteDisconnect())
 	{
 		sendMoleculeDone(id.c_str(), V3_ERROR_DISCONNECTED, pos, length);
 		if (m_interface)
 		{
-			m_interface->begin() << V3_EVENT << " RDIS " << m_trunk->getName() 
+			m_interface->begin() << V3_EVENT << " RDIS " << getName() 
 				<< end();
 		}
 
-		return;
+		start = false;
+	}
+
+	if (m_closing)
+	{
+		m_interface->begin() << V3_OK << ' ' << m_id.c_str() << " BGRC " 
+			<< getName() << end();
+
+		gMediaPool.release(m_media);
+		m_media = 0;
+
+		start = false;
 	}
 
 	// start next molecule before sending reply to minimise delay
-	m_activity.start();
+	if (start)
+		m_activity.start();
 
 	if (atEnd && done)
 	{
 		sendMoleculeDone(id.c_str(), status, pos, length);
 	}
+
+	unlock();
+
+	if (m_closing)
+		delete this;
 }
 
 void Sequencer::touchtone(Media* server, char tt)

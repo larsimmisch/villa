@@ -259,8 +259,8 @@ bool Interface::data(InterfaceConnection *ic)
 	}
 	else if (command == "BGRO")
 	{
-		Sequencer *s = new Sequencer(0);
-		std::string name = s->getMedia()->getName();
+		Sequencer *s = new Sequencer(ic);
+		std::string name = s->getName();
 
 		ic->add(name, s);
 
@@ -286,16 +286,14 @@ bool Interface::data(InterfaceConnection *ic)
 		Sequencer *s = ic->find(device);
 		if (!s)
 		{
-			ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " BGRC device not found" 
-				<< command << end();
+			ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " BGRC " << device 
+				<< end();
 		}
 		else
 		{
-			// Todo: will this work when a command is under way?
-			delete s;
 			ic->remove(device);
 
-			ic->begin() << V3_OK << ' ' << id.c_str() << " BGRC" << end();
+			s->close(id);
 		}
 	}
 	else if (command == "LSTN")

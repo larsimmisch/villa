@@ -26,7 +26,10 @@ public:
 
 	enum { indefinite = -1 };
 
+	// Sequencer with trunk
 	Sequencer(TrunkConfiguration* configuration);
+	// background server
+	Sequencer(InterfaceConnection *server);
 	virtual ~Sequencer() {}
 
 	// external protocol - called by remote client by sending appropriate packets
@@ -42,6 +45,9 @@ public:
 	int transfer(InterfaceConnection *server, const std::string &id);
 	int disconnect(InterfaceConnection *server, const std::string &id);
 	int disconnect(int cause);
+
+	/* used for background server - deletes self */
+	int close(const std::string &id);
 
 	int accept(InterfaceConnection *server, const std::string &id);
 	int reject(InterfaceConnection *server, const std::string &id);
@@ -124,6 +130,8 @@ public:
 	static Timer& getTimer()		{ return timer; }
 	AculabMedia* getMedia()			{ return m_media; }
 
+	const char *getName() { return m_trunk ? m_trunk->getName() : m_media->getName(); }
+
 	Timeslot m_receive;
 	Timeslot m_transmit;
 
@@ -139,6 +147,7 @@ protected:
 	omni_mutex m_mutex;
 	ConnectCompletion *m_connectComplete;
 	unsigned m_disconnecting;
+	bool m_closing;
 	SAP m_local;
 	SAP m_remote;
 	InterfaceConnection *m_interface;
