@@ -9,13 +9,10 @@ $Id$
 import sys,getopt
 from sequencer import *
 
-caller = 0
-
 class Conftest:
 
     def __init__(self, sequencer):
-        self.device = None
-        self.background = None
+        self.devices = []
         self.conf = None
         self.sequencer = sequencer
         self.send('CNFO')
@@ -23,39 +20,41 @@ class Conftest:
     def send(self, cmd):
         self.sequencer.send(self, cmd)
 
-    def CNFO(self, event, data):
+    def CNFO(self, event, user_data):
         self.conf = event['device']
         print 'conference is: ', self.conf
         self.send('LSTN any any')
 
-    def LSTN(self, event, data):
-        self.device = event['device']
-        self.sequencer.devices[self.device] = self
+    def LSTN(self, event, user_data):
+        device = event['device']
+        self.devices.append(device)
         # queue next listen as early as possible
         self.send('LSTN any any')
         # self.send('DISC ' + self.device)
-        self.send('ACPT ' + self.device)
-        print 'connected:', self.device
+        self.send('ACPT ' + device)
+        print 'connected:', device
 
-    def ACPT(self, event, data):
+    def ACPT(self, event, user_data):
+        device = event['device']
         mode = 'duplex'
         
-        global caller
-        caller = caller + 1
-
-        if caller == 2:
-            mode = 'speak'
-        
         self.send('MLCA %s 0 0 1 conf %s %s'
-                  % (self.device, self.conf, mode))
+                  % (device, self.conf, mode))
     
-    def MLCA(self, event, data):
+    def MLCA(self, event, user_data):
         pass
+
+    def DISC(self, event, user_data):
+        pass
+
+    def RDIS(self, event):
+        self.send('DISC %s' % event['device'])
 
 if __name__ == '__main__':
 
     # check commandline arguments
-    optlist, args = getopt.getopt(sys.argv[1:], 's:c:', ['server=','channels='])
+    optlist, args = getopt.getopt(sys.argv[1:], 's:c:',
+                                  ['server=','channels='])
 
     nchannels = 1
     hostname = None

@@ -34,37 +34,39 @@ public:
 	virtual ~Sequencer() {}
 
 	/* Add molecule */
-	int MLCA(InterfaceConnection *server, const std::string &id);
+	unsigned MLCA(InterfaceConnection *server, const std::string &id);
 	/* Delete molecule */
-	int MLCD(InterfaceConnection *server, const std::string &id);
+	unsigned MLCD(InterfaceConnection *server, const std::string &id);
 	/* delete molecules by priority */
-	int MLDP(InterfaceConnection *server, const std::string &id);
+	unsigned MLDP(InterfaceConnection *server, const std::string &id);
 
 	/* accept */
-	int ACPT(InterfaceConnection *server, const std::string &id);
+	unsigned ACPT(InterfaceConnection *server, const std::string &id);
 	/* transfer */
-	int TRSF(InterfaceConnection *server, const std::string &id);
+	unsigned TRSF(InterfaceConnection *server, const std::string &id);
 	/* disconnect */
-	int DISC(InterfaceConnection *server, const std::string &id);
+	unsigned DISC(InterfaceConnection *server, const std::string &id);
 	/* close background channel */
-	int BGRC(const std::string &id);
+	unsigned BGRC(const std::string &id);
 
-	int disconnect(int cause);
+	unsigned disconnect(int cause);
+	bool close(const char *id = 0);
 
-	int reject(InterfaceConnection *server, const std::string &id);
+	unsigned reject(InterfaceConnection *server, const std::string &id);
 
-	int stopListening(InterfaceConnection *server, const std::string &id);
-	int stopConnecting(InterfaceConnection *server, const std::string &id);
-	int stopTransferring(InterfaceConnection *server, const std::string &id);
+	unsigned stopListening(InterfaceConnection *server, const std::string &id);
+	unsigned stopConnecting(InterfaceConnection *server, const std::string &id);
+	unsigned stopTransferring(InterfaceConnection *server, const std::string &id);
 
 	void lock()   { m_mutex.lock(); }
 	void unlock() { m_mutex.unlock(); }
 
 	// helpers for sending packets
-	void sendAtomDone(const char *id, unsigned nAtom, unsigned status, unsigned msecs);
-	void sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned msecs);
+	unsigned sendATOM(const std::string &id, unsigned nAtom, unsigned status, unsigned msecs);
+	unsigned sendMLCA(const std::string &id, unsigned status, unsigned pos, unsigned msecs);
+	void sendRDIS();
 
-	int connect(ConnectCompletion* complete);
+	unsigned connect(ConnectCompletion* complete);
 
 	// TrunkClients connectRequest & details are treated here
 	void onIncoming(Trunk *server, unsigned callref, const SAP &local, const SAP &remote); 
@@ -125,11 +127,6 @@ public:
 	// called when connection to client is lost
 	void lost_connection();
 
-	// todo: needed?
-	// virtual void waitForCompletion()	{ done.wait(); }
-
-	// void loadSwitch(const char* aName, int is32bit = 1, int aDevice = 0)	{ phone.loadSwitch(aName, aDevice); }
-
 	static Timer& getTimer()		{ return timer; }
 	AculabMedia* getMedia()			{ return m_media; }
 
@@ -151,7 +148,8 @@ protected:
 	CompletedQueue m_delayedCompletions;
 	omni_mutex m_mutex;
 	ConnectCompletion *m_connectComplete;
-	unsigned m_disconnecting;
+	unsigned m_disconnecting; 	/* contains the call reference of the DISC request */
+	unsigned m_sent_rdis; /* contains call reference for RDIS sent */
 	bool m_closing;
 	SAP m_local;
 	SAP m_remote;

@@ -3,7 +3,7 @@ simple sequencer client:
 
 allocate background channel, start play and deallocate
 
-$Id: background.py,v 1.3 2004/01/15 17:18:59 lars Exp $
+$Id$
 """
 
 import sys,getopt
@@ -20,22 +20,22 @@ class Background:
     def send(self, cmd):
         self.sequencer.send(self, cmd)
 
-    def CNFO(self, event, data):
+    def CNFO(self, event, user_data):
         self.conf = event['device']
         print 'conference is: ', self.conf
         self.send('BGRO') 
 
-    def BGRO(self, event, data):
+    def BGRO(self, event, user_data):
         self.device = event['device']
         self.sequencer.devices[self.device] = self
         print 'allocated:', self.device
         self.send('MLCA %s 0 2 1 play ../test/phone/wiese.al none'
                   % self.device)
 
-    def BGRC(self, event, data):
+    def BGRC(self, event, user_data):
         sys.exit(0)
 
-    def MLCA(self, event, data):
+    def MLCA(self, event, user_data):
         pass
 
 if __name__ == '__main__':

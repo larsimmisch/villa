@@ -41,8 +41,10 @@ Timer Sequencer::timer;
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
   :	m_configuration(aConfiguration), m_connectComplete(0),
-	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), m_interface(0),
-	m_callref(INVALID_CALLREF), m_trunk(0), m_media(0), m_closing(false)
+	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), 	m_sent_rdis(INVALID_CALLREF),
+	m_interface(0),	m_callref(INVALID_CALLREF), 
+	m_trunk(0), m_media(0), m_closing(false)
+
 {
 	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
@@ -59,8 +61,9 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
 
 Sequencer::Sequencer(InterfaceConnection *server) 
   :	m_configuration(0), m_connectComplete(0),
-	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), m_interface(server),
-	m_callref(INVALID_CALLREF), m_trunk(0), m_media(0), m_closing(false)
+	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), 	m_sent_rdis(INVALID_CALLREF),
+	m_interface(server), m_callref(INVALID_CALLREF), 
+	m_trunk(0), m_media(0), m_closing(false)
 {
 	m_receive = gBus->allocate();
 	m_transmit = gBus->allocate();
@@ -89,7 +92,7 @@ void Sequencer::lost_connection()
 	}
 	else if (!m_trunk)
 	{
-		BGRC(std::string(""));
+		close();
 	}
 }
 
@@ -101,6 +104,7 @@ void Sequencer::release()
 
 	m_disconnecting = INVALID_CALLREF;
 	m_callref = INVALID_CALLREF;
+	m_sent_rdis = INVALID_CALLREF;
 
 	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
@@ -110,7 +114,7 @@ void Sequencer::release()
 
 #pragma warning(default : 4355)
 
-int Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
+unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 {
 	unsigned channel;
 	unsigned mode;
@@ -243,40 +247,22 @@ int Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 			log(log_error, "sequencer") << "Exception in addMolecule: " << e << logend();
 			atom = 0;
 
-			if (m_interface)
-			{
-				m_interface->begin() << V3_ERROR_FAILED << ' ' << id
-					<< " MLCA " << getName() << " 0 " 
-					<< molecule->getLength() << end();
-			}
-
-			return V3_ERROR_FAILED;
+			return sendMLCA(id, V3_ERROR_FAILED, molecule->getPos(), molecule->getLength());
 		}
 		catch (const FileDoesNotExist &e)
 		{
 			log(log_error, "sequencer") << e << logend();
 			atom = 0;
 
-			if (m_interface)
-			{
-				m_interface->begin() << V3_ERROR_NOT_FOUND << ' ' << id  
-					<< " MLCA " << getName() << " 0 " << molecule->getLength() << end();
-			}
+			return sendMLCA(id, V3_ERROR_NOT_FOUND, molecule->getPos(), molecule->getLength());
 
-			return V3_ERROR_FAILED;
 		}
 		catch (const Exception &e)
 		{
 			log(log_error, "sequencer") << e << logend();
 			atom = 0;
 
-			if (m_interface)
-			{
-				m_interface->begin() << V3_ERROR_FAILED << ' ' << id  
-					<< " MLCA " << getName() << " 0 " << molecule->getLength() << end();
-			}
-
-			return V3_ERROR_FAILED;
+			return sendMLCA(id.c_str(), V3_ERROR_FAILED, molecule->getPos(), molecule->getLength());
 		}
 
 		molecule->add(*atom);
@@ -303,7 +289,7 @@ int Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 }
 
 
-int Sequencer::MLCD(InterfaceConnection *server, const std::string &id)
+unsigned Sequencer::MLCD(InterfaceConnection *server, const std::string &id)
 {
 	std::string mid;
 
@@ -351,7 +337,7 @@ int Sequencer::MLCD(InterfaceConnection *server, const std::string &id)
 	return V3_OK;
 }
 
-int Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
+unsigned Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
 {
 	bool done = true;
 	int fromPriority;
@@ -419,8 +405,8 @@ int Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
 	return V3_OK;
 }
 
-void Sequencer::sendAtomDone(const char *id, unsigned nAtom, 
-							 unsigned status, unsigned msecs)
+unsigned Sequencer::sendATOM(const std::string &id, unsigned nAtom, 
+						 unsigned status, unsigned msecs)
 {
 	if (m_interface)
 	{
@@ -428,10 +414,12 @@ void Sequencer::sendAtomDone(const char *id, unsigned nAtom,
 			<< getName() << ' ' << id << ' '
 			<< nAtom << ' ' << status << ' ' << msecs << end();
 	}
+
+	return status;
 }
 
-void Sequencer::sendMoleculeDone(const char *id, unsigned status, 
-								 unsigned pos, unsigned length)
+unsigned Sequencer::sendMLCA(const std::string &id, unsigned status, 
+						 unsigned pos, unsigned length)
 {
 	if (m_interface)
 	{
@@ -442,9 +430,32 @@ void Sequencer::sendMoleculeDone(const char *id, unsigned status,
 	log(log_debug, "sequencer", getName())
 		<< "sent molecule done for: " << id << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
+
+	return status;
 }
 
-int Sequencer::connect(ConnectCompletion* complete)
+void Sequencer::sendRDIS()
+{
+	lock();
+
+	if (m_sent_rdis == m_callref)
+	{
+		unlock();
+	}
+	else
+	{
+		m_sent_rdis = m_callref;
+		unlock();
+
+		if (m_interface)
+		{
+			m_interface->begin() << V3_EVENT << " RDIS " << getName() 
+				<< end();
+		}
+	}
+}
+
+unsigned Sequencer::connect(ConnectCompletion* complete)
 {
 	omni_mutex_lock lock(m_mutex);
 
@@ -470,7 +481,7 @@ int Sequencer::connect(ConnectCompletion* complete)
 	return V3_OK;
 }
 
-int Sequencer::TRSF(InterfaceConnection *server, const std::string &id)
+unsigned Sequencer::TRSF(InterfaceConnection *server, const std::string &id)
 {
 /* Todo
 
@@ -514,7 +525,7 @@ int Sequencer::TRSF(InterfaceConnection *server, const std::string &id)
 	return V3_OK;
 }
 
-int Sequencer::DISC(InterfaceConnection *server, const std::string &id)
+unsigned Sequencer::DISC(InterfaceConnection *server, const std::string &id)
 {
 	int cause(0);
 
@@ -563,7 +574,7 @@ bool Sequencer::channelsIdle()
 	return idle;
 }
 
-int Sequencer::disconnect(int cause)
+unsigned Sequencer::disconnect(int cause)
 {
 	int rc = V3_OK;
 
@@ -594,22 +605,46 @@ int Sequencer::disconnect(int cause)
 	return rc;
 }
 
-int Sequencer::BGRC(const std::string &id)
+unsigned Sequencer::BGRC(const std::string &id)
+{
+	bool idle(false);
+
+	lock();
+
+	if (m_id.size())
+	{
+		unlock();
+		if (m_interface)
+		{
+ 			m_interface->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
+				<< " BGRC " << getName() << end();
+		}
+
+		return V3_ERROR_PROTOCOL_VIOLATION;
+	}
+
+	unlock();
+
+	if (close(id.c_str()))
+	{
+		if (m_interface)
+		{
+			m_interface->begin() << V3_OK << ' ' << id.c_str() << " BGRC " << getName() 
+				<< end();
+		}
+		delete this;
+	}
+
+	return V3_OK;
+}
+
+bool Sequencer::close(const char *id)
 {
 	bool idle(false);
 
 	lock();
 
 	m_closing = true;
-
-	if (m_id.size())
-	{
-		unlock();
- 		m_interface->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-			<< " BGRC " << getName() << end();
-
-		return V3_ERROR_PROTOCOL_VIOLATION;
-	}
 
 	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
@@ -626,28 +661,19 @@ int Sequencer::BGRC(const std::string &id)
 
 	if (channelsIdle())
 	{
-		log(log_debug, "sequencer", getName()) << "BGRC - all channels idle" << logend();
+		log(log_debug, "sequencer", getName()) << "close - all channels idle" << logend();
 
 		idle = true;
 		gMediaPool.release(m_media);
 		m_media = 0;
 	}
 
-	m_id = id;
+	if (!idle && id)
+		m_id = id;
+
 	unlock();
 
-	if (idle)
-	{
-		if (m_interface)
-		{
-			m_interface->begin() << V3_OK << ' ' << id.c_str() << " BGRC " << getName() 
-				<< end();
-		}
-		delete this;
-
-	}
-
-	return V3_OK;
+	return idle;
 }
 
 void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, const SAP& remote)
@@ -827,17 +853,16 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 			log(log_debug, "sequencer", getName()) 
 				<< "remote disconnect - stopping channel " << i << logend();
 
-			m_activity[i].abort();
+			m_activity[i].abort(V3_DISCONNECTED);
 		}
 	}
 
 	checkCompleted();
 
 	// notify client unless already disconnecting or still stopping
-	if (m_disconnecting == INVALID_CALLREF && channelsIdle() && m_interface)
+	if (channelsIdle() && m_disconnecting == INVALID_CALLREF)
 	{
-		m_interface->begin() << V3_EVENT << " RDIS " << getName() 
-			<< end();
+		sendRDIS();
 	}
 }
 
@@ -861,7 +886,7 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 	release();
 }
 
-int Sequencer::ACPT(InterfaceConnection *server, const std::string &id)
+unsigned Sequencer::ACPT(InterfaceConnection *server, const std::string &id)
 {
 	omni_mutex_lock l(m_mutex);
 
@@ -1001,11 +1026,11 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	if (send_atom_done)
 	{
 		log(log_debug, "sequencer", server->getName()) 
-			<< "sent atom-done for " 
+			<< "sent ATOM done for " 
 			<< ", " << id.c_str() << ", " << atom << std::endl 
 			<< *molecule << logend();
 
-		sendAtomDone(id.c_str(), atom, status, msecs);
+		sendATOM(id.c_str(), atom, status, msecs);
 	}
 
 	if (m_activity[channel].getState() == Activity::stopping || done)
@@ -1028,10 +1053,6 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	{
 		start = false;
 		send_molecule_done = true;
-
-		// special status for disconnect-related moleculeDone(s)
-		if (!m_closing)
-			status = V3_ERROR_DISCONNECTED;
 	}
 
 	if (start)
@@ -1047,7 +1068,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	if (send_molecule_done)
 	{
-		sendMoleculeDone(id.c_str(), status, pos, length);
+		sendMLCA(id.c_str(), status, pos, length);
 	}
 
 	unlock();
@@ -1076,11 +1097,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 			log(log_debug, "sequencer", getName()) << "remote disconnect - all channels idle" 
 				<< logend();
 
-			if (m_interface)
-			{
-				m_interface->begin() << V3_EVENT << " RDIS " << getName() 
-					<< end();
-			}
+			sendRDIS();
 		}
 	}
 

@@ -22,20 +22,17 @@ class Call:
     def restart(self):
         d = self.device
         self.device = None
-        # we don't want any unsolicited events after we sent a disconnect
-        del self.sequencer.devices[d]
         self.send('DISC %s 0' % d)
         
-    def LSTN(self, event, data):
+    def LSTN(self, event, user_data):
         self.device = event['device']
-        self.sequencer.devices[self.device] = self
-        # queue next listen as early as possible
+         # queue next listen as early as possible
         self.send('LSTN any any')
         # self.send('DISC ' + self.device)
         self.send('ACPT ' + self.device)
         print 'connected:', self.device
 
-    def ACPT(self, event, data):
+    def ACPT(self, event, user_data):
         self.send('MLCA %s 0 2 1 play ../test/phone/sitrtoot.al none'
                   % self.device)
 ##         self.send('MLCA %s 0 2 1 beep 2'
@@ -43,10 +40,10 @@ class Call:
 ##         self.send('MLCA %s 0 2 1 rec foo 10000'
 ##                   % self.device)
 
-    def MLCA(self, event, data):
+    def MLCA(self, event, user_data):
         self.send('DISC %s 0' % self.device)
     
-    def DISC(self, event, data):
+    def DISC(self, event, user_data):
         print "disconnected:", event['device']
 
     def RDIS(self, event):

@@ -49,7 +49,7 @@ public:
 
 	/* channel is the index of the parallel job */
 	virtual bool start(Sequencer* sequencer);
-	virtual bool stop(Sequencer* sequencer);
+	virtual bool stop(Sequencer* sequencer, unsigned status = V3_ABORTED);
 
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return true; }
 	virtual bool setPos(unsigned aPosition) { return true; }
@@ -103,7 +103,7 @@ public:
 	virtual ~Molecule();	
 
 	virtual bool start(Sequencer* sequencer);
-	virtual bool stop(Sequencer* sequencer);
+	virtual bool stop(Sequencer* sequencer, unsigned status = V3_ABORTED);
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason);
 	virtual bool setPos(unsigned aPosition);
 	unsigned getPos() const { return m_pos; }
@@ -240,7 +240,7 @@ public:
 	virtual ~SilenceAtom() {}
 
 	virtual bool start(Sequencer* sequencer);
-	virtual bool stop(Sequencer* sequencer);
+	virtual bool stop(Sequencer* sequencer, unsigned status = V3_ABORTED);
 	virtual bool setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
 	virtual unsigned getStatus()	{ return V3_OK; }
@@ -270,7 +270,7 @@ public:
 	virtual ~ConferenceAtom() {}
 
 	virtual bool start(Sequencer* sequencer);
-	virtual bool stop(Sequencer* sequencer);
+	virtual bool stop(Sequencer* sequencer, unsigned status = V3_ABORTED);
 	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return INDEFINITE; }
 	virtual unsigned getStatus()	{ return V3_OK; }
@@ -302,9 +302,9 @@ public:
 	virtual void remove(Molecule* aMolecule);
 
 	virtual bool start();
-	virtual bool stop();
+	virtual bool stop(unsigned status = V3_ABORTED);
 
-	virtual bool abort();
+	virtual bool abort(unsigned status = V3_ABORTED);
 
 	virtual Molecule* find(const std::string &id);
 

@@ -22,14 +22,13 @@ class Conftest:
     def send(self, cmd):
         self.sequencer.send(self, cmd)
 
-    def CNFO(self, event, data):
+    def CNFO(self, event, user_data):
         self.conf = event['device']
         print 'conference is: ', self.conf
         self.send('BGRO') 
 
-    def BGRO(self, event, data):
+    def BGRO(self, event, user_data):
         self.background = event['device']
-        self.sequencer.devices[self.background] = self
         print 'allocated:', self.background
         # add background to conference on channel 0
         self.send('MLCA %s 0 0 1 conf %s speak'
@@ -40,27 +39,30 @@ class Conftest:
         # wait for caller
         self.send('LSTN any any')
 
-    def LSTN(self, event, data):
+    def LSTN(self, event, user_data):
         self.device = event['device']
-        self.sequencer.devices[self.device] = self
         # queue next listen as early as possible
         self.send('LSTN any any')
         # self.send('DISC ' + self.device)
         self.send('ACPT ' + self.device)
         print 'connected:', self.device
 
-    def ACPT(self, event, data):
+    def ACPT(self, event, user_data):
         self.send('MLCA %s 0 0 1 conf %s duplex'
                   % (self.device, self.conf))
     
-    def BGRC(self, event, data):
+    def BGRC(self, event, user_data):
         sys.exit(0)
 
-    def RDIS(self, event, data):
+    def MLCA(self, event, user_data):
+        pass
+
+    def DISC(self, event, user_data):
+        self.send('BGRC ' + self.background)
+
+    def RDIS(self, event):
         self.send('DISC ' + self.device)
 
-    def MLCA(self, event, data):
-        pass
 
 if __name__ == '__main__':
 

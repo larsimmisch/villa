@@ -27,9 +27,9 @@ bool Atom::start(Sequencer *sequencer)
 	return true;
 }
 
-bool Atom::stop(Sequencer *sequencer)
+bool Atom::stop(Sequencer *sequencer, unsigned status)
 {
-	return m_sample->stop(sequencer->getMedia());
+	return m_sample->stop(sequencer->getMedia(), status);
 }
 
 PlayAtom::PlayAtom(unsigned channel, Sequencer* sequencer, 
@@ -71,7 +71,7 @@ bool ConferenceAtom::start(Sequencer* sequencer)
 	return true;
 }
 
-bool ConferenceAtom::stop(Sequencer* sequencer)
+bool ConferenceAtom::stop(Sequencer* sequencer, unsigned status)
 {
 	Time now;
 
@@ -80,7 +80,8 @@ bool ConferenceAtom::stop(Sequencer* sequencer)
 	if (m_conference)
 		m_conference->remove(sequencer->getMedia());
 
-	sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_data, 0, now - m_started);
+	sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_data, 
+		now - m_started, status);
 
 	return true;
 }
@@ -103,7 +104,7 @@ bool SilenceAtom::start(Sequencer* sequencer)
 	return true;
 }
 
-bool SilenceAtom::stop(Sequencer* sequencer)
+bool SilenceAtom::stop(Sequencer* sequencer, unsigned status)
 {
 	if (m_timer.is_valid())
 	{
@@ -113,7 +114,8 @@ bool SilenceAtom::stop(Sequencer* sequencer)
 
 		// if we have to use completed() or addCompleted() depends on the thread context
 		// here we are in the sequencers context, so we use addCompleted
-		sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_timer.m_data, 0, m_pos);
+		sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_timer.m_data, 
+			m_pos, status);
 
 		m_timer.invalidate();
 
@@ -223,14 +225,14 @@ bool Molecule::start(Sequencer* sequencer)
 	return started;
 }
 
-bool Molecule::stop(Sequencer* sequencer)
+bool Molecule::stop(Sequencer* sequencer, unsigned status)
 {
 	if (m_mode & dont_interrupt)
 		return false;
 
 	m_flags |= stopped;
 
-	return m_current ? m_current->stop(sequencer) : false;
+	return m_current ? m_current->stop(sequencer, status) : false;
 }
 
 bool Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
@@ -444,7 +446,7 @@ bool Activity::start()
 		{
 			log(log_error, "activ") << "start failed: " << *molecule << logend();
 	
-			m_sequencer->sendMoleculeDone(molecule->getId(),
+			m_sequencer->sendMLCA(molecule->getId(),
 				molecule->getStatus(), molecule->getPos(), molecule->getLength());
 
 			remove((Molecule*)head);
@@ -456,7 +458,7 @@ bool Activity::start()
 	return started;
 }
 
-bool Activity::stop()
+bool Activity::stop(unsigned status)
 {
 	bool stopped(false);
 
@@ -464,16 +466,18 @@ bool Activity::stop()
 
 	if (head)
 	{
-		stopped = ((Molecule*)head)->stop(m_sequencer);
+		stopped = ((Molecule*)head)->stop(m_sequencer, status);
 	}
 
 	if (stopped)
+	{
 		setState(idle);
+	}
 
 	return stopped;
 }
 
-bool Activity::abort()
+bool Activity::abort(unsigned status)
 {
 	bool stopped(false);
 
@@ -481,7 +485,7 @@ bool Activity::abort()
 
 	if (head)
 	{
-		stopped = ((Molecule*)head)->stop(m_sequencer);
+		stopped = ((Molecule*)head)->stop(m_sequencer, status);
 		removeAfter(head);
 	}
 
