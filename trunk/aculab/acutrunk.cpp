@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.21 2003/12/02 23:46:31 lars Exp $
+	$Id: acutrunk.cpp,v 1.22 2003/12/04 00:59:49 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -482,34 +482,38 @@ void AculabTrunk::onIdle()
 	// stopTimer();
 
 	TrunkCommand cmd;
+	unsigned callref;
+	bool stopped;
 
 	lock();
 	cmd = m_cmd;
+	m_cmd = t_none;
+	callref = m_callref;
+	m_callref = INVALID_CALLREF;
+	m_remote_disconnect = false;
+	stopped = m_stopped;
+	m_stopped = false;
 	unlock();
 
 	switch (cmd)
 	{
 	case t_connect:
 		// outgoing failed or stopped
-		m_client->connectDone(this, m_callref, m_stopped ? PHONE_ERROR_ABORTED : cause);
+		m_client->connectDone(this, callref, stopped ? PHONE_ERROR_ABORTED : cause);
 		break;
 	case t_disconnect:
-		m_client->disconnectDone(this, m_callref, PHONE_OK);
+		m_client->disconnectDone(this, callref, PHONE_OK);
 		break;
 	case t_accept:
-		m_client->acceptDone(this, m_callref, cause);
+		m_client->acceptDone(this, callref, cause);
 		break;
 	default:
-		m_client->disconnectRequest(this, m_callref, cause);
+		m_client->disconnectRequest(this, callref, cause);
 		break;
 	}
 
 	lock();
 	setName(-1);
-	m_remote_disconnect = false;
-	m_stopped = false;
-	m_cmd = t_none;
-	m_callref = INVALID_CALLREF;
 	unlock();
 
 	release();
@@ -564,6 +568,10 @@ void AculabTrunk::onCallConnected()
 
 	details.timeout = 0;
 	details.handle = m_handle;
+
+	lock();
+	m_cmd = t_none;
+	unlock();
 
 	int rc = call_details(&details);
 
