@@ -811,43 +811,47 @@ void Sequencer::connectRequest(Trunk* server, unsigned callref,
 
 void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 {
+	std::string id;
+
 	log(log_debug, "sequencer", getName()) 
-		<< "connect done: " << result << logend();
+		<< "connect done: " << result << " callref: " << callref << logend();
+
+	lock();
+
+	if (!m_connectComplete)
+	{
+		unlock();
+
+		log(log_error, "sequencer", getName()) 
+			<< "internal error: m_connectComplete is NULL in connectDone()" << logend();
+
+		return;
+	}
+
+	m_callref = callref;
+	m_interface = m_connectComplete->m_interface;
+	id = m_connectComplete->m_id;
 
 	if (result == V3_OK)
 	{
-		if (m_connectComplete)
-		{
-			// good. we got through
-			m_interface = m_connectComplete->m_interface;
-			m_interface->add(server->getName(), this);
-
-			m_media->connected(server);
-
-			m_interface->begin() << V3_OK << ' ' << m_connectComplete->m_id.c_str() 
-				<< " CONN " << getName() << end();
-		}
-		else
-		{
-			log(log_error, "sequencer", getName()) 
-				<< "internal error: m_connectComplete is NULL in connectDone()" << logend();
-		}
+		m_interface->add(server->getName(), this);
+		m_media->connected(server);
 	}
 	else
 	{
-		lock();
 		m_callref = INVALID_CALLREF;
 		if (m_interface)
 		{
 			m_interface->remove(server->getName());
 		}
-		unlock();
 	}
 
-	lock();
 	delete m_connectComplete;
 	m_connectComplete = 0;
 	unlock();
+
+	m_interface->begin() << result << ' ' << id.c_str() 
+		<< " CONN " << getName() << end();
 }
 
 void Sequencer::transferDone(Trunk *server, unsigned callref, int result)

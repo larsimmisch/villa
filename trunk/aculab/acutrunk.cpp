@@ -589,7 +589,6 @@ void AculabTrunk::onIncomingCallDetected()
 	m_callref = new_callref();
 
 	int rc = call_details(&details);
-
 	if (rc)
 	{
 		log(log_error, "trunk", getName()) << "call_details failed: " << rc << logend();
@@ -648,7 +647,6 @@ void AculabTrunk::onCallConnected()
 
 void AculabTrunk::onWaitForOutgoing()
 {
-	m_callref = new_callref();
 }
 
 void AculabTrunk::onOutgoingProceeding()
@@ -666,8 +664,13 @@ void AculabTrunk::onOutgoingProceeding()
 		return;
 	}
 
-	setName(details.ts);
+	lock();
+	m_callref = new_callref();
 
+	setName(details.ts);
+	m_timeslot.st = details.stream;
+	m_timeslot.ts = details.ts;
+	unlock();
 }
 
 void AculabTrunk::onOutgoingRinging()
