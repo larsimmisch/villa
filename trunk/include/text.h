@@ -96,6 +96,7 @@ protected:
 	friend std::ostream& text_end(std::ostream& s);
 
 	// helper methods
+	void grow_rbuf();
 
 	// fills the streambuf get area from the receive buffer
 	unsigned fillGBuf();

@@ -1081,7 +1081,10 @@ void AculabMedia::onRecog(tSMEventId id)
 	switch(recog.type)
 	{
 	case kSMRecognisedDigit:
-		m_client->touchtone(this, recog.param0);
+		if (m_client)
+			m_client->touchtone(this, recog.param0);
+		else
+			log(log_error, "phone", getName()) << "no client for touchtone"<< logend();
 		break;
 	case kSMRecognisedGruntStart:
 		// todo

@@ -11,10 +11,14 @@
 
 static char get_lost[] = "finger weg!\r\n";
 
+#define RMIN 256
+#define RSIZE 1024
+#define GSIZE 1024
+
 SocketStream::SocketStream(const Socket &socket) : 
 	Socket(socket.protocol(), socket.fd()),
-	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(512),
-	m_rbuf(0), m_rpos(0), m_rsize(0), m_rmax(512),
+	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(GSIZE),
+	m_rbuf(0), m_rpos(0), m_rsize(0), m_rmax(RSIZE),
 	std::basic_iostream<char>(this)
 {
 	m_gbuf = new char[m_gmax];
@@ -27,8 +31,8 @@ SocketStream::SocketStream(const Socket &socket) :
 
 SocketStream::SocketStream(int protocol, int s) : 
 	Socket(protocol, s),
-	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(512),
-	m_rbuf(0), m_rpos(0), m_rsize(0), m_rmax(512),
+	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(GSIZE),
+	m_rbuf(0), m_rpos(0), m_rsize(0), m_rmax(RSIZE),
 	std::basic_iostream<char>(this)
 {
 	m_gbuf = new char[m_gmax];
@@ -103,6 +107,15 @@ unsigned SocketStream::fillGBuf()
 	return m_gsize;
 }
 
+void SocketStream::grow_rbuf()
+{
+	char *newbuf = new char[m_rmax*2];
+	memcpy(newbuf, m_rbuf, m_rsize);
+	m_rmax *= 2;
+	delete m_rbuf;
+	m_rbuf = newbuf;
+ }
+
 unsigned SocketStream::receive()
 {
 	unsigned len = fillGBuf();
@@ -116,7 +129,7 @@ unsigned SocketStream::receive()
 
 	for(;;)
 	{	
-		unsigned rcvd = Socket::receive(&m_rbuf[m_rsize], m_rmax - m_rsize - 1);
+		unsigned rcvd = Socket::receive(m_rbuf + m_rsize, m_rmax - m_rsize - 1);
 		if (rcvd == 0)
 		{
 			return 0;
@@ -126,19 +139,14 @@ unsigned SocketStream::receive()
 		m_rbuf[m_rsize] = '\0';
 
 		len = fillGBuf();
-
 		if (len)
 			return len;
 
-		// grow the buffer if necessary
-        if (m_rsize >= m_rmax)
+		// grow the buffer if the remaining buffer size is below RMIN
+        if (m_rmax - m_rsize < RMIN)
         {
-			char *newbuf = new char[m_rmax*2];
-			memcpy(newbuf, m_rbuf, m_rmax);
-			m_rmax *= 2;
-			delete m_rbuf;
-			m_rbuf = newbuf;
-        }
+			grow_rbuf();
+	    }
 	}
 
     // unreached statement
