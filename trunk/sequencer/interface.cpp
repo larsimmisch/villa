@@ -129,7 +129,12 @@ void Interface::run()
 				bool exit(false);
 				InterfaceConnection *ic = *i;
 
-				if (FD_ISSET(ic->fd(), &read))
+				if (FD_ISSET(ic->fd(), &except))
+				{
+					ic->lost_connection();
+					remove.push_back(ic);
+				}
+				else if (FD_ISSET(ic->fd(), &read))
 				{
 					do
 					{
@@ -150,11 +155,6 @@ void Interface::run()
 						ic->lost_connection();
 						remove.push_back(ic);
 					}
-				}
-				if (FD_ISSET(ic->fd(), &except))
-				{
-					ic->lost_connection();
-					remove.push_back(ic);
 				}
 			}
 

@@ -135,7 +135,7 @@ unsigned SocketStream::receive()
 	for(;;)
 	{	
 		int rcvd = Socket::receive(m_rbuf + m_rsize, m_rmax - m_rsize - 1);
-		if (rcvd < 0)
+		if (rcvd <= 0)
 		{
 			int rc = GetLastError();
 
@@ -144,7 +144,8 @@ unsigned SocketStream::receive()
 
 			log(log_warning, "text") << m_remote << " receive returned: " << rc
 				<< logend();
-			return rcvd;
+
+			return -1;
 		}
 		
 		m_rsize += rcvd;
