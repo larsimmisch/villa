@@ -46,7 +46,7 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
 {
 	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
-		m_activity[i] = this;
+		m_activity[i].m_sequencer = this;
 	}
 
 	m_receive = gBus->allocate();
@@ -64,6 +64,11 @@ Sequencer::Sequencer(InterfaceConnection *server)
 {
 	m_receive = gBus->allocate();
 	m_transmit = gBus->allocate();
+
+	for (int i = 0; i < MAXCHANNELS; ++i)
+	{
+		m_activity[i].m_sequencer = this;
+	}
 
 	m_media = gMediaPool.allocate(this);
 	if (!m_media)
@@ -104,7 +109,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 	{
 		server->clear();
 
-		server->syntax_error(id) << "expecting channel, jobid, mode and priority" << end(); 
+		server->syntax_error(id) << "expecting channel, mode and priority" << end(); 
 
 		return V3_FATAL_SYNTAX;
 	}
@@ -181,7 +186,15 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 				unsigned handle(0);
 
-				sscanf(conf.c_str(), "conf[%d]", &handle);
+				if (sscanf(conf.c_str(), "conf[%d]", &handle) != 1)
+				{
+					server->clear();
+
+					server->syntax_error(id) << "invalid conference descriptor" 
+						<< end(); 
+
+					return V3_FATAL_SYNTAX;
+				}
 
 				atom = new ConferenceAtom(handle, 
 					Conference::listen | Conference::speak);

@@ -66,9 +66,9 @@ public:
 
 	virtual void printOn(std::ostream& out) = 0;
 
-	// no error checking - if m_sample is NULL or invalid, it is a bug
-	void setUserData(void *data) { m_sample->setUserData(data); }
-	void *getUserData() { return m_sample->getUserData(); }
+	// if a subclass does not use m_sample, it must override these methods
+	virtual void setUserData(void *data) { m_sample->setUserData(data); }
+	virtual void *getUserData() { return m_sample->getUserData(); }
 
 protected:
 
@@ -238,7 +238,7 @@ public:
 	SilenceAtom(unsigned aLength) : m_length(aLength) {}
 	virtual ~SilenceAtom() {}
 
-	virtual bool start(Sequencer* sequencer, void* userData = 0);
+	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
 	virtual bool stop(Sequencer* sequencer);
 	virtual bool setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
@@ -249,6 +249,9 @@ public:
 
 	// protocol of TimerClient
 	virtual void on_timer(const Timer::TimerID &id);
+
+	virtual void setUserData(void *data) { m_timer.m_data = data; }
+	virtual void *getUserData() { return m_timer.m_data; }
 
 protected:
 
@@ -265,7 +268,7 @@ public:
 	ConferenceAtom(unsigned aConf, unsigned aMode);
 	virtual ~ConferenceAtom() {}
 
-	virtual bool start(Sequencer* sequencer, void* userData = 0);
+	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
 	virtual bool stop(Sequencer* sequencer);
 	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return INDEFINITE; }
@@ -274,10 +277,13 @@ public:
 
 	virtual void printOn(std::ostream& out)	{ out << "ConferenceAtom()"; }
 
+	virtual void setUserData(void *data) { m_data = data; }
+	virtual void *getUserData() { return m_data; }
+
 protected:
 
 	Conference *m_conference;
-	void *m_userData;
+	void *m_data;
 	Time m_started;
 	unsigned m_mode;
 };

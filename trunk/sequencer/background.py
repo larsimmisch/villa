@@ -17,19 +17,19 @@ class Background:
         self.conf = None
         self.send('CNFO')
 
+    def send(self, cmd):
+        self.sequencer.send(self, cmd)
+
     def CNFO(self, event, data):
         self.conf = event['device']
         print 'conference is: ', self.conf
         self.send('BGRO') 
 
-    def send(self, cmd):
-        self.sequencer.send(self, cmd)
-
     def BGRO(self, event, data):
         self.device = event['device']
         self.sequencer.devices[self.device] = self
         print 'allocated:', self.device
-        self.send('MLCA %s 0 2 1 play ../test/phone/sitrtoot none'
+        self.send('MLCA %s 0 2 1 play ../test/phone/wiese.al none'
                   % self.device)
 
     def BGRC(self, event, data):
