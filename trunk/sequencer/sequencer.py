@@ -34,6 +34,8 @@ class Sequencer:
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.socket.connect((host, port))
 
+		self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
 		# make file from socket
 		self.stdin=self.socket.makefile("r")
 		self.stdout=self.socket.makefile("w")
