@@ -44,6 +44,9 @@ class Conftest:
     def MLCA(self, event, user_data):
         pass
 
+    def DTMF(self, event):
+        print event
+
     def DISC(self, event, user_data):
         pass
 
