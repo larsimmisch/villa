@@ -294,20 +294,12 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 		return V3_WARNING_SILENCE;
 	}
 
-	lock();
-
-	try
 	{
+		omni_mutex_lock l(m_mutex);
+
 		m_activity[channel].add(*molecule);
 		checkCompleted();
 	}
-	catch(...)
-	{
-		unlock();
-		throw;
-	}
-
-	unlock();
 
 	return V3_OK;
 }
@@ -693,7 +685,7 @@ bool Sequencer::close(const char *id)
 {
 	bool idle(false);
 
-	lock();
+	omni_mutex_lock l(m_mutex);
 
 	m_closing = true;
 
@@ -721,8 +713,6 @@ bool Sequencer::close(const char *id)
 
 	if (!idle && id)
 		m_id = id;
-
-	unlock();
 
 	return idle;
 }
@@ -1064,64 +1054,64 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	assert(molecule);
 
-	lock();
-
-	// the molecule will be changed after the done. Grab all necesssary information before done.
-
-	channel = molecule->getChannel();
-	atom = molecule->currentAtom();
-	send_molecule_done = molecule->atEnd();
-	send_atom_done = molecule->notifyStop();
-	id = molecule->getId();
-	done = molecule->done(this, msecs, status);
-	pos = molecule->getPos();
-	length = molecule->getLength();
-	send_molecule_done = send_molecule_done && done;
-
-	if (send_atom_done)
 	{
-		log(log_debug, "sequencer", server->getName()) 
-			<< "sent ATOM done for " 
-			<< ", " << id.c_str() << ", " << atom << std::endl 
-			<< *molecule << logend();
+		omni_mutex_lock l(m_mutex);
 
-		sendATOM(id.c_str(), atom, status, msecs);
+		// the molecule will be changed after the done. Grab all necesssary information before done.
+
+		channel = molecule->getChannel();
+		atom = molecule->currentAtom();
+		send_molecule_done = molecule->atEnd();
+		send_atom_done = molecule->notifyStop();
+		id = molecule->getId();
+		done = molecule->done(this, msecs, status);
+		pos = molecule->getPos();
+		length = molecule->getLength();
+		send_molecule_done = send_molecule_done && done;
+
+		if (send_atom_done)
+		{
+			log(log_debug, "sequencer", server->getName()) 
+				<< "sent ATOM done for " 
+				<< ", " << id.c_str() << ", " << atom << std::endl 
+				<< *molecule << logend();
+
+			sendATOM(id.c_str(), atom, status, msecs);
+		}
+
+		if (m_activity[channel].getState() == Activity::stopping || done)
+		{
+			log(log_debug+2, "sequencer", server->getName()) 
+				<< "removing " << *molecule << logend();
+
+			m_activity[channel].remove(molecule);
+		}
+		else
+		{
+			log(log_debug+2, "sequencer", server->getName()) 
+				<< "done " << *molecule << logend();
+		}
+
+		// handle the various disconnect/close conditions
+
+		if ((m_trunk && (m_disconnecting != INVALID_CALLREF || status == V3_STOPPED_DISCONNECT))
+			|| m_closing)
+		{
+			start = false;
+			send_molecule_done = true;
+		}
+
+		if (start)
+		{
+			// start next molecule before sending reply to minimise delay
+			m_activity[channel].start();
+		}
+		else
+		{
+			// current channel is idle
+			m_activity[channel].setState(Activity::idle);
+		}
 	}
-
-	if (m_activity[channel].getState() == Activity::stopping || done)
-	{
-		log(log_debug+2, "sequencer", server->getName()) 
-			<< "removing " << *molecule << logend();
-
-		m_activity[channel].remove(molecule);
-	}
-	else
-	{
-		log(log_debug+2, "sequencer", server->getName()) 
-			<< "done " << *molecule << logend();
-	}
-
-	// handle the various disconnect/close conditions
-
-	if ((m_trunk && (m_disconnecting != INVALID_CALLREF || status == V3_STOPPED_DISCONNECT))
-		|| m_closing)
-	{
-		start = false;
-		send_molecule_done = true;
-	}
-
-    if (start)
-	{
-		// start next molecule before sending reply to minimise delay
-		m_activity[channel].start();
-	}
-	else
-	{
-		// current channel is idle
-		m_activity[channel].setState(Activity::idle);
-	}
-
-	unlock();
 
     if (send_molecule_done)
 	{
@@ -1172,13 +1162,15 @@ void Sequencer::touchtone(Media* server, char tt)
 	log(log_debug, "sequencer", server->getName())
 		<< "DTMF: " << tt << logend();
 
-	lock();
-	/* give Activities a chance to stop */
-	for (i = 0; i < MAXCHANNELS; ++i)
 	{
-		m_activity[i].DTMF(tt);
+		omni_mutex_lock l(m_mutex);
+
+		/* give Activities a chance to stop */
+		for (i = 0; i < MAXCHANNELS; ++i)
+		{
+			m_activity[i].DTMF(tt);
+		}
 	}
-	unlock();
 
 	if (m_interface)
 	{
