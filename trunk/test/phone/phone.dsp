@@ -113,10 +113,6 @@ SOURCE=..\..\include\phone.h
 
 SOURCE=..\..\include\phoneclient.h
 # End Source File
-# Begin Source File
-
-SOURCE=..\..\include\storage.h
-# End Source File
 # End Group
 # End Target
 # End Project
