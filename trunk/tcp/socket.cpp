@@ -164,7 +164,7 @@ void *Listener::run_undetached(void *arg)
 	struct sockaddr_in remoteAddress;
 
 	while(1)
-	{	
+	{
 		size = sizeof(remoteAddress);
 		aSocket = ::accept(hsocket, (sockaddr*)&remoteAddress, &size);
 		if (aSocket < 0)

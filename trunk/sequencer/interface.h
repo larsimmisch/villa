@@ -93,11 +93,6 @@ public:
 	// must call server.disconnectAccept or server.disconnectReject 
 	virtual void disconnectRequest(TextTransport *server);
 	
-	// replies to server.disconnect from far end
-	virtual void disconnectConfirm(TextTransport *server);
-	virtual void disconnectReject(TextTransport *server);
-	virtual void disconnectTimeout(TextTransport *server);
-
     virtual void abort(TextTransport *server);
 
 	// sent whenever packet is received

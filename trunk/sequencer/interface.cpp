@@ -78,6 +78,7 @@ void Interface::connectRequest(TextTransport *server, SAP& remote)
 
 	log(log_debug, "sequencer") << "client attached from " << remote << logend();
 
+/*
 	if (unused == 0)
 	{
 		log(log_debug, "sequencer") << "spawning new interface listener" << logend();
@@ -85,9 +86,10 @@ void Interface::connectRequest(TextTransport *server, SAP& remote)
 		connections.addFirst(new InterfaceConnection(*this, local));
 		unused++;
 	}
-
+*/
 	server->accept();
 
+	(*server) << "sequence protocol 0.1\r\n";
 }
 
 void Interface::connectRequestTimeout(TextTransport *server)
@@ -127,17 +129,6 @@ void Interface::disconnectRequest(TextTransport *server)
 	cleanup(server);
 }
 
-void Interface::disconnectConfirm(TextTransport *server)
-{}
-
-void Interface::disconnectTimeout(TextTransport *server)
-{}
-
-void Interface::disconnectReject(TextTransport *server)
-{
-    // We don't actively disconnect
-}
-
 void Interface::abort(TextTransport *server)
 {
 	SAP remote;
@@ -167,6 +158,15 @@ void Interface::data(TextTransport *server)
 	if (!server->good() || server->eof())
 	{
 		server->clear();
+
+		// exit from telnet - does not restrict tid usage
+		if (id == "exit")
+		{
+			server->disconnect();
+			server->listen(local);
+
+			return;
+		}
 
 		(*server) << _syntax_error << ' ' << id.c_str() 
 			<< " syntax error\r\n";
