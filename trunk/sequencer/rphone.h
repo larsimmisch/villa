@@ -16,23 +16,6 @@ enum { notify_start = 0x01, notify_stop = 0x02 };
 
 enum { recognizer_isolated, recognizer_contiguous };
 
-enum
-{
-	if_describe,
-	if_describe_done,
-    if_open_conference,
-    if_open_conference_done,
-    if_close_conference,
-    if_close_conference_done,
-	if_listen,
-	if_listen_done,
-	if_connect,
-	if_connect_done,
-	if_stop_listening,
-	if_stop_listening_done,
-	if_shutdown
-};
-
 /*
     currently the discard_*_done packets are not sent when an active entity is discarded.
     This is probably undesireable in some cases. If anyone needs these packets, please let me know.

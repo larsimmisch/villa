@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.20 2003/12/01 22:26:56 lars Exp $
+	$Id: acutrunk.cpp,v 1.21 2003/12/02 23:46:31 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -482,31 +482,26 @@ void AculabTrunk::onIdle()
 	// stopTimer();
 
 	TrunkCommand cmd;
-	bool remote_disconnect;
 
 	lock();
 	cmd = m_cmd;
-	remote_disconnect = m_remote_disconnect;
 	unlock();
 
-	if (!remote_disconnect)
+	switch (cmd)
 	{
-		switch (cmd)
-		{
-		case t_connect:
-			// outgoing failed or stopped
-			m_client->connectDone(this, m_callref, m_stopped ? PHONE_ERROR_ABORTED : cause);
-			break;
-		case t_disconnect:
-			m_client->disconnectDone(this, m_callref, PHONE_OK);
-			break;
-		case t_accept:
-			m_client->acceptDone(this, m_callref, cause);
-			break;
-		default:
-			m_client->disconnectRequest(this, m_callref, cause);
-			break;
-		}
+	case t_connect:
+		// outgoing failed or stopped
+		m_client->connectDone(this, m_callref, m_stopped ? PHONE_ERROR_ABORTED : cause);
+		break;
+	case t_disconnect:
+		m_client->disconnectDone(this, m_callref, PHONE_OK);
+		break;
+	case t_accept:
+		m_client->acceptDone(this, m_callref, cause);
+		break;
+	default:
+		m_client->disconnectRequest(this, m_callref, cause);
+		break;
 	}
 
 	lock();

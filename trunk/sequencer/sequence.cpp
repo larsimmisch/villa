@@ -423,7 +423,7 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 	{
 		unlock();
  		server->begin() << PHONE_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-			<< " protocol violation" << end();
+			<< " DISC protocol violation" << end();
 
 		return PHONE_ERROR_PROTOCOL_VIOLATION;
 	}
@@ -432,11 +432,21 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 	m_id = id;
 	unlock();
 
-	return disconnect(cause);
+	int rc = disconnect(cause);
+
+	if (rc != PHONE_OK) 
+	{
+ 		server->begin() << rc << ' ' << id.c_str() 
+			<< " DISC" << end();
+	}
+
+	return rc;
 }
 
 int Sequencer::disconnect(int cause)
 {
+	int rc = PHONE_OK;
+
 	omni_mutex_lock l(m_mutex);
 
 	if (m_activity.getState() == Activity::active)
@@ -454,13 +464,13 @@ int Sequencer::disconnect(int cause)
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
 
 		m_media->disconnected(m_trunk);
-		m_trunk->disconnect(m_callref, cause);
+		rc = m_trunk->disconnect(m_callref, cause);
 	}
 	else
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - stopping activity" << logend();
 
 
-	return PHONE_OK;
+	return rc;
 }
 
 void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, const SAP& remote)
@@ -468,6 +478,8 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 	int contained; 
 
 	omni_mutex_lock lock(m_mutex);
+
+	m_callref = callref;
 
 	// do we have an exact match?
 	m_clientSpec = m_configuration->dequeue(local);
@@ -630,8 +642,8 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	{
 		if (m_interface)
 		{
-			m_interface->begin() << PHONE_EVENT << ' ' << m_trunk->getName() 
-				<< " RDIS" << end();
+			m_interface->begin() << PHONE_EVENT << " RDIS " << m_trunk->getName() 
+				<< end();
 		}
 
 		return;
@@ -651,8 +663,8 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	// if the stop was synchronous, notify client
 	if (m_activity.getState() == Activity::idle && m_interface)
 	{
-		m_interface->begin() << PHONE_EVENT << ' ' << m_trunk->getName() 
-			<< " RDIS" << end();
+		m_interface->begin() << PHONE_EVENT << " RDIS " << m_trunk->getName() 
+			<< end();
 	}
 
 	unlock();
@@ -698,9 +710,15 @@ int Sequencer::accept(InterfaceConnection *server, const std::string &id)
 
 	m_id = id;
 
-	m_trunk->accept(m_callref);
+	int rc = m_trunk->accept(m_callref);
 
-	return PHONE_OK;
+	if (rc != PHONE_OK) 
+	{
+ 		server->begin() << rc << ' ' << id.c_str() << " ACPT"
+			<< end();
+	}
+
+	return rc;
 }
 
 void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
@@ -734,7 +752,7 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 		unlock();
 
 		log(log_error, "sequencer", server->getName()) << "call accept failed: " 
-		<< result << logend();
+			<< result << logend();
 
 		m_clientSpec->requeue();
 	}	

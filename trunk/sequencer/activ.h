@@ -73,9 +73,22 @@ class Molecule : public Atom, public DList
 {
 public:
 
-	enum a_mode { discard = 0x01, mute = 0x02, dont_interrupt = 0x04, restart = 0x08, pause = 0x10, loop = 0x20 };
+	enum a_mode 
+	{ 
+		discard = 0x01, 
+		pause = 0x02, 
+		mute = 0x04, 
+		restart = 0x08, 
+		dont_interrupt = 0x10, 
+		loop = 0x20 
+	};
 
-	enum a_flags { active = 0x01, need_rewind = 0x02, stopped = 0x04 };
+	enum a_flags 
+	{ 
+		active = 0x01, 
+		need_rewind = 0x02, 
+		stopped = 0x04 
+	};
 
 	Molecule(unsigned mode, int aPriority, const std::string &id);
 	virtual ~Molecule();	
