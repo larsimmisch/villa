@@ -12,7 +12,8 @@ class Call:
 
     def __init__(self, sequencer):
         self.device = None
-        self.wait = None
+        self.record = None
+        self.play = None
         self.sequencer = sequencer
 
         self.sequencer.send(self, 'LSTN any any') 
@@ -39,11 +40,13 @@ class Call:
 ##         self.send('MLCA %s 0 2 1 beep 2'
 ##                   % self.device)
         self.send('MLCA %s 0 16 4 beep 1 none ' % self.device)
-        self.wait = self.send('MLCA %s 0 16 4 rec foo 10000 none'
-                              % self.device)
+        self.record = self.send('MLCA %s 0 80 4 rec foo 10000 none'
+                                % self.device)
 
     def MLCA(self, event, user_data):
-        if event['tid'] == self.wait:
+        if event['tid'] == self.record:
+            self.play = self.send('MLCA %s 0 2 1 play foo none' % self.device)
+        elif event['tid'] == self.play:
             self.send('DISC %s 0' % self.device)
     
     def DISC(self, event, user_data):

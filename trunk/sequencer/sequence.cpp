@@ -860,7 +860,7 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 			log(log_debug, "sequencer", getName()) 
 				<< "remote disconnect - stopping channel " << i << logend();
 
-			m_activity[i].abort(V3_DISCONNECTED);
+			m_activity[i].abort(V3_STOPPED_DISCONNECT);
 		}
 	}
 
@@ -1126,8 +1126,18 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 void Sequencer::touchtone(Media* server, char tt)
 {
+	int i;
+
 	log(log_debug, "sequencer", server->getName())
 		<< "DTMF: " << tt << logend();
+
+	lock();
+	/* give Activities a chance to stop */
+	for (i = 0; i < MAXCHANNELS; ++i)
+	{
+		m_activity[i].DTMF(tt);
+	}
+	unlock();
 
 	if (m_interface)
 	{

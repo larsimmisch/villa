@@ -914,7 +914,9 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 			p->m_receiving = 0;
 			p->m_mutex.unlock();
 			
-			if (m_status != V3_ABORTED && m_status != V3_DISCONNECTED)
+			/* Retain status codes in the range of successful completions - 
+			   m_status may have been set in stop() */
+			if (m_status >= V3_WARNING_OFFSET)
 			{
 				rc = sm_record_how_terminated(&how);
 				if (rc)
@@ -930,7 +932,7 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 					m_status = V3_ENDSILENCE;
 					break;
 				case kSMRecordHowTerminatedAborted:
-					m_status = V3_ABORTED;
+					m_status = V3_STOPPED;
 					break;
 				default:
 					m_status = V3_ERROR_FAILED;

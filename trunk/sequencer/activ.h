@@ -49,7 +49,7 @@ public:
 
 	/* channel is the index of the parallel job */
 	virtual bool start(Sequencer* sequencer);
-	virtual bool stop(Sequencer* sequencer, unsigned status = V3_ABORTED);
+	virtual bool stop(Sequencer* sequencer, unsigned status = V3_STOPPED);
 
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return true; }
 	virtual bool setPos(unsigned aPosition) { return true; }
@@ -89,7 +89,8 @@ public:
 		mute = V3_MODE_MUTE, 
 		restart = V3_MODE_RESTART, 
 		dont_interrupt = V3_MODE_DONT_INTERRUPT, 
-		loop = V3_MODE_LOOP 
+		loop = V3_MODE_LOOP,
+		dtmf_stop = V3_MODE_DTMF_STOP
 	};
 
 	enum a_flags 
@@ -103,7 +104,11 @@ public:
 	virtual ~Molecule();	
 
 	virtual bool start(Sequencer* sequencer);
-	virtual bool stop(Sequencer* sequencer, unsigned status = V3_ABORTED);
+	virtual bool stop(Sequencer* sequencer, unsigned status = V3_STOPPED);
+
+	/* ignores flag dont_interrupt */
+	virtual bool abort(Sequencer* sequencer, unsigned status = V3_STOPPED);
+
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason);
 	virtual bool setPos(unsigned aPosition);
 	unsigned getPos() const { return m_pos; }
@@ -240,7 +245,7 @@ public:
 	virtual ~SilenceAtom() {}
 
 	virtual bool start(Sequencer* sequencer);
-	virtual bool stop(Sequencer* sequencer, unsigned status = V3_ABORTED);
+	virtual bool stop(Sequencer* sequencer, unsigned status = V3_STOPPED);
 	virtual bool setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
 	virtual unsigned getStatus()	{ return V3_OK; }
@@ -270,7 +275,7 @@ public:
 	virtual ~ConferenceAtom() {}
 
 	virtual bool start(Sequencer* sequencer);
-	virtual bool stop(Sequencer* sequencer, unsigned status = V3_ABORTED);
+	virtual bool stop(Sequencer* sequencer, unsigned status = V3_STOPPED);
 	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return INDEFINITE; }
 	virtual unsigned getStatus()	{ return V3_OK; }
@@ -302,9 +307,13 @@ public:
 	virtual void remove(Molecule* aMolecule);
 
 	virtual bool start();
-	virtual bool stop(unsigned status = V3_ABORTED);
+	virtual bool stop(unsigned status = V3_STOPPED);
 
-	virtual bool abort(unsigned status = V3_ABORTED);
+	/* abort current Molecule and remove all following Molecules */
+	virtual bool abort(unsigned status = V3_STOPPED);
+
+	/* return true if stopped */
+	virtual bool DTMF(char dtmf);
 
 	virtual Molecule* find(const std::string &id);
 

@@ -537,7 +537,7 @@ void AculabTrunk::onIdle()
 		break;
 	case t_connect:
 		// outgoing failed or stopped
-		m_client->connectDone(this, callref, stopped ? V3_ABORTED : cause);
+		m_client->connectDone(this, callref, stopped ? V3_STOPPED : cause);
 		break;
 	case t_disconnect:
 		m_client->disconnectDone(this, callref, V3_OK);

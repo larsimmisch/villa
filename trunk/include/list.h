@@ -3,6 +3,9 @@
 #if !defined(INCL_COLLECT_LIST)
 #define INCL_COLLECT_LIST
 
+/* In hindsight (about ten years later), this is an example
+   of bad OO design. I thought it was clever at the time */
+
 class List
 {
 public:
@@ -126,7 +129,7 @@ inline List::Link* List::removeNextLink(Link* aLink)
 
 class DList : public List
 {
-	public:
+public:
 
 	struct DLink : public List::Link
 	{
@@ -156,7 +159,7 @@ class DList : public List
 		DLink* currentLink;
 	};
 
-	public: //	external protocol
+public: //	external protocol
 
 	// assert:
 	//	aNewLink != 0 and is not in list!

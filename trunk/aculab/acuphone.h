@@ -173,7 +173,7 @@ protected:
 		virtual ~FileSample();
 
         virtual unsigned start(Media *phone);
-        virtual bool stop(Media *phone, unsigned status = V3_ABORTED);
+        virtual bool stop(Media *phone, unsigned status = V3_STOPPED);
 		virtual unsigned submit(Media *phone);
 		// fills prosody buffers if space available, notifies about completion if done
 		virtual int process(Media *phone);
@@ -201,7 +201,7 @@ protected:
 		virtual ~RecordFileSample() {}
 
         virtual unsigned start(Media *phone);
-        virtual bool stop(Media *phone, unsigned status = V3_ABORTED);
+        virtual bool stop(Media *phone, unsigned status = V3_STOPPED);
 		virtual unsigned receive(Media *phone);
 		// empties prosody buffers if data available, notifies about completion if done
 		virtual int process(Media *phone);
@@ -222,7 +222,7 @@ protected:
 		virtual ~Beep() {}
 
         virtual unsigned start(Media *phone);
-        virtual bool stop(Media *phone, unsigned status = V3_ABORTED);
+        virtual bool stop(Media *phone, unsigned status = V3_STOPPED);
 		virtual unsigned submit(Media *phone);
 		// fills prosody buffers if space available, notifies about completion if done
 		virtual int process(Media *phone);
@@ -242,7 +242,7 @@ protected:
 		virtual ~Touchtones() {}
 
         virtual unsigned start(Media *phone);
-        virtual bool stop(Media *phone, unsigned status = V3_ABORTED);
+        virtual bool stop(Media *phone, unsigned status = V3_STOPPED);
 		virtual int process(Media *phone);
 
 		std::string m_tt;

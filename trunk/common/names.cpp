@@ -8,10 +8,12 @@ const char* result_name(int r)
 		return "event";
 	case V3_OK:
 		return "ok";
-	case V3_ABORTED:
-		return "aborted";
-	case V3_DISCONNECTED:
-		return "disconnected";
+	case V3_STOPPED:
+		return "stopped";
+	case V3_STOPPED_DISCONNECT:
+		return "stopped by disconnect";
+	case V3_STOPPED_DTMF:
+		return "stopped by DTMF";
 	case V3_ENDSILENCE:
 		return "end silence";
 	case V3_WARNING_TIMEOUT:

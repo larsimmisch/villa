@@ -78,7 +78,10 @@ void List::LinkIter::setToEnd()
 
 void List::addFirst(Link* aNewLink)
 {
-    if(!tail) tail = aNewLink;
+    if (!tail) 
+	{
+		tail = aNewLink;
+	}
 
     aNewLink->next = head;
 

@@ -230,7 +230,13 @@ bool Molecule::stop(Sequencer* sequencer, unsigned status)
 	if (m_mode & dont_interrupt)
 		return false;
 
+	return abort(sequencer, status);
+}
+
+bool Molecule::abort(Sequencer* sequencer, unsigned status)
+{
 	m_flags |= stopped;
+	m_status = status;
 
 	return m_current ? m_current->stop(sequencer, status) : false;
 }
@@ -253,11 +259,8 @@ bool Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 		m_timeStopped.now();
 		log(log_debug + 2, "activ") << "stopped after: " 
 			<< m_timeStopped - m_timeStarted << " ms" << logend();
-	}
 
-	if (isStopped())
-	{
-		if (m_mode & discard)
+		if ((m_mode & discard) | ((m_mode & dtmf_stop) && m_status == V3_STOPPED_DTMF))
 			return true;
 
 		return false;
@@ -323,6 +326,7 @@ void Molecule::printOn(std::ostream &out)
 	if (getMode() & Molecule::restart)  out << " restart";
 	if (getMode() & Molecule::pause)	out << " pause";
 	if (getMode() & Molecule::loop)  out << " loop";
+	if (getMode() & Molecule::dtmf_stop)  out << " dtmf_stop";
 
 	out << ", " << result_name(getStatus()) << ')' << std::endl;
 
@@ -485,7 +489,7 @@ bool Activity::abort(unsigned status)
 
 	if (head)
 	{
-		stopped = ((Molecule*)head)->stop(m_sequencer, status);
+		stopped = ((Molecule*)head)->abort(m_sequencer, status);
 		removeAfter(head);
 	}
 
@@ -496,6 +500,25 @@ bool Activity::abort(unsigned status)
 
 	return stopped;
 }
+
+bool Activity::DTMF(char dtmf)
+{
+	if (head)
+	{
+		Molecule *h = (Molecule*)head;
+
+		if (h->getMode() & V3_MODE_DTMF_STOP)
+		{
+			log(log_debug, "activ") << "stopping " << *h << "id: " 
+				<< h->getId() << " due to DTMF" << logend();
+		
+			stop(V3_STOPPED_DTMF);
+		}
+	}
+
+	return false;
+}
+
 
 Molecule* Activity::find(const std::string &id)
 {
