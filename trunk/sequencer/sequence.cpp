@@ -753,8 +753,6 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 
 		log(log_error, "sequencer", server->getName()) << "call accept failed: " 
 			<< result << logend();
-
-		m_clientSpec->requeue();
 	}	
 }
 
