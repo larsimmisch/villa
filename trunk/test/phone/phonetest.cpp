@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.15 2001/06/23 09:55:20 lars Exp $
+	$Id: phonetest.cpp,v 1.16 2001/06/27 20:03:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -58,9 +58,9 @@ public:
 
 		if (m_active)
 		{
+			m_active->stop(server->getTelephone());
 			m_mutex.unlock();
 			log(log_debug, "app", server->getName()) << "remote disconnect - aborting DSP activity" << logend();
-			m_active->stop(server->getTelephone());
 		}
 		else
 		{
@@ -136,9 +136,8 @@ public:
 		{
 			Sample* sample = server->createFileSample("sitrtoot.al");
 
-			sample->start(server);
-
 			m_mutex.lock();
+			sample->start(server);
 			m_active = sample;
 			m_mutex.unlock();
 
@@ -160,12 +159,12 @@ public:
 	{
 		log(log_debug, "app", server->getName()) << "sample completed" 
 			<< logend();
-
-		delete sample;
 		
 		m_mutex.lock();
 		m_active = 0;
 		m_mutex.unlock();
+
+		delete sample;
 
 		server->disconnect();
 	}
