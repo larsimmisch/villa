@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.17 2001/07/03 23:13:02 lars Exp $
+	$Id: phonetest.cpp,v 1.18 2001/07/04 16:29:26 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -180,6 +180,8 @@ void usage()
 {
 	cout << "usage: phonetest -p <port>[:<count>] -s <switch> -l <loglevel>" << endl;
 	cout << "\t -p may be repeated" << std::endl;
+
+	exit(2);
 }
 
 int main(int argc, char* argv[])
