@@ -88,7 +88,7 @@ void Interface::connectRequest(TextTransport *server, SAP& remote)
 */
 	server->accept();
 
-	(*server) << "sequence protocol 0.2\r\n";
+	server->begin() << "sequence protocol 0.2" << end();
 }
 
 void Interface::connectRequestTimeout(TextTransport *server)
@@ -167,7 +167,8 @@ void Interface::data(TextTransport *server)
 			return;
 		}
 
-		(*server) << _syntax_error << " syntax error - expecting id and scope\r\n";
+		server->begin() << _syntax_error 
+			<< " syntax error - expecting id and scope" << end();
 
 		return;
 	}
@@ -182,13 +183,16 @@ void Interface::data(TextTransport *server)
 		{
 			server->clear();
 
-			(*server) << _syntax_error << " syntax error - expecting command\r\n";
+			server->begin() << _syntax_error << 
+				" syntax error - expecting command" << end();
 
 			return;
 		}
 
 		if (command == "describe")
 		{
+			server->begin();
+
 			for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
 			{
 				(*server) << id.c_str() << ' ' << _ok << ' '
@@ -198,7 +202,7 @@ void Interface::data(TextTransport *server)
 					<< "\n";
 			}
 
-			(*server) << "\r\n";
+			(*server) << end();
 		}
 		else if (command == "open-conference")
 		{
@@ -210,13 +214,13 @@ void Interface::data(TextTransport *server)
 
 				sprintf(name, "Conf[%d]", conf->getHandle());
 
-				(*server) << id.c_str() << ' ' << _ok 
-					<< " global open-conference-done " << name << "\r\n";
+				server->begin() << id.c_str() << ' ' << _ok 
+					<< " global open-conference-done " << name << end();
 			}
 			else
 			{
-				(*server) << id.c_str() << _failed 
-					<< " global open-conference-done\r\n";
+				server->begin() << id.c_str() << _failed 
+					<< " global open-conference-done" << end();
 			}
 		}
 		else if (command == "close-conference")
@@ -230,8 +234,8 @@ void Interface::data(TextTransport *server)
 			{
 				server->clear();
 
-				(*server) << id.c_str() << ' ' << _syntax_error << 
-					" global close-conference-done\r\n";
+				server->begin() << id.c_str() << ' ' << _syntax_error << 
+					" global close-conference-done" << end();
 				return;
 			}
 
@@ -241,21 +245,21 @@ void Interface::data(TextTransport *server)
 
 			if (!handle)
 			{
-				(*server) << _syntax_error << 
-					" global close-conference-done\r\n";
+				server->begin() << _syntax_error << 
+					" global close-conference-done" << end();
 
 				return;
 			}
 
 			if (gConferences.close(handle))
 			{
-				(*server) << id.c_str() << ' ' << _ok 
-					<< " global close-conference-done\r\n";
+				server->begin() << id.c_str() << ' ' << _ok 
+					<< " global close-conference-done" << end();
 			}
 			else
 			{
-				(*server) << id.c_str() << ' ' << _failed 
-					<< " global close-conference-done\r\n";
+				server->begin() << id.c_str() << ' ' << _failed 
+					<< " global close-conference-done" << end();
 			}
 		}
 		else if (command == "listen")
@@ -270,7 +274,9 @@ void Interface::data(TextTransport *server)
 			{
 				server->clear();
 
-				(*server) << _syntax_error << " syntax error - expecting trunk name and DID\r\n";
+				server->begin() << _syntax_error 
+					<< " syntax error - expecting trunk name and DID" 
+					<< end();
 				return;
 			}
 
@@ -290,8 +296,8 @@ void Interface::data(TextTransport *server)
 						<< "attempted to add listen for invalid trunk " 
 						<< trunkname.c_str() << logend();
 
-					(*server) << id.c_str() << ' ' << _invalid 
-						<< " invalid trunk " << trunkname.c_str() << "\r\n";
+					server->begin() << id.c_str() << ' ' << _invalid 
+						<< " invalid trunk " << trunkname.c_str() << end();
 
 					return;
 				}
@@ -415,9 +421,9 @@ void Interface::data(TextTransport *server)
 		{
 			// syntax error
 
-			(*server) << id.c_str() << ' ' << _failed 
+			server->begin() << id.c_str() << ' ' << _failed 
 				<< " syntax error - unknown command " << command.c_str()
-				<< "\r\n";
+				<< end();
 		}
 	}
 	else
@@ -426,9 +432,9 @@ void Interface::data(TextTransport *server)
 
 		if (!s)
 		{
-			(*server) << id.c_str() << ' ' << _failed 
+			server->begin() << id.c_str() << ' ' << _failed 
 				<< " syntax error - unknown scope " << scope.c_str()
-				<< "\r\n";
+				<< end();
 		}
 		else
 		{

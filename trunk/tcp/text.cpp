@@ -9,8 +9,8 @@
 
 static char get_lost[] = "finger weg!\r\n";
 
-TextTransport::TextTransport(void* aPrivateData) : socket(), 
-	privateData(aPrivateData), state(idle), m_gbuf(0), m_gpos(0), 
+TextTransport::TextTransport(void* aPrivateData) : m_socket(), 
+	m_privateData(aPrivateData), m_state(idle), m_gbuf(0), m_gpos(0), 
 	m_gsize(0), m_gmax(256),
 	std::basic_iostream<char>(this)
 {
@@ -22,9 +22,10 @@ TextTransport::TextTransport(void* aPrivateData) : socket(),
 
 TextTransport::~TextTransport()
 {
-	if (state == connected)	abort();
+	if (m_state == connected)	
+		abort();
 	
-	socket.close();
+	m_socket.close();
 }
 
 void TextTransport::assertState(states aState)
@@ -39,9 +40,9 @@ int TextTransport::listen(SAP& aLocalSAP, unsigned aTimeout, int single)
 {	
 	assertState(idle);
 	
-	local = aLocalSAP;
-	timeout = aTimeout;
-	socket.bind(aLocalSAP, single);
+	m_local = aLocalSAP;
+	m_timeout = aTimeout;
+	m_socket.bind(aLocalSAP, single);
 
 	setState(listening);
 	
@@ -52,8 +53,8 @@ int TextTransport::connect(SAP& aRemoteSAP, unsigned aTimeout)
 {
 	assertState(idle);
 	
-	remote = aRemoteSAP;
-	timeout = aTimeout;
+	m_remote = aRemoteSAP;
+	m_timeout = aTimeout;
 	
 	setState(calling);
 	
@@ -73,21 +74,21 @@ void TextTransport::reject()
 
 	setState(idle);
 
-	socket.close();	
+	m_socket.close();	
 }
 
 void TextTransport::disconnect(unsigned aTimeout)
 {	
-	timeout = aTimeout;
+	m_timeout = aTimeout;
 
-	switch (state)
+	switch (m_state)
     {
     case idle:
         return;
     case listening:
     case calling:
     case connected:
-        socket.close();
+        m_socket.close();
         setState(idle);
         break;
     case disconnecting:
@@ -105,9 +106,9 @@ int TextTransport::disconnectAndWait(unsigned aTimeout)
 
     disconnect(aTimeout);
 
-    while (state != idle)
+    while (m_state != idle)
     {
-        received = receiveRaw(timeout);
+        received = receiveRaw(m_timeout);
         if (received == 0)  return 0;
     }
 
@@ -120,7 +121,7 @@ void TextTransport::disconnectAccept()
 	
 	setState(idle);
 	
-	socket.close();	
+	m_socket.close();	
 }
 
 void TextTransport::abort()
@@ -129,7 +130,7 @@ void TextTransport::abort()
 	
 	setState(idle);
 
-	socket.close();
+	m_socket.close();
 }
 
 unsigned TextTransport::sendRaw(const char *data, unsigned size,
@@ -140,11 +141,11 @@ unsigned TextTransport::sendRaw(const char *data, unsigned size,
 
 	while (sent < size)
 	{
-		socket.waitForSend(aTimeout);
-		rc = socket.send((void*)&data[sent], size - sent, expedited);
+		m_socket.waitForSend(aTimeout);
+		rc = m_socket.send((void*)&data[sent], size - sent, expedited);
 		if (rc == 0)
 		{	
-			if (state == connected)  
+			if (m_state == connected)
 				aborted();
 
 			return 0;
@@ -177,15 +178,15 @@ unsigned TextTransport::receiveRaw(unsigned aTimeout)
 
 	while (true)
 	{
-		if ((timeout = socket.waitForData(aTimeout)) == 0)	
+		if ((m_timeout = m_socket.waitForData(aTimeout)) == 0)	
 		{
 			return 0;
 		}
 	
-		rcvd = socket.receive(&m_gbuf[m_gsize], m_gmax - m_gsize);
+		rcvd = m_socket.receive(&m_gbuf[m_gsize], m_gmax - m_gsize);
 		if (rcvd == 0)
 		{
-			if (state == connected)
+			if (m_state == connected)
 				aborted();
 
 			return 0;
@@ -220,7 +221,7 @@ void TextTransport::aborted()
 {
 	setState(idle);
 	
-	socket.close();
+	m_socket.close();
 }
 
 void TextTransport::fatal(char* error)
@@ -232,18 +233,18 @@ int TextTransport::doListen()
 {
     while(1)
     {
-   		timeout = socket.listen(remote, timeout);
-    	if (timeout == 0)
+   		m_timeout = m_socket.listen(m_remote, m_timeout);
+    	if (m_timeout == 0)
     	{
     		setState(idle);
-    		socket.close();
+    		m_socket.close();
     		return 0;
     	}
         break;
 	}
-	socket.setLingerTimeout(2);
-	socket.setNoDelay(1);
-	socket.setKeepAlive(1);
+	m_socket.setLingerTimeout(2);
+	m_socket.setNoDelay(1);
+	m_socket.setKeepAlive(1);
 
 	setState(connecting);
 
@@ -252,17 +253,17 @@ int TextTransport::doListen()
 
 int TextTransport::doConnect()
 {
-	timeout = socket.connect(remote, timeout);
-	if (timeout == 0)
+	m_timeout = m_socket.connect(m_remote, m_timeout);
+	if (m_timeout == 0)
 	{
 		setState(idle);
-		socket.close();
+		m_socket.close();
 		return 0;
 	}
 
-	socket.setLingerTimeout(2);
-	socket.setNoDelay(1);
-	socket.setKeepAlive(1);
+	m_socket.setLingerTimeout(2);
+	m_socket.setNoDelay(1);
+	m_socket.setKeepAlive(1);
 
 	setState(connected);
     return 1;

@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.5 2001/09/24 10:53:48 lars Exp $
+$Id: client.py,v 1.6 2001/09/25 09:01:45 lars Exp $
 """
 import socket,re,sys,time,getopt,string
 
@@ -69,10 +69,9 @@ class Interface:
 		was just performed and additional data.
 		"""
 
-		# check if unsolicited event
-
 		tr = string.split(line, ' ')
 		print tr
+		# check if unsolicited event
 		if tr[0] == '-1':
 			if len(tr) < 3:
 				print "parse error:", line
@@ -132,6 +131,7 @@ class Call:
 		interface.send(self, self.device + ' accept')
 
 	def accept_done(self, event, data):
+		print 'connected:', self.device
 		interface.send(self, self.device + ' add 2 1 play sitrtoot.al none')
 
 	def molecule_done(self, event, data):

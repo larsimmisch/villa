@@ -48,14 +48,22 @@ public:
 
 	virtual void fatal(char* error);
 
-	states getState()	{ return state; }
-	int isConnected()	{ return state == connected; }
-	int isDisconnecting()	{ return state == disconnecting; }
-	int isIdle()		{ return state == idle; }
-	void* getPrivateData()			{ return privateData; }
+	states getState()	{ return m_state; }
+	int isConnected()	{ return m_state == connected; }
+	int isDisconnecting()	{ return m_state == disconnecting; }
+	int isIdle()		{ return m_state == idle; }
+	void* getPrivateData()			{ return m_privateData; }
 
-    SAP& getLocalSAP()  { return local; }
-    SAP& getRemoteSAP() { return remote; }
+    SAP& getLocalSAP()  { return m_local; }
+    SAP& getRemoteSAP() { return m_remote; }
+
+	// lock the mutex. unlocking is done via the io manipulator end()
+	TextTransport &begin()
+	{
+		lock();
+
+		return *this;
+	}
 
 	// streambuf protocol
 
@@ -115,6 +123,9 @@ public:
 		return m;
 	}
 
+	virtual void lock() {}
+	virtual void unlock() {}
+
 protected:
 	
 	// helper methods
@@ -129,14 +140,14 @@ protected:
 	virtual int doListen();
 	virtual int doConnect();
 	
-	virtual void setState(states aState) { state = aState; }
+	virtual void setState(states aState) { m_state = aState; }
 
-	volatile states state;
-	SAP local;
-	SAP remote;
-	volatile unsigned timeout;
-	void* privateData;
-	Socket socket;
+	volatile states m_state;
+	SAP m_local;
+	SAP m_remote;
+	volatile unsigned m_timeout;
+	void* m_privateData;
+	Socket m_socket;
 	std::vector<char> m_pbuf;
 	char *m_gbuf;
 	int m_gpos;
@@ -144,6 +155,34 @@ protected:
 	int m_gmax;
 };
 
-void endl(TextTransport& t);
+struct textmanip
+{
+	textmanip(std::ostream& (*f)(std::ostream&)) 
+		: function(f) {}
+
+	std::ostream& (*function)(std::ostream&);
+};
+
+inline std::ostream& operator<<(std::ostream& os, textmanip& l)
+{
+	return l.function(os);
+}
+
+// helper
+inline std::ostream& text_end(std::ostream& s)
+{
+	s << "\r\n";
+
+	TextTransport &t = dynamic_cast<TextTransport&>(s);
+
+	t.unlock();
+
+	return s;
+}
+
+inline textmanip end()
+{
+	return textmanip(text_end);
+}
 
 #endif /* _TEXT_H_ */

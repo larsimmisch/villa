@@ -67,7 +67,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 	{
 		server->clear();
 
-		server->syntax_error(id) << "expecting mode and priority\r\n"; 
+		server->syntax_error(id) << "expecting mode and priority" << end(); 
 
 		return _syntax_error;
 	}
@@ -158,12 +158,20 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 			log(log_error, "sequencer") << "Exception in addMolecule: " << e << logend();
 			atom = 0;
 
+			m_interface->begin() << id << ' ' << _failed << ' ' 
+				<< m_trunk->getName() << " molecule-done " 
+				<< 0 << ' ' << molecule->getLength() << end();
+
 			return _failed;
 		}
 		catch (const Exception& e)
 		{
 			log(log_error, "sequencer") << e << logend();
 			atom = 0;
+
+			m_interface->begin() << id << ' ' << _failed << ' ' 
+				<< m_trunk->getName() << " molecule-done " 
+				<< 0 << ' ' << molecule->getLength() << end();
 
 			return _failed;
 		}
@@ -197,7 +205,7 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 
 	if (!server->good())
 	{
-		server->syntax_error(id) << "expecting <molecule id>\r\n";
+		server->syntax_error(id) << "expecting <molecule id>" << end();
 		return _syntax_error;
 	}
 
@@ -208,8 +216,8 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 		log(log_error, "sequencer") << "discard molecule: (" << mid.c_str() 
 			<< ") not found" << logend();
 
-		(*server) << id.c_str() << ' ' << _invalid << " invalid molecule "
-			<< mid.c_str() << "\r\n";
+		server->begin() << id.c_str() << ' ' << _invalid << " invalid molecule "
+			<< mid.c_str() << end();
 
 		return _invalid;
 	}
@@ -226,8 +234,8 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 	{
 		activity.remove(molecule);
 
-		(*server) << id.c_str() << ' ' << _ok << " molecule " << m_id.c_str()
-			<< " removed\r\n";
+		server->begin() << id.c_str() << ' ' << _ok << " molecule " << m_id.c_str()
+			<< " removed" << end();
 	}
 
 	return _ok;
@@ -246,7 +254,7 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 
 	if (!server->good())
 	{
-		server->syntax_error(id) << "expecting <fromPriority> <toPriority> <immediately>\r\n";
+		server->syntax_error(id) << "expecting <fromPriority> <toPriority> <immediately>" << end();
 		return _syntax_error;
 	}
 
@@ -286,8 +294,8 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 
 	if (discarded)
 	{
-		(*server) << id.c_str() << ' ' << _ok << " removed molecules with priorities from " 
-			<< fromPriority << " to " << toPriority << "\r\n";
+		server->begin() << id.c_str() << ' ' << _ok << " removed molecules with priorities from " 
+			<< fromPriority << " to " << toPriority << end();
 	}
 
 	return _ok;
@@ -295,8 +303,8 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 
 void Sequencer::sendAtomDone(const char *id, unsigned nAtom, unsigned status, unsigned msecs)
 {
-	(*m_interface) << id << ' ' << _event << " atom-done " 
-		<< nAtom << ' ' << status << ' ' << msecs << "\r\n";
+	m_interface->begin() << id << ' ' << _event << " atom-done " 
+		<< nAtom << ' ' << status << ' ' << msecs << end();
 }
 
 void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned length)
@@ -306,8 +314,8 @@ void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, 
 		<< pos << " length: " << length << logend();
 
 
-	(*m_interface) << id << ' ' << status << ' ' << m_trunk->getName()
-		<< " molecule-done " << pos << ' ' << length << "\r\n";
+	m_interface->begin() << id << ' ' << status << ' ' << m_trunk->getName()
+		<< " molecule-done " << pos << ' ' << length << end();
 }
 
 int Sequencer::connect(ConnectCompletion* complete)
@@ -340,8 +348,8 @@ int Sequencer::accept(InterfaceConnection *server, const std::string &id)
 {
 	if (m_id.size())
 	{
- 		(*server) << _protocol_violation << ' ' << id.c_str() 
-			<< " protocol violation\r\n";
+ 		server->begin() << _protocol_violation << ' ' << id.c_str() 
+			<< " protocol violation" << end();
 
 		return _protocol_violation;
 	}
@@ -358,8 +366,8 @@ int Sequencer::reject(InterfaceConnection *server, const std::string &id)
 {
 	if (m_id.size())
 	{
- 		(*server) << _protocol_violation << ' ' << id.c_str() 
-			<< " protocol violation\r\n";
+ 		server->begin() << _protocol_violation << ' ' << id.c_str() 
+			<< " protocol violation" << end();
 
 		return _protocol_violation;
 	}
@@ -431,8 +439,8 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 
 	if (m_id.size())
 	{
- 		(*server) << _protocol_violation << ' ' << id.c_str() 
-			<< " protocol violation\r\n";
+ 		server->begin() << _protocol_violation << ' ' << id.c_str() 
+			<< " protocol violation" << end();
 
 		return _protocol_violation;
 	}
@@ -486,13 +494,13 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 		m_interface = clientSpec->m_interface;
 		m_interface->add(m_trunk->getName(), this);
 
-		(*m_interface) << clientSpec->m_id.c_str() << ' ' << _ok 
+		m_interface->begin() << clientSpec->m_id.c_str() << ' ' << _ok 
 			<< ' ' << m_trunk->getName()
 			<< " listen-done "
 			<< " \"" << remote.getAddress() << "\" \""
 			<< configuration->getNumber() << "\" \""
 			<< local.getService() << "\" "
-			<< server->getTimeslot().ts << "\r\n";
+			<< server->getTimeslot().ts << end();
 
 		unlock();
 	}
@@ -549,7 +557,7 @@ void Sequencer::connectRequestFailed(Trunk* server, int cause)
 
 		// todo better info
 		(*connectComplete->m_interface) << connectComplete->m_id.c_str() 
-			<< ' ' << _failed << "\r\n";
+			<< ' ' << _failed << end();
 
 	}
 	else
@@ -645,14 +653,14 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 
 		if (activity.getState() == Activity::idle)
 		{
-			(*m_interface) << _event << ' ' << m_trunk->getName() 
-				<< " disconnect\r\n";
+			m_interface->begin() << _event << ' ' << m_trunk->getName() 
+				<< " disconnect" << end();
 		}
 	}
 	else
 	{
-		(*m_interface) << _event << ' ' << m_trunk->getName() 
-			<< " disconnect\r\n";
+		m_interface->begin() << _event << ' ' << m_trunk->getName() 
+			<< " disconnect" << end();
 	}
 
 	unlock();
@@ -665,13 +673,13 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 
 	if (m_id.size())
 	{
-		(*m_interface) << m_id.c_str() << ' ' << result << ' '
-			<< m_trunk->getName() << " disconnect-done\r\n";
+		m_interface->begin() << m_id.c_str() << ' ' << result << ' '
+			<< m_trunk->getName() << " disconnect-done" << end();
 	}
 	else if (m_interface)
 	{
-		(*m_interface) << _event << ' '
-			<< m_trunk->getName() << " disconnect\r\n";
+		m_interface->begin() << _event << ' '
+			<< m_trunk->getName() << " disconnect" << end();
 	}
 
 	m_id.erase();
@@ -689,8 +697,8 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 
 	m_media->connected(server);
 
-	(*m_interface) << m_id.c_str() << ' ' << result
-		<< " " << m_trunk->getName() << " accept-done\r\n";
+	m_interface->begin() << m_id.c_str() << ' ' << result
+		<< " " << m_trunk->getName() << " accept-done" << end();
 
 	m_id.erase();
 }
@@ -725,8 +733,8 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 		log(log_debug, "sequencer", server->getName()) 
 			<< "call rejected" << logend();
 
-		(*m_interface) << m_id.c_str() << ' ' << result << server->getName() 
-			<< " reject-done\r\n";
+		m_interface->begin() << m_id.c_str() << ' ' << result << server->getName() 
+			<< " reject-done" << end();
 
 		m_id.erase();
 
@@ -772,8 +780,8 @@ void Sequencer::started(Media *server, Sample *aSample)
 			<< m->currentAtom() << logend();
 
 		
-		(*m_interface) << m->getId() << ' ' << _event << " atom-started "
-			<< m->currentAtom() << "\r\n";
+		m_interface->begin() << m->getId() << ' ' << _event << " atom-started "
+			<< m->currentAtom() << end();
 	}
 }
 
@@ -849,8 +857,8 @@ void Sequencer::touchtone(Media* server, char tt)
 	log(log_debug, "sequencer", server->getName())
 		<< "touchtone: " << tt << logend();
 
-	(*m_interface) << _event << ' ' << server->getName() 
-		<< " touchtone " << tt << "\r\n";
+	m_interface->begin() << _event << ' ' << server->getName() 
+		<< " touchtone " << tt << end();
 }
 
 void Sequencer::fatal(Media* server, const char* e)
@@ -911,9 +919,9 @@ void Sequencer::data(InterfaceConnection* server, const std::string &id)
 		transfer(server, id);
 	else
 	{
-		(*server) << id.c_str() << ' ' << _failed 
+		server->begin() << id.c_str() << ' ' << _failed 
 			<< " syntax error - unknown command " << command.c_str()
-			<< "\r\n";
+			<< end();
 	}
 
 	server->clear();

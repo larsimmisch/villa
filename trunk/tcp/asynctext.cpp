@@ -8,7 +8,7 @@
 
 
 AsyncText::AsyncText(TextTransportClient& aClient, void* aPrivateData)
-	: TextTransport(aPrivateData), client(aClient), event(&mutex)
+	: TextTransport(aPrivateData), m_client(aClient), m_event(&m_mutex)
 {
 }
 
@@ -16,9 +16,9 @@ AsyncText::~AsyncText()
 {
 	setState(dying);
 
-	socket.close();
+	m_socket.close();
 
-	event.signal();
+	m_event.signal();
 }
 
 void AsyncText::aborted()
@@ -30,11 +30,11 @@ void AsyncText::aborted()
 
 void AsyncText::setState(states aState)
 {
-	if (TextTransport::state != aState)
+	if (TextTransport::m_state != aState)
 	{
-		mutex.lock();
+		m_mutex.lock();
 		TextTransport::setState(aState);
-		mutex.unlock();
+		m_mutex.unlock();
 	}
 }
 
@@ -54,19 +54,21 @@ void AsyncText::run()
     		switch (getState())
     		{
     		case idle:
-    			event.wait();		
+    			m_event.wait();		
     			break;
     		case listening:
     			result = TextTransport::doListen();
     			if (!result) getClient().connectRequestTimeout(this);
-    			else getClient().connectRequest(this, remote);
+    			else getClient().connectRequest(this, m_remote);
     			break;
     		case calling:
     			result = TextTransport::doConnect();
     			if (result == 0)
     			{
-    				if (timeout == 0)	getClient().connectTimeout(this);
-    				else	getClient().connectReject(this);
+    				if (m_timeout == 0)	
+						getClient().connectTimeout(this);
+    				else
+						getClient().connectReject(this);
     			}
     			else getClient().connectConfirm(this);
     			break;

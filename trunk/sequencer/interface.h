@@ -43,7 +43,7 @@ public:
 	{
 		clear();
 
-		(*this) << _syntax_error << ' ' << id.c_str() 
+		begin() << id.c_str() << ' ' << _syntax_error
 			<< " syntax error - ";
 
 		return *this;
