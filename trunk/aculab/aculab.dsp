@@ -218,10 +218,6 @@ SOURCE=.\smwavlib.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\include\storage.h
-# End Source File
-# Begin Source File
-
 SOURCE=..\include\switch.h
 # End Source File
 # End Group
