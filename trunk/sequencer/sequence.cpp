@@ -1250,6 +1250,7 @@ int main(int argc, char* argv[])
 	int nmodules = 0;
 	int sw = 0;
 	char szKey[256];
+	char *firmware = 0;
 
 	ULONG rc;
 	WSADATA wsa;
@@ -1262,7 +1263,7 @@ int main(int argc, char* argv[])
 	/*
 	 * commandline parsing
 	 */
-	while( (c = getopt(argc, argv, "d:l:")) != EOF) {
+	while( (c = getopt(argc, argv, "d:l:f:")) != EOF) {
 		switch(c) 
 		{
 		case 'd':
@@ -1272,6 +1273,9 @@ int main(int argc, char* argv[])
 		case 'l':
 			std::cout << "logging to: " << optarg << std::endl;
 			// todo
+			break;
+		case 'f':
+			firmware = optarg;
 			break;
 		case '?':
 			usage();
@@ -1386,6 +1390,29 @@ int main(int argc, char* argv[])
 		nmodules = sm_get_modules();
 		log(log_debug, "sequencer") 
 			 << nmodules << " prosody modules found" << logend();
+
+		if (firmware)
+		{
+			for (int i = 0; i < nmodules; ++i)
+			{
+				SM_DOWNLOAD_PARMS dnld;
+
+				dnld.module = i;
+				dnld.id = i + 1;
+				dnld.filename = firmware;
+				
+				rc = sm_download_fmw(&dnld);
+				if (rc)
+				{
+					throw ProsodyError(__FILE__, __LINE__, "sm_download_firmware()", rc);
+				}
+
+				log(log_debug, "sequencer") 
+					 << "prosody module " << i << " downloaded ["
+					 << firmware << ']' << logend();
+
+			}
+		}
 
 		try
 		{
