@@ -660,7 +660,8 @@ unsigned Sequencer::disconnect(int cause)
         if (m_media)
 		    m_media->disconnected(m_trunk);
 
-		rc = m_trunk->disconnect(m_callref, cause);
+        if (m_trunk)
+		    rc = m_trunk->disconnect(m_callref, cause);
 	}
 
 	return rc;
@@ -1158,9 +1159,6 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	// various disconnect/close conditions continued
 
-	if (m_media)
-		m_media->disconnected(m_trunk);
-
 	if (m_trunk)
 	{
 		// active DISC
@@ -1169,6 +1167,9 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 			log(log_debug, "sequencer", getName()) << "disconnect - all channels idle" 
 				<< logend();
 
+        	if (m_media)
+		        m_media->disconnected(m_trunk);
+
 			m_trunk->disconnect(m_disconnecting);
 		}
 	}
@@ -1176,6 +1177,9 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	if (m_closing)
 	{
 		log(log_debug, "sequencer", getName()) << "close - all channels idle" << logend();
+
+       	if (m_media)
+    		m_media->disconnected(m_trunk);
 
 		if (m_interface)
 		{
