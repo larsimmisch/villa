@@ -639,18 +639,6 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	
 	omni_mutex_lock lock(m_mutex);
 
-	// notify client unless we are disconnecting already and not active
-	if (!m_disconnecting && m_activity.getState() == Activity::idle)
-	{
-		if (m_interface)
-		{
-			m_interface->begin() << PHONE_EVENT << " RDIS " << m_trunk->getName() 
-				<< end();
-		}
-
-		return;
-	}
-
 	// if we are active, stop
 	if (m_activity.getState() == Activity::active)
 	{
@@ -662,14 +650,12 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 
 	checkCompleted();
 
-	// if the stop was synchronous, notify client
-	if (m_activity.getState() == Activity::idle && m_interface)
+	// notify client unless already disconnecting or still stopping
+	if (m_interface && !m_disconnecting && m_activity.getState() == Activity::idle)
 	{
 		m_interface->begin() << PHONE_EVENT << " RDIS " << m_trunk->getName() 
 			<< end();
 	}
-
-	unlock();
 }
 
 void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
@@ -868,6 +854,11 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	if (m_trunk->remoteDisconnect())
 	{
 		sendMoleculeDone(id.c_str(), PHONE_ERROR_DISCONNECTED, pos, length);
+		if (m_interface)
+		{
+			m_interface->begin() << PHONE_EVENT << " RDIS " << m_trunk->getName() 
+				<< end();
+		}
 
 		return;
 	}
@@ -884,7 +875,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 void Sequencer::touchtone(Media* server, char tt)
 {
 	log(log_debug, "sequencer", server->getName())
-		<< "touchtone: " << tt << logend();
+		<< "DTMF: " << tt << logend();
 
 	if (m_interface)
 	{
