@@ -1143,6 +1143,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 				<< getName() << end();
 		}
 
+		m_id.erase();
 		release();
 
 		delete this;
