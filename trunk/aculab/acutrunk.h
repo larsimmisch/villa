@@ -1,9 +1,9 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.2 2000/10/18 16:58:43 lars Exp $
+	$Id: acutrunk.h,v 1.3 2001/05/20 20:02:44 lars Exp $
 
-	Copyright 2000 ibp (uk) Ltd.
+	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */

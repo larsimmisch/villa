@@ -1,9 +1,9 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.4 2001/01/11 13:06:48 lars Exp $
+	$Id: acuphone.cpp,v 1.5 2001/05/20 20:02:44 lars Exp $
 
-	Copyright 2000 ibp (uk) Ltd.
+	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */

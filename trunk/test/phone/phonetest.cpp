@@ -1,9 +1,9 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.5 2001/01/14 16:22:41 lars Exp $
+	$Id: phonetest.cpp,v 1.6 2001/05/20 20:02:44 lars Exp $
 
-	Copyright 2000 ibp (uk) Ltd.
+	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */

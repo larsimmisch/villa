@@ -1,9 +1,9 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.6 2001/05/19 18:12:38 lars Exp $
+	$Id: phone.h,v 1.7 2001/05/20 20:02:44 lars Exp $
 
-	Copyright 2000 ibp (uk) Ltd.
+	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */

@@ -1,5 +1,5 @@
 /*
-	Copyright 1995 Immisch, Becker & Partner, Hamburg
+	Copyright 1995-2001 Lars Immisch
 
 	created: Thu Nov 16 15:40:24 GMT+0100 1995
 

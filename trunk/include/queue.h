@@ -1,7 +1,7 @@
 /*
 	Queue.h
 	
-	Copyright 1995 Immisch, Becker & Partner, Hamburg
+	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */

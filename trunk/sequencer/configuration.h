@@ -1,5 +1,5 @@
 /*
-	Copyright 1995 Immisch, Becker & Partner, Hamburg
+	Copyright 1995-2001 Lars Immisch
 
 	created: Tue Nov 12 17:02:03 GMT+0100 1996
 
@@ -9,7 +9,7 @@
 #ifndef _CONFIGURATION_H_
 #define _CONFIGURATION_H_
 
-#include <omnithread.h>
+#include "omnithread.h"
 #include "exc.h"
 #include "list.h"
 #include "set.h"

@@ -1,9 +1,9 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.3 2000/11/06 13:10:59 lars Exp $
+	$Id: acuphone.h,v 1.4 2001/05/20 20:02:44 lars Exp $
 
-	Copyright 2000 ibp (uk) Ltd.
+	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */

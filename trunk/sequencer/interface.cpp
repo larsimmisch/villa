@@ -1,5 +1,5 @@
 /*
-	Copyright 2001 Lars Immisch
+	Copyright 1995-2001 Lars Immisch
 
 	created: Mon Nov 18 17:09:12 GMT+0100 1996
 

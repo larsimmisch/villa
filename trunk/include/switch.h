@@ -1,9 +1,9 @@
 /*
 	switch.h
 
-	Copyright 1995-2000 ibp (uk) Ltd.
+	Copyright 1995-2001 Lars Immisch
 
-	$Id: switch.h,v 1.2 2000/10/18 16:58:43 lars Exp $
+	$Id: switch.h,v 1.3 2001/05/20 20:02:44 lars Exp $
 
 	Author: Lars Immisch <lars@ibp.de>
 */

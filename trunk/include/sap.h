@@ -1,9 +1,9 @@
 /*
  	SAP.h
 
-	$Id: sap.h,v 1.1 2000/10/02 15:52:14 lars Exp $
+	$Id: sap.h,v 1.2 2001/05/20 20:02:44 lars Exp $
 
-	Copyright 2000 ibp (uk) Ltd.
+	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */

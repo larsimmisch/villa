@@ -1,13 +1,13 @@
 /*
     packet.h
 
-	$Id: packet.h,v 1.4 2001/05/19 18:12:38 lars Exp $
+	$Id: packet.h,v 1.5 2001/05/20 20:02:44 lars Exp $
 
 	Caution! 
 	
 	Assumes sizeof(int) == sizeof(void*).
 
-	Copyright 1995, 1996 Immisch, Becker & Partner, Hamburg
+	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */
