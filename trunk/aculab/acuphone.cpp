@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.10 2001/06/23 09:55:20 lars Exp $
+	$Id: acuphone.cpp,v 1.11 2001/06/28 07:27:58 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -248,15 +248,18 @@ unsigned ProsodyChannel::Beep::start(Telephone *phone)
 
 	omni_mutex_lock(prosody->mutex);
 
+	prosody->current = this;
+
 	int rc = sm_replay_start(&start);
 	if (rc)
+	{
+		prosody->current = 0;
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
+	}
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "beep " << beeps << " started" << logend();
 	
-	prosody->current = this;
-
 	process(phone);
 
 	return position;
@@ -378,14 +381,17 @@ unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
 
 	omni_mutex_lock(prosody->mutex);
 
+	prosody->current = this;
+
 	int rc = sm_play_digits(&digits);
 	if (rc)
+	{
+		prosody->current = 0;
 		throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
+	}
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "touchtones " << tt.c_str() << " started" << logend();
-
-	prosody->current = this;
 
 	// time played
 	return 0;
@@ -510,11 +516,14 @@ unsigned ProsodyChannel::FileSample::start(Telephone *phone)
 
 	omni_mutex_lock(prosody->mutex);
 
+	prosody->current = this;
+
 	int rc = sm_replay_start(&start);
 	if (rc)
+	{
+		prosody->current = 0;
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
-
-	prosody->current = this;
+	}
 
 	process(phone);
 
@@ -585,6 +594,7 @@ int ProsodyChannel::FileSample::process(Telephone *phone)
 			log(log_debug, "phone", phone->getName()) 
 				<< "file sample " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
 
+			p->current = 0;
 			p->mutex.unlock();
 			phone->completed(this);
 			p->mutex.lock();
@@ -620,11 +630,14 @@ unsigned ProsodyChannel::RecordFileSample::start(Telephone *phone)
 
 	omni_mutex_lock(prosody->mutex);
 
+	prosody->current = this;
+
 	int rc = sm_record_start(&record);
 	if (rc)
+	{
+		prosody->current = 0;
 		throw ProsodyError(__FILE__, __LINE__, "sm_record_start", rc);
-
-	prosody->current = this;
+	}
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "recording " << name.c_str() << " started" << logend();
