@@ -5,13 +5,9 @@
 
 	Author: Lars Immisch <lars@ibp.de>
 */
+#pragma warning (disable: 4786)
 
-#ifdef _WIN32
 #include <windows.h>
-#else
-#define INCL_BASE
-#include <os2.h>
-#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -43,12 +39,9 @@ Timer Sequencer::timer;
 #pragma warning(disable : 4355)
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
-  :	tcp(*this), activity(this),
-	mutex(), configuration(aConfiguration), connectComplete(0),
+  :	activity(this), configuration(aConfiguration), connectComplete(0),
 	clientSpec(0), outOfService(0)
 {
-	packet = new(buffer) Packet(0, sizeof(buffer));
-
 	Timeslot receive(24, SCBus.lowest_bit());
 	SCBus.set_bit(receive.ts, false);
 
@@ -65,6 +58,8 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
 
 int Sequencer::addMolecule(Packet* aPacket)
 {
+/* Todo:
+
 	int result;
 	unsigned pos = 0;
 	unsigned syncMinor = aPacket->getSyncMinor();
@@ -98,6 +93,7 @@ int Sequencer::addMolecule(Packet* aPacket)
 	tcp.send(*packet);
 
 	return _ok;
+*/
 }
 
 int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
@@ -136,7 +132,7 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 				{
 					log(log_error, "sequencer") 
 						<< "invalid packet contents for addMolecule(atom_play_sample)." 
-						<< endl << *aPacket << logend();
+						<< std::endl << *aPacket << logend();
 					
 					return _invalid;
 				}
@@ -153,7 +149,7 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 				{
 					log(log_error, "sequencer") 
 						<< "invalid packet contents for addMolecule(atom_record_sample)." 
-						<< endl << *aPacket << logend();
+						<< std::endl << *aPacket << logend();
 					
 					return _invalid;
 				}
@@ -171,7 +167,7 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 				{
 					log(log_error, "sequencer")
 						<< "invalid packet contents for addMolecule(atom_beep)." 
-						<< endl << *aPacket << logend();
+						<< std::endl << *aPacket << logend();
 
 					return _invalid;
 				}
@@ -186,7 +182,7 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 				{
 					log(log_error, "sequencer") 
 						<< "invalid packet contents for addMolecule(atom_conference)." 
-						<< endl << *aPacket << logend();
+						<< std::endl << *aPacket << logend();
 
 					return _invalid;
 				}
@@ -201,7 +197,7 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 				{
 					log(log_error, "sequencer") 
 						<< "invalid packet contents for addMolecule(atom_touchtone)." 
-						<< endl << *aPacket << logend();
+						<< std::endl << *aPacket << logend();
 
 					return _invalid;
 				}
@@ -216,7 +212,7 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 				{
 					log(log_error, "sequencer")
 						<< "invalid packet contents for addMolecule(atom_silence)." 
-						<< endl << *aPacket << logend();
+						<< std::endl << *aPacket << logend();
 
 					return _invalid;
 				}
@@ -251,7 +247,7 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 	if (aMolecule->getSize() == 0)
 	{
 		log(log_warning, "sequencer") << "Molecule is empty. will not be added." 
-			<< endl << *aPacket << logend();
+			<< std::endl << *aPacket << logend();
 
 		return _empty;
 	}
@@ -266,6 +262,8 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 
 int Sequencer::discardMolecule(Packet* aPacket)
 {
+/* Todo
+
 	omni_mutex_lock lock(mutex);
 
 	unsigned syncMajor = aPacket->getSyncMajor();
@@ -301,11 +299,14 @@ int Sequencer::discardMolecule(Packet* aPacket)
 		tcp.send(*packet);
 	}
 
+*/
 	return _ok;
 }
 
 int Sequencer::discardByPriority(Packet* aPacket)
 {
+/* Todo
+
 	unsigned syncMajor = aPacket->getSyncMajor();
 
 	Molecule* molecule;
@@ -359,12 +360,14 @@ int Sequencer::discardByPriority(Packet* aPacket)
 		tcp.send(*packet);
 	}
 
+*/
 	return _ok;
 }
 
-
 void Sequencer::sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status, unsigned msecs)
 {
+/* Todo
+
 	lock();
 	packet->clear(3);
 	packet->setSync(0, syncMinor);
@@ -375,6 +378,8 @@ void Sequencer::sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status
  
 	tcp.send(*packet);
 	unlock();
+
+*/
 }
 
 void Sequencer::sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned pos, unsigned length)
@@ -382,6 +387,8 @@ void Sequencer::sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned p
 	log(log_debug + 2, "sequencer")
 		<< "send molecule done for: 0." << syncMinor << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
+
+/* Todo
 
 	lock();
 	packet->clear(3);
@@ -393,15 +400,8 @@ void Sequencer::sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned p
  
 	tcp.send(*packet);
 	unlock();
-}
 
-int Sequencer::listen(Packet* aPacket)
-{
-	log(log_debug, "sequencer") << "listening" << logend();
-
-	phone->listen();
-
-	return _ok;
+*/
 }
 
 int Sequencer::accept(Packet* aPacket)
@@ -422,46 +422,10 @@ int Sequencer::reject(Packet* aPacket)
 	return _ok;
 }
 
-int Sequencer::connect(Packet* aPacket)
-{
-	SAP remote;
-	unsigned timeout;
-
-	if (aPacket->typeAt(0) != Packet::type_string
-	||	aPacket->typeAt(1) != Packet::type_string
-	||	aPacket->typeAt(2) != Packet::type_string
-	||	aPacket->typeAt(3) != Packet::type_unsigned)
-	{
-		lock();
-		packet->clear(1);
-		packet->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
-		packet->setContent(phone_connect_done);
-		packet->setUnsignedAt(0, _invalid);
-
-		tcp.send(*packet);
-		unlock();
-
-		return _invalid;
-	}
-
-	remote.setAddress(aPacket->getStringAt(0));
-	remote.setService(aPacket->getStringAt(1));
-	remote.setSelector(aPacket->getStringAt(2));	
-	timeout = aPacket->getUnsignedAt(3);
-
-	// todo: check usage
-	SAP local;
-
-	phone->connect(local, remote, timeout);
-
-	log(log_debug, "sequencer") << "connecting to: " << remote << " timeout: " 
-		<< timeout << logend();
-
-	return _ok;
-}
-
 int Sequencer::transfer(Packet* aPacket)
 {
+/* Todo
+
 	SAP remote;
 	unsigned timeout = indefinite;
 
@@ -498,12 +462,14 @@ int Sequencer::transfer(Packet* aPacket)
 	unlock();
 
 	phone->transfer(remote, timeout);
-
+*/
 	return _ok;
 }
 
 int Sequencer::disconnect(Packet* aPacket)
 {
+/* Todo
+
 	log(log_debug, "sequencer") << "disconnecting" << logend();
 
 	if (!phone->isConnected() || aPacket->typeAt(0) != Packet::type_unsigned)
@@ -537,12 +503,14 @@ int Sequencer::disconnect(Packet* aPacket)
 	checkCompleted();
 
 	tcp.disconnect();
-
+*/
 	return _ok;
 }
 
 int Sequencer::abort(Packet* aPacket)
 {
+/* Todo
+
 	lock();
 
 #ifdef __RECOGNIZER__
@@ -559,129 +527,9 @@ int Sequencer::abort(Packet* aPacket)
 	checkCompleted();
 
 	phone->abort();
-
+*/
 	return _ok;
 }
-
-int Sequencer::startRecognition(Packet* aPacket)
-{
-#ifdef __RECOGNIZER__
-	if (recognizer)
-	{
-		int type = aPacket->getUnsignedAt(0);
-		int vocabulary = aPacket->getUnsignedAt(1);
-		recognizer->setVocabulary(vocabulary);
-		type == recognizer_isolated ? recognizer->startIsolated() : recognizer->startContiguous();
-
-		log(log_debug, "sequencer") << "recognition started. mask " << vocabulary << logend();
-	}
-	else
-	{
-		log(log_warning, "sequencer") << "tried to start nonexistent recognizer" 
-			<< logend();
-	}
-
-	return _ok;
-
-#else
-
-	log(log_warning, "sequencer") << "tried to start nonexistent recognizer" 
-		<< logend();
-
-	return _failed;
-
-#endif
-}
-
-int Sequencer::stopRecognition(Packet* aPacket)
-{
-#ifdef __RECOGNIZER__
-	if (recognizer)
-	{
-		recognizer->stop();
-
-		log(log_debug, "sequencer") << "recognition stopped." << logend();
-	}
-	else 
-	{
-		log(log_warning, "sequencer") << "tried to stop nonexistent recognizer" 
-			<< logend();
-	}
-
-	return _ok;
-#else
-
-	log(log_warning, "sequencer") << "tried to stop nonexistent recognizer" 
-		<< logend();
-
-	return _failed;
-
-#endif
-}
-
-int Sequencer::connect(ConnectCompletion* complete)
-{
-	lock();
-
-	if (connectComplete || tcp.getState() != Transport::idle
-	 || phone->getState() != Trunk::listening)
-	{
-		log(log_warning, "sequencer") << "connect failed due to invalid state (phone: " 
-			<< (int)phone->getState() << " tcp: " << (int)tcp.getState() << logend();
-
-		unlock();
-
-		return _busy;
-	}
-	else if (outOfService)
-	{
-		log(log_warning, "sequencer") << "connect failed: out of service" << logend();
-
-		unlock();
-
-		return _out_of_service;
-	}
-
-	connectComplete = complete;
-
-	unlock();
-
-	// tcp connect happens in connectRequestFailed of TelephoneClient
-
-	phone->abort();
-
-	return _ok;
-}
-
-#ifdef __RECOGNIZER__
-
-// Protocol of RecognizerClient
-
-void Sequencer::speechStarted(Recognizer* server)
-{	
-	log(log_debug, "sequencer") << "speech started." << logend();
-}
-
-void Sequencer::recognized(Recognizer* server, Recognizer::Result& result)
-{
-	for (int i = 0; i < result.getWordCount(); i++)
-	{
-		log(log_debug, "sequencer") << "recognized: " << result[i] << endl;
-	}
-	log(log_debug, "sequencer") << "probability: " << result.probability() << logend();
-
-	lock();
-
-	packet->clear(result.getWordCount());
-	packet->setContent(phone_recognition);
-
-	for (int i = 0; i < result.getWordCount(); ++i) 
-		packet->setStringAt(i, result[i]);
-
-	tcp.send(*packet);
-	unlock();
-}
-#endif
 
 void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 {
@@ -692,7 +540,7 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 	if (clientSpec)
 	{
 		log(log_debug, "sequencer") << "found client matching: " << local 
-			<< " remote: " << clientSpec->client << logend();
+			<< " id: " << clientSpec->m_id << logend();
 	}
 	else
 	{
@@ -707,24 +555,24 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 			if (clientSpec)
 			{
 				log(log_debug, "sequencer") << "found client in global queue, remote: " 
-					<< clientSpec->client << logend();
+					<< clientSpec->m_id << logend();
 			}
 		}
 	}
 	if (clientSpec)
 	{
 		lock();
-		packet->clear(6);
 
-		packet->setContent(phone_connect_request);
-		packet->setUnsignedAt(0, _ok);
-		packet->setStringAt(1, remote.getAddress());
-		packet->setStringAt(2, configuration->getNumber());  
-		packet->setStringAt(3, local.getService());  
-		packet->setStringAt(4, local.getSelector());
-		packet->setUnsignedAt(5, server->getTimeslot().ts);
- 
-		tcp.connect(clientSpec->client, 2000, packet);
+		m_interface = clientSpec->m_interface;
+		m_interface->add(phone->getName(), this);
+
+		(*m_interface) << clientSpec->m_id.c_str() << ' ' << _ok 
+			<< " connect-request "
+			<< phone->getName() << ' ' << remote.getAddress() << ' '
+			<< configuration->getNumber() << ' '
+			<< local.getService() << ' '
+			<< server->getTimeslot().ts << "\r\n";
+
 		unlock();
 	}
 	else 
@@ -771,10 +619,14 @@ void Sequencer::connectRequestFailed(Trunk* server, int cause)
 {
 	if (cause == _aborted && connectComplete)
 	{
-		log(log_debug, "sequencer") << "connecting to " << connectComplete->getClient() 
+		log(log_debug, "sequencer") << "connecting to " 
+			<< connectComplete->m_id.c_str() 
 			<< " for dialout" << logend();
 
-		tcp.connect(connectComplete->getClient(), 10000);
+		// todo better info
+		(*connectComplete->m_interface) << connectComplete->m_id.c_str() 
+			<< ' ' << _failed << "\r\n";
+
 	}
 	else
 	{
@@ -789,18 +641,21 @@ void Sequencer::connectDone(Trunk* server, int result)
 {
 	log(log_debug, "sequencer") << "telephone connect done: " << result << logend();
 
-	lock();
-	packet->clear(2);
+	// good. we got through
 
-	packet->setContent(phone_connect_done);
-	packet->setUnsignedAt(0, result);
- 
-	tcp.disconnect(indefinite, packet);
-	unlock();
-
-	if (result == r_no_dialtone)
+	if (connectComplete)
 	{
-		outOfService = 1;
+		(*connectComplete->m_interface) << connectComplete->m_id.c_str()
+			<< ' ' << result 
+			<< (result == _ok ? " connected\r\n" : " connect failed\r\n");
+
+		delete connectComplete;
+
+		connectComplete = 0;
+	}
+	else
+	{
+		// Todo log error
 	}
 }
 
@@ -808,16 +663,12 @@ void Sequencer::transferDone(Trunk *server)
 {
 	log(log_debug, "sequencer") << "telephone transfer succeeded" << logend();
 
-#ifdef __RECOGNIZER__
-	if (recognizer) 
-		delete recognizer;
-	recognizer = 0;
-#endif
-
 	activity.setASAP();
 	activity.stop();
 
 	checkCompleted();
+
+/* Todo
 
 	lock();
 	packet->clear(1);
@@ -827,25 +678,25 @@ void Sequencer::transferDone(Trunk *server)
  
 	tcp.send(*packet);
 	unlock();
+
+*/
 }
 
 void Sequencer::transferFailed(Trunk *server, int cause)
 {
 	log(log_warning, "sequencer") << "telephone transfer failed: " << cause << logend();
 
+/* Todo
+
 	lock();
 	packet->clear(1);
-
-#ifdef __RECOGNIZER__
-	if (recognizer) recognizer->startContiguous();
-	if (activity)	activity->start();
-#endif
 
 	packet->setContent(phone_transfer_done);
 	packet->setUnsignedAt(0, cause);
  
 	tcp.send(*packet);
 	unlock();
+*/
 }
 
 void Sequencer::disconnectRequest(Trunk *server, int cause)
@@ -856,22 +707,17 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 
 	lock();
 
-#ifdef __RECOGNIZER__
-	if (recognizer) 
-		delete recognizer;
-
-	recognizer = 0;
-#endif
-
 	activity.setASAP();
 	activity.stop();
 
 	checkCompleted();
 
+/* Todo
 	packet->clear(0);
 	packet->setContent(phone_disconnect);
  
 	tcp.disconnect(indefinite, packet);
+*/
 
 	unlock();
 }
@@ -879,6 +725,7 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 void Sequencer::disconnectDone(Trunk *server, unsigned result)
 {
 	// result is always _ok
+/* Todo
 
 	lock();
 	packet->clear(1);
@@ -891,10 +738,12 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 	unlock();
 
 	phone->listen();
+*/
 }
 
 void Sequencer::acceptDone(Trunk *server, unsigned result)
 {
+/* Todo
 	lock();
 	packet->clear(1);
 
@@ -914,17 +763,6 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 	if (result == r_ok)
 	{
 		log(log_debug, "sequencer") << "call accepted" << logend();
-
-#ifdef __RECOGNIZER__
-		try
-		{
-			recognizer = new AsyncRecognizer(*this, phone->getSlot(), ~phone->getSlot(), 1);
-		}	   
-		catch(Exception& e)
-		{
-			log(log_warning, "sequencer") << "no recognizer due to:" << e << logend();
-		}
-#endif
 	}
 	else
 	{
@@ -932,10 +770,13 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 
 		log(log_debug, "sequencer") << "call accept failed" << logend();
 	}
+*/
 }
 
 void Sequencer::rejectDone(Trunk *server, unsigned result)
 {
+/* Todo
+
 	// result is always _ok
 
 	lock();
@@ -944,12 +785,16 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 	{
 		// internal reject. an outgoing call is outstanding
 
-		log(log_debug, "sequencer") << "connecting to " 
-			<< connectComplete->getClient() << " for dialout" << logend();
+		m_interface = connectComplete->m_interface;
 
 		unlock();
 
-		tcp.connect(connectComplete->getClient(), 10000);
+		phone->connect(connectComplete->m_local, connectComplete->m_remote, 
+			connectComplete->m_timeout);
+
+		log(log_debug, "sequencer") << "connecting to: " << connectComplete->m_remote 
+			<< " timeout: " << connectComplete->m_timeout 
+			<< " as: " << connectComplete->m_local << logend();
 	}
 	else
 	{
@@ -970,6 +815,7 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 
 		phone->listen();
 	}
+*/
 }
 
 void Sequencer::details(Trunk *server, const SAP& local, const SAP& remote)
@@ -984,6 +830,8 @@ void Sequencer::remoteRinging(Trunk *server)
 {
 	log(log_debug, "sequencer") << "telephone remote end ringing" << logend();
 
+/* Todo
+
 	lock();
 	packet->clear(1);
 
@@ -992,19 +840,11 @@ void Sequencer::remoteRinging(Trunk *server)
  
 	tcp.send(*packet);
 	unlock();
+*/
 }
 
 void Sequencer::started(Telephone *server, Sample *aSample)
 {
-#ifdef __RECOGNIZER__
-	if (isOutgoing && recognizer)	
-	{
-		log(log_debug, "sequencer") << "ec started" << logend();
-
-		recognizer->playbackStarted();
-	}
-#endif
-
 	Molecule* m = (Molecule*)aSample->getUserData();
 
 	if (m->notifyStart())
@@ -1013,6 +853,8 @@ void Sequencer::started(Telephone *server, Sample *aSample)
 			<< m->getSyncMinor() << ", " 
 			<< m->currentAtom() << logend();
  
+/* Todo
+
 		lock();
 		packet->clear(1);
 		packet->setSync(0, m->getSyncMinor());
@@ -1021,6 +863,8 @@ void Sequencer::started(Telephone *server, Sample *aSample)
  
 		tcp.send(*packet);
 		unlock();
+
+*/
 	}
 }
 
@@ -1062,7 +906,7 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 		{
 			log(log_debug, "sequencer") << "sent atom_done for 0, " 
 				<< ", " << aMolecule->getSyncMinor() 
-				<< ", " << nAtom << endl << *aMolecule << logend();
+				<< ", " << nAtom << std::endl << *aMolecule << logend();
 
 			sendAtomDone(aMolecule->getSyncMinor(), nAtom, status, msecs);
 		}
@@ -1104,6 +948,8 @@ void Sequencer::completed(Telephone* server, Molecule* aMolecule, unsigned msecs
 
 void Sequencer::touchtone(Telephone* server, char tt)
 {
+/* Todo
+
 	char s[2];
 
 	s[0] = tt;
@@ -1117,85 +963,12 @@ void Sequencer::touchtone(Telephone* server, char tt)
 
 	tcp.send(*packet);
 	unlock();
+
+*/
 }
 
-// protocol of Transport Client
 
-void Sequencer::connectRequest(Transport* server, SAP& remote, Packet* initialPacket)
-{
-	// future extension. We won't listen right now
-}
-
-void Sequencer::connectRequestTimeout(Transport* server)
-{
-	// future extension. We won't listen right now
-}
-
-void Sequencer::connectConfirm(Transport* server, Packet* initialReply)
-{
-	// good. we got through
-
-	if (connectComplete)
-	{
-		connectComplete->done(_ok);
-		delete connectComplete;
-
-		connectComplete = 0;
-	}
-}
-
-void Sequencer::connectFailed(Transport* server)
-{
-	if (connectComplete)
-	{
-		// our client wanted us to dial out, we must let him know
-		connectComplete->done(_failed);
-		delete connectComplete;
-
-		connectComplete = 0;
-	}
-	else if (clientSpec)
-	{
-		// re-queue the listen, the other possibility would be to let the 
-		// other side know we did not get through (similar to the connect case)
-
-		log(log_error, "sequencer") << "connect to " << clientSpec->client 
-			<< " failed" << logend();
-
-		configuration->enqueue(clientSpec->details, clientSpec->client, clientSpec->tag);
-			
-		delete clientSpec;
-		clientSpec = 0;
-	}
-	else
-	{
-		log(log_error, "sequencer") 
-			<< "neither client spec nor connect completion - something is _fishy_" 
-			<< logend();
-	}
-
-	phone->abort();
-}
-
-void Sequencer::connectReject(Transport* server, Packet* initialReply)
-{
-	// nasty. Didn't get through to client
-
-	log(log_error, "sequencer") << "connect to client " << server->getRemoteSAP() 
-		<< " rejected" << logend();
-
-	connectFailed(server);
-}
-
-void Sequencer::connectTimeout(Transport* server)
-{
-	// nasty. Didn't get through to client
-
-	log(log_error, "sequencer") << "connect to client " << server->getRemoteSAP() 
-		<< " timed out" << logend();
-
-	connectFailed(server);
-}
+/* Todo
 
 void Sequencer::disconnectRequest(Transport* server, Packet* finalPacket)
 {
@@ -1215,44 +988,11 @@ void Sequencer::disconnectRequest(Transport* server, Packet* finalPacket)
 	tcp.disconnectAccept();
 }
 
-void Sequencer::abort(Transport* server, Packet* finalPacket)
-{
-	lock();
-
-	activity.setASAP();
-	activity.stop();
-
-	unlock();
-
-	if (!phone->isIdle())
-		phone->abort();
-
-	checkCompleted();
-
-	log(log_warning, "sequencer") << "TCP connection aborted." << logend();
-	
-	phone->listen();
-}
-
-void Sequencer::fatal(Transport* server, const char* e)
-{
-	log(log_error, "sequencer") << "fatal TCP exception: " << e << endl 
-		<< "terminating" << logend();
-
-	exit(4);
-}
-
-void Sequencer::fatal(Transport* server, Exception& e)
-{
-	log(log_error, "sequencer") << "fatal Telephone exception: " << e << endl
-		<< "terminating" << logend();
-
-	exit(4);
-}
+*/
 
 void Sequencer::fatal(Telephone* server, const char* e)
 {
-	log(log_error, "sequencer") << "fatal Telephone exception: " << e << endl
+	log(log_error, "sequencer") << "fatal Telephone exception: " << e << std::endl
 		<< "terminating" << logend();
 
 	exit(5);
@@ -1260,7 +1000,7 @@ void Sequencer::fatal(Telephone* server, const char* e)
 
 void Sequencer::fatal(Telephone* server, Exception& e)
 {
-	log(log_error, "sequencer") << "fatal Telephone exception: " << e << endl
+	log(log_error, "sequencer") << "fatal Telephone exception: " << e << std::endl
 		<< "terminating" << logend();
 
 	exit(5);
@@ -1282,24 +1022,9 @@ void Sequencer::checkCompleted()
 	}
 }
 
-void Sequencer::disconnectConfirm(Transport* server, Packet* finalReply)
-{
-	phone->listen();
-}
-
-void Sequencer::disconnectReject(Transport* server, Packet* aPacket)
-{
-	// will not happen
-}
-
-void Sequencer::disconnectTimeout(Transport* server)
-{
-	// will not happen
-}
-
 void Sequencer::data(Transport* server, Packet* aPacket)
 {
-	// that's the main packet inspection method...
+	// the main packet inspection method...
 
 	switch (aPacket->getContent())
 	{
@@ -1346,7 +1071,7 @@ void Sequencer::data(Transport* server, Packet* aPacket)
 
 void usage()
 {
-	cerr << "usage: " << endl << "sequence -[dl]" << endl;
+	std::cerr << "usage: " << std::endl << "sequence -[dl]" << std::endl;
 
 	exit(1);
 }
@@ -1377,10 +1102,10 @@ int main(int argc, char* argv[])
 		{
 		case 'd':
 			set_log_level(atoi(optarg));
-			cout << "debug level " << atoi(optarg) << endl;
+			std::cout << "debug level " << atoi(optarg) << std::endl;
 			break;
 		case 'l':
-			cout << "logging to: " << optarg << endl;
+			std::cout << "logging to: " << optarg << std::endl;
 			// todo
 			break;
 		case '?':

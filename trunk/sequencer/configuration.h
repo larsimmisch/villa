@@ -9,6 +9,9 @@
 #ifndef _CONFIGURATION_H_
 #define _CONFIGURATION_H_
 
+#include <string>
+#include <map>
+
 #include "omnithread.h"
 #include "exc.h"
 #include "list.h"
@@ -32,28 +35,36 @@ public:
 	char* key;
 };
 
+class InterfaceConnection;
+
 class ClientQueue : public DList
 {
 public:
 
 	struct Item : public DList::DLink
 	{
-		Item(const SAP &aDetail, const SAP &aClient, void* aTag = 0) 
-			: details(aDetail), client(aClient), tag(aTag) {}
+		Item(const std::string &id, const SAP &aDetail, 
+			InterfaceConnection *iface)
+			: m_id(id), m_details(aDetail), m_interface(iface) {}
 		
-		SAP details;
-		SAP client;
-		void* tag;
+		std::string m_id;
+		SAP m_details;
+		InterfaceConnection *m_interface;
 	};
 	
 	ClientQueue() : DList() {}
 	virtual ~ClientQueue() { for (LinkIter i(head); !i.isDone(); i.next() ) freeLink( i.current() );}
 	
-	void enqueue(const SAP &details, const SAP &client, void* tag = 0)	{ addLast(new Item(details, client, tag)); }
+	void enqueue(const std::string &id, const SAP &details, 
+		InterfaceConnection *iface)	
+	{ 
+		addLast(new Item(id, details, iface)); 
+	}
+
 	Item* dequeue();
 
-	void remove(void* tag);
-	void remove(void* tag, const SAP &aSAP);
+	void remove(InterfaceConnection *iface);
+	void remove(InterfaceConnection *iface, const std::string &id);
 
 	virtual void freeLink(List::Link* item)	{ delete (Item*)item; }
 };
@@ -66,7 +77,7 @@ public:
 	
 	class Node
 	{
-		public:
+	public:
 
 		Node();
 
@@ -135,12 +146,18 @@ public:
 	// starts sequencers for all lines
 	virtual void start() = 0;
 
-	// removes a Client with given tag
-	virtual void removeClient(void* tag) = 0;
-	virtual void removeClient(void* tag, const SAP& aSAP) = 0;
+	// remove all clients belonging to the interface
+	virtual void removeClient(InterfaceConnection *iface) = 0;
 
-	virtual void enqueue(const SAP& details, const SAP& client, void* tag) = 0;
+	// removes a client with given id
+	virtual void removeClient(InterfaceConnection *iface, 
+		const std::string &id) = 0;
+
+	virtual void enqueue(const std::string &id, const SAP& details, 
+		InterfaceConnection *iface) = 0;
+
 	virtual ClientQueue::Item* dequeue(const SAP& details) = 0;
+
 	virtual int isContained(const SAP& details)	{ return 0; }
 
 	virtual unsigned connect(ConnectCompletion* complete) = 0;
@@ -177,11 +194,17 @@ public:
 	virtual int readFromKey(RegistryKey& key);
 
 	virtual void start();
-	virtual void removeClient(void* tag);
-	virtual void removeClient(void* tag, const SAP& aSAP);
 
-	virtual void enqueue(const SAP& details, const SAP& client, void* tag);
+	virtual void removeClient(InterfaceConnection *iface);
+
+	virtual void removeClient(InterfaceConnection *iface, 
+		const std::string &id);
+
+	virtual void enqueue(const std::string &id, const SAP& details, 
+		InterfaceConnection *iface);
+
 	virtual ClientQueue::Item* dequeue(const SAP& details);
+
 	virtual int  isContained(const SAP& details)
 	{ 
 		return ddis.isSubKey(details.getService()) != 0;

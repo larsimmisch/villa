@@ -26,7 +26,7 @@ protected:
 		return num;
 	}
 };
-  
+
 typedef basic_nullbuf<char> nullbuf;
 typedef basic_nullbuf<wchar_t> wnullbuf;
 

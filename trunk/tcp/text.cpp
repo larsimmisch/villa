@@ -1,5 +1,5 @@
 /*
-	TCP.cpp
+	Text.cpp
 */
 
 #include <iostream>
@@ -7,17 +7,16 @@
 #include <new.h>
 #include "Text.h"
 
-static char get_lost[] = "finger weg!\n";
+static char get_lost[] = "finger weg!\r\n";
 
-void endl(TextTransport& t)
+TextTransport::TextTransport(void* aPrivateData) : socket(), 
+	privateData(aPrivateData), state(idle), m_gbuf(0), m_gpos(0), m_gmax(256),
+	std::basic_iostream<char>(this)
 {
-    static char crlf[] = "\r\n";
- 
-    t.send(crlf);
-}
+	m_gbuf = new char[256];
+	m_pbuf.reserve(256);
 
-TextTransport::TextTransport(void* aPrivateData) : socket(), privateData(aPrivateData), state(idle)
-{
+	setbuf(0, 0);
 }
 
 TextTransport::~TextTransport()
@@ -35,12 +34,13 @@ void TextTransport::assertState(states aState)
 	} 
 }
 
-int TextTransport::listen(SAP& aLocalSAP, unsigned aTimeout)
+int TextTransport::listen(SAP& aLocalSAP, unsigned aTimeout, int single)
 {	
 	assertState(idle);
 	
 	local = aLocalSAP;
 	timeout = aTimeout;
+	socket.bind(aLocalSAP, single);
 
 	setState(listening);
 	
@@ -100,7 +100,7 @@ void TextTransport::disconnect(unsigned aTimeout)
 
 int TextTransport::disconnectAndWait(unsigned aTimeout)
 {
-    char* received;
+    unsigned received;
 
     disconnect(aTimeout);
 
@@ -108,7 +108,6 @@ int TextTransport::disconnectAndWait(unsigned aTimeout)
     {
         received = receiveRaw(timeout);
         if (received == 0)  return 0;
-        delete received;
     }
 
     return 1;
@@ -132,115 +131,76 @@ void TextTransport::abort()
 	socket.close();
 }
 
-int TextTransport::send(const char* aPacket, unsigned aTimeout, int expedited)
-{
-	if (state != connected)	
-	{
-		return 0;	
-	}
-	
-	return sendRaw(aPacket, aTimeout, expedited);
-}
-
-int TextTransport::sendRaw(const char* aPacket, unsigned aTimeout, int expedited)
+unsigned TextTransport::sendRaw(const char *data, unsigned size,
+								unsigned aTimeout, int expedited)
 {
 	int rc;
 	unsigned sent = 0;
-    unsigned size = strlen(aPacket);
-	
+
 	while (sent < size)
 	{
 		socket.waitForSend(aTimeout);
-		rc = socket.send((void*)(aPacket + sent), size - sent, expedited);
+		rc = socket.send((void*)&data[sent], size - sent, expedited);
 		if (rc == 0)
 		{	
-			if (state == connected)  aborted();
+			if (state == connected)  
+				aborted();
+
 			return 0;
 		}
 		
 		sent += rc;
 	}
 
-    return 1;
+    return sent;
 }
 
-TextTransport& TextTransport::operator<<(int i)
+unsigned TextTransport::receiveRaw(unsigned aTimeout)
 {
-    char number[32];
- 
-    sprintf(number, "%d", i);
-
-    send(number);
-
-    return *this;
-}
-
-TextTransport& TextTransport::operator<<(char c)
-{
-    char cnull[2];
- 
-    cnull[0] = c;
-    cnull[1] = 0;
-
-    send(cnull);
-
-    return *this;
-}
-
-char* TextTransport::receive(unsigned aTimeout)
-{
-	return receiveRaw(aTimeout);
-}
-
-char* TextTransport::receiveRaw(unsigned aTimeout)
-{
-	char* buffer;
-	unsigned len = 0;
 	unsigned rcvd;
-	unsigned bufferSize = 255;
 
-    buffer = new char[bufferSize];
+	m_gsize = 0;
+	m_gpos = 0;
 
 	while(1)
 	{
 		if ((timeout = socket.waitForData(aTimeout)) == 0)	
 		{
-			delete buffer;
 			return 0;
 		}
 	
-		rcvd = socket.receive(&buffer[len], bufferSize - len);
+		rcvd = socket.receive(&m_gbuf[m_gsize], m_gmax - m_gsize);
 		if (rcvd == 0)
 		{
-			if (state == connected)	aborted();
+			if (state == connected)
+				aborted();
+
 			return 0;
 		}
 		
-		len += rcvd;
+		m_gsize += rcvd;
 		
-        if (len >= 2) for (unsigned i = 0; i < len-1; i++)
+        if (m_gsize >= 2) for (unsigned i = 0; i < m_gsize-1; ++i)
         {
-            if (buffer[i] == '\r' && buffer[i+1] == '\n')
+            if (m_gbuf[i] == '\r' && m_gbuf[i+1] == '\n')
             {
-                buffer[i] = '\0';
-                return buffer;
+                return m_gsize;
             }
         }
 
-        if (len == bufferSize)
+		// grow the buffer if necessary
+        if (m_gsize == m_gmax)
         {
-            char* temp;
-            bufferSize += 255;
-            temp = new char[bufferSize];
-            strcpy(temp, buffer);
-            delete buffer;
-
-            buffer = temp;
+			char *newbuf = new char[m_gmax*2];
+			memcpy(newbuf, m_gbuf, m_gmax);
+			m_gmax *= 2;
+			delete m_gbuf;
+			m_gbuf = newbuf;
         }
 	}
 
-    // will never come here
-	return 0;
+    // unreached statement
+	return m_gsize;
 }
 
 void TextTransport::aborted()

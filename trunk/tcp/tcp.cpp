@@ -207,7 +207,7 @@ int TCP::sendRaw(Packet& aPacket, unsigned aTimeout, int expedited)
 		sent += rc;
 	}
 
-    return 1;
+    return sent;
 }
 
 int TCP::sendControl(Packet* aPacket, int aControlContent)

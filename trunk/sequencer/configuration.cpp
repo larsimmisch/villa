@@ -1,3 +1,4 @@
+#pragma warning (disable: 4786)
 
 #include "omnithread.h"
 #include "configuration.h"
@@ -70,23 +71,24 @@ void AculabPRITrunkConfiguration::start()
 	log(log_debug, "sequencer") << "Aculab PRI started " << lines << " lines on device " << device << logend();
 }
 
-void AculabPRITrunkConfiguration::removeClient(void* tag)
+void AculabPRITrunkConfiguration::removeClient(InterfaceConnection *iface)
 {
 	omni_mutex_lock lock(mutex);
 
 	for (DDIIterator i(ddis); !i.isDone(); i.next())
 	{
-		i.current()->queue.remove(tag);
+		i.current()->queue.remove(iface);
 	}
 }
 
-void AculabPRITrunkConfiguration::removeClient(void* tag, const SAP& aSAP)
+void AculabPRITrunkConfiguration::removeClient(InterfaceConnection *iface,
+											   const std::string &id)
 {
 	omni_mutex_lock lock(mutex);
 
 	for (DDIIterator i(ddis); !i.isDone(); i.next())
 	{
-		i.current()->queue.remove(tag, aSAP);
+		i.current()->queue.remove(iface, id);
 	}
 }
 
@@ -96,18 +98,21 @@ ClientQueue::Item* AculabPRITrunkConfiguration::dequeue(const SAP& details)
 
 	DDIs::Node* node = ddis.find(details.getService());
 
-	if (!node) return 0;
+	if (!node) 
+		return 0;
 
 	return node->queue.dequeue();
 }
 
-void AculabPRITrunkConfiguration::enqueue(const SAP& details, const SAP& client, void* tag)
+void AculabPRITrunkConfiguration::enqueue(const std::string &id, 
+										  const SAP& details, 
+										  InterfaceConnection *iface)
 {
 	omni_mutex_lock lock(mutex);
 
 	DDIs::Node* node = ddis.create(details.getService());
 
-	node->queue.enqueue(details, client, tag);
+	node->queue.enqueue(id, details, iface);
 }
 
 unsigned AculabPRITrunkConfiguration::connect(ConnectCompletion* complete)
@@ -130,15 +135,15 @@ ClientQueue::Item* ClientQueue::dequeue()
 	return (Item*)removeFirst();
 }
 
-void ClientQueue::remove(void* tag)
+void ClientQueue::remove(InterfaceConnection *iface)
 {
 	for (ListIter gc(*this); !gc.isDone(); gc.next())
 	{
 		Item* item = (Item*)gc.current();
-		if (item->tag == tag)
+		if (item->m_interface == iface)
 		{
 			log(log_debug, "sequencer") 
-				<< "removed client at: " << item->client << logend();
+				<< "removed client at: " << item->m_details << logend();
 
 			DList::remove(item);
 			delete item;
@@ -146,15 +151,15 @@ void ClientQueue::remove(void* tag)
 	}
 }
 
-void ClientQueue::remove(void* tag, const SAP& aSAP)
+void ClientQueue::remove(InterfaceConnection *iface, const std::string &id)
 {
 	for (ListIter gc(*this); !gc.isDone(); gc.next())
 	{
 		Item* item = (Item*)gc.current();
-		if (item->tag == tag && item->client == aSAP)
+		if (item->m_interface == iface && item->m_id == id)
 		{
 			log(log_debug, "sequencer") 
-				<< "removed client at: " << item->client << logend();
+				<< "removed client at: " << item->m_details << logend();
 
 			DList::remove(item);
 			delete item;

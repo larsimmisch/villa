@@ -6,6 +6,8 @@
 	Author: Lars Immisch <lars@ibp.de>
 */
 
+#pragma warning (disable: 4786)
+
 #include "omnithread.h"
 #include "conference.h"
 #include "rphone.h"
@@ -19,24 +21,10 @@ extern ClientQueue gClientQueue;
 
 extern ConfiguredTrunks gConfiguration;
 
-InterfaceConnection::InterfaceConnection(TransportClient& aClient, SAP& local) 
-: AsyncTCPNoThread(aClient)
+InterfaceConnection::InterfaceConnection(TextTransportClient& aClient, SAP& local) 
+: AsyncText(aClient)
 {
     listen(local);
-
-    packet = new(buffer) Packet(0, sizeof(buffer));
-}
-
-void InterfaceConnection::sendConnectDone(unsigned syncMajor, unsigned syncMinor, unsigned result)
-{
-	omni_mutex_lock lock(mutex);
-	
-	Packet* reply = staticPacket(1);
-
-	reply->setSync(syncMajor, syncMinor);
-
-	reply->setUnsignedAt(0, result);
-	send(*reply);
 }
 
 Interface::Interface(SAP& aLocal) : unused(1), local(aLocal)
@@ -49,7 +37,7 @@ void Interface::run()
 	((InterfaceConnection*)connections.getHead())->run();
 }
 
-void Interface::cleanup(Transport* server)
+void Interface::cleanup(TextTransport *server)
 {
 	// remove all listeners for the disconnected app
 
@@ -57,14 +45,14 @@ void Interface::cleanup(Transport* server)
 
 	log(log_debug, "sequencer") << "client aborted" << logend();
 
-	gClientQueue.remove(server);
+	gClientQueue.remove((InterfaceConnection*)server);
 
 	// then in all the trunks
 
 	gConfiguration.lock();
 	for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
 	{
-		t.current()->removeClient(server);
+		t.current()->removeClient((InterfaceConnection*)server);
 	}
 	gConfiguration.unlock();
 
@@ -82,7 +70,7 @@ void Interface::cleanup(Transport* server)
 	*/
 }
 
-void Interface::connectRequest(Transport* server, SAP& remote, Packet* initialPacket)
+void Interface::connectRequest(TextTransport *server, SAP& remote)
 {
 	omni_mutex_lock lock(mutex);
 
@@ -94,55 +82,37 @@ void Interface::connectRequest(Transport* server, SAP& remote, Packet* initialPa
 	{
 		log(log_debug, "sequencer") << "spawning new interface listener" << logend();
 
-		connections.addFirst(new InterfaceConnectionThread(*this, local));
+		connections.addFirst(new InterfaceConnection(*this, local));
 		unused++;
 	}
 
-	if (initialPacket->getContent() == if_describe)
-	{
-		Packet* reply = ((InterfaceConnection*)server)->staticPacket(gConfiguration.numElements() * 3);
-
-		reply->setSync(0, 0);
-		reply->setContent(if_describe_done);
-
-		unsigned index = 0;
-
-		for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next(), index += 3)
-		{
-			reply->setStringAt(index, c.current()->getName());
-			reply->setStringAt(index + 1, c.current()->getNumber());
-			reply->setUnsignedAt(index + 2, c.current()->isDigital() ? 1 : 0);
-		}
-
-	    server->accept(reply);
-	}
-	else server->accept();
+	server->accept();
 
 }
 
-void Interface::connectRequestTimeout(Transport* server)
+void Interface::connectRequestTimeout(TextTransport *server)
 {
 	SAP remote;
 
     server->listen(local, indefinite);
 }
 
-void Interface::connectConfirm(Transport* server, Packet* first)
+void Interface::connectConfirm(TextTransport *server)
 {
 	// we don't connect currently
 }
 
-void Interface::connectReject(Transport* server, Packet* first)
+void Interface::connectReject(TextTransport *server)
 {
 	// we don't connect currently
 }
 
-void Interface::connectTimeout(Transport* server)
+void Interface::connectTimeout(TextTransport *server)
 {
 	// we don't connect currently
 }
 
-void Interface::disconnectRequest(Transport* server, Packet* cause)
+void Interface::disconnectRequest(TextTransport *server)
 {
 	SAP remote;
 
@@ -157,18 +127,18 @@ void Interface::disconnectRequest(Transport* server, Packet* cause)
 	cleanup(server);
 }
 
-void Interface::disconnectConfirm(Transport* server, Packet* last)
+void Interface::disconnectConfirm(TextTransport *server)
 {}
 
-void Interface::disconnectTimeout(Transport* server)
+void Interface::disconnectTimeout(TextTransport *server)
 {}
 
-void Interface::disconnectReject(Transport* server, Packet* aPacket)
+void Interface::disconnectReject(TextTransport *server)
 {
     // We don't actively disconnect
 }
 
-void Interface::abort(Transport* server, Packet* finalPacket)
+void Interface::abort(TextTransport *server)
 {
 	SAP remote;
 
@@ -181,239 +151,238 @@ void Interface::abort(Transport* server, Packet* finalPacket)
     server->listen(local, indefinite);
 }
 
-void Interface::data(Transport* server, Packet* aPacket)
+void Interface::data(TextTransport *server)
 {
     // that's the main packet inspection method...
-    Packet* reply;
 	InterfaceConnection* ico = (InterfaceConnection*)server;
 
 	omni_mutex_lock lock(ico->getMutex());
 
-    switch(aPacket->getContent())
-    {
-    case if_open_conference:
+	std::string id;
+	std::string scope;
+
+	(*server) >> id;
+	(*server) >> scope;
+
+	if (!server->good())
 	{
-        reply = ico->staticPacket(2);
-        reply->setContent(if_open_conference_done);
-        reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
+		(*server) << _syntax_error << id.c_str() 
+			<< " syntax error\r\n";
 
-		Conference* conference = 0; //gConferences.create();
-
-        reply->setUnsignedAt(0, conference ? _ok : _failed);
-        if (conference) reply->setUnsignedAt(1, conference->getHandle());
-
-        server->send(*reply);
-        break;
+		return;
 	}
-    case if_close_conference:
-        reply = ico->staticPacket(1);
-        reply->setContent(if_close_conference_done);
-        reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
 
-        // check parameters
-        if (aPacket->typeAt(0) != Packet::type_unsigned 
-		 || 0 /*!gConferences[aPacket->getUnsignedAt(0)]*/)
-        {
-			reply->setUnsignedAt(0, _failed);
-			server->send(*reply);
-            break;
-        }
-
-		// gConferences.close(aPacket->getUnsignedAt(0));
-		reply->setUnsignedAt(0, _not_implemented);
-		server->send(*reply);
-		break;
-	case if_listen:
+	if (scope == "global")
 	{
-        reply = ico->staticPacket(1);
-        reply->setContent(if_listen_done);
-        reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
-		
-		if (aPacket->typeAt(0) != Packet::type_string
-		 || aPacket->typeAt(1) != Packet::type_string
-		 || aPacket->typeAt(2) != Packet::type_string
-		 || aPacket->typeAt(3) != Packet::type_string)
-		{
-			reply->setUnsignedAt(0, _invalid);
-			server->send(*reply);
+		std::string command;
 
-			break;
+		(*server) >> command;
+
+		if (!server->good())
+		{
+			(*server) << _syntax_error << id.c_str() 
+				<< " syntax error\r\n";
+
+			return;
 		}
 
-		TrunkConfiguration* trunk = 0;
-		SAP client, detail;
-		
-		trunk = gConfiguration[aPacket->getStringAt(0)];
-		detail.setService(aPacket->getStringAt(1));
-
-		client.setAddress(aPacket->getStringAt(2));
-		client.setService(aPacket->getStringAt(3));
-
-		if (trunk)
+		if (command == "describe")
 		{
-			log(log_debug, "sequencer") << "client " << client 
-				<< " added listen for " << trunk->getName() 
-				<< ' ' << (detail.getService() ? detail.getService() : "any") 
-				<< logend();
-
-			trunk->enqueue(detail, client, server);
-		}
-		else
-		{
-			if (aPacket->getStringAt(0))
+			for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
 			{
-				log(log_error, "sequencer")
-					<< "client " << client 
-					<< " attempted to add listen for invalid trunk " 
-					<< aPacket->getStringAt(0) << logend();
+				(*server) << id.c_str() << ' ' << _ok << ' '
+					<< c.current()->getName() << ' ' 
+					<< c.current()->getNumber() << ' '
+					<< (c.current()->isDigital() ? "digital" : "analog")
+					<< "\n";
+			}
 
-				reply->setUnsignedAt(0, _invalid);
-				server->send(*reply);
+			(*server) << "\r\n";
+		}
+		else if (command == "open-conference")
+		{
+			(*server) << id.c_str() << ' ' << _not_implemented 
+				<< " not implemented" << "\r\n";
+		}
+		else if (command == "close-conference")
+		{
+			(*server) << id.c_str() << ' ' << _not_implemented 
+				<< " not implemented" << "\r\n";
+		}
+		else if (command == "listen")
+		{
+			std::string trunkname;
+			std::string spec;
 
-				break;
+			(*server) >> trunkname;
+			(*server) >> spec;
+
+			if (!server->good())
+			{
+				(*server) << id.c_str() << _syntax_error 
+					<< " syntax error\r\n";
+				return;
+			}
+
+			TrunkConfiguration* trunk = 0;
+			SAP client, detail;
+			
+			if (spec != "any")
+				detail.setService(spec.c_str());
+
+			if (trunkname != "any")
+			{
+				trunk = gConfiguration[trunkname.c_str()];
+
+				if (!trunk)
+				{
+					log(log_error, "sequencer")
+						<< "attempted to add listen for invalid trunk " 
+						<< trunkname.c_str() << logend();
+
+					(*server) << id.c_str() << ' ' << _invalid 
+						<< " invalid trunk " << trunkname.c_str() << "\r\n";
+
+					return;
+				}
+	
+				log(log_debug, "sequencer") << "client " << client 
+					<< " added listen for " << trunk->getName() 
+					<< ' ' << (detail.getService() ? detail.getService() : "any") 
+					<< logend();
+
+				trunk->enqueue(id, detail, ico);
 			}
 			else
 			{
 				log(log_debug, "sequencer") << "client " << client 
 					<< " added listen for any trunk " << logend();
 
-				gClientQueue.enqueue(detail, client, server);
+				gClientQueue.enqueue(id, detail, ico);
 			}
 		}
-
-		reply->setUnsignedAt(0, _ok);
-		server->send(*reply);
-
-		break;
-	}
-	case if_connect:
-	{
-        reply = ico->staticPacket(1);
-        reply->setContent(if_connect_done);
-        reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
-		
-		if (aPacket->typeAt(0) != Packet::type_string
-		 || aPacket->typeAt(1) != Packet::type_string
-		 || aPacket->typeAt(2) != Packet::type_string)
+		else if (command == "connect")
 		{
-			reply->setUnsignedAt(0, _invalid);
-			server->send(*reply);
+/*
+			SAP client;
 
-			break;
-		}
+			client.setAddress(aPacket->getStringAt(0));
+			client.setService(aPacket->getStringAt(1));
 
-		SAP client;
+			// remove any listeners for this client
+			// first in the global queue
 
-		client.setAddress(aPacket->getStringAt(0));
-		client.setService(aPacket->getStringAt(1));
+			gClientQueue.remove(server, client);
 
-		// remove any listeners for this client
-		// first in the global queue
+			// then in all the trunks
 
-		gClientQueue.remove(server, client);
-
-		// then in all the trunks
-
-		gConfiguration.lock();
-		for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
-		{
-			t.current()->removeClient(server, client);
-		}
-		gConfiguration.unlock();
-
-		// now start the connect
-
-		TrunkConfiguration* trunk;
-		unsigned result = _failed;
-
-		trunk = gConfiguration[aPacket->getStringAt(2)];
-
-		log(log_debug, "sequencer") << "client " << client 
-			<< " wants outgoing line on " 
-			<< (aPacket->getStringAt(2) ? aPacket->getStringAt(2) : "any trunk") 
-			<< logend();
-
-		ConnectCompletion* complete = 
-			new ConnectCompletion(*ico, aPacket->getSyncMajor(), aPacket->getSyncMinor(), client);
-
-		if (trunk)
-		{
-			result = trunk->connect(complete);
-		}
-		else
-		{
 			gConfiguration.lock();
 			for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
 			{
-				result = t.current()->connect(complete);
-				if (result == _ok)	break;
+				t.current()->removeClient(server, client);
 			}
 			gConfiguration.unlock();
+
+			// now start the connect
+
+			TrunkConfiguration* trunk;
+			unsigned result = _failed;
+
+			trunk = gConfiguration[aPacket->getStringAt(2)];
+
+			log(log_debug, "sequencer") << "client " << client 
+				<< " wants outgoing line on " 
+				<< (aPacket->getStringAt(2) ? aPacket->getStringAt(2) : "any trunk") 
+				<< logend();
+
+			ConnectCompletion* complete = 
+				new ConnectCompletion(*ico, aPacket->getSyncMajor(), aPacket->getSyncMinor(), client);
+
+			if (trunk)
+			{
+				result = trunk->connect(complete);
+			}
+			else
+			{
+				gConfiguration.lock();
+				for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+				{
+					result = t.current()->connect(complete);
+					if (result == _ok)	break;
+				}
+				gConfiguration.unlock();
+			}
+
+			if (result != _ok)
+			{
+				delete complete;
+
+				reply->setUnsignedAt(0, result);
+				server->send(*reply);
+			}
+*/
 		}
-
-		if (result != _ok)
+		else if (command == "stop-listening")
 		{
-			delete complete;
+/*
+			reply = ((InterfaceConnection*)server)->staticPacket(1);
+			reply->setContent(if_stop_listening_done);
+			reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
 
-			reply->setUnsignedAt(0, result);
+			if (aPacket->typeAt(0) != Packet::type_string
+			 || aPacket->typeAt(1) != Packet::type_string)
+			{
+				reply->setUnsignedAt(0, _invalid);
+				server->send(*reply);
+
+				break;
+			}
+
+			SAP client;
+
+			client.setAddress(aPacket->getStringAt(0));
+			client.setService(aPacket->getStringAt(1));
+
+			// remove any listeners for this client
+			// first in the global queue
+
+			gClientQueue.remove(server, client);
+
+			// then in all the trunks
+
+			gConfiguration.lock();
+			for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+			{
+				t.current()->removeClient(server, client);
+			}
+			gConfiguration.unlock();
+
+			reply->setUnsignedAt(0, _ok);
 			server->send(*reply);
+*/
 		}
+		else
+		{
+			// syntax error
 
-		break;
+			(*server) << id.c_str() << ' ' << _failed 
+				<< " syntax error - unknown command " << command.c_str()
+				<< "\r\n";
+		}
 	}
-	case if_stop_listening:
+	else
 	{
-        reply = ((InterfaceConnection*)server)->staticPacket(1);
-        reply->setContent(if_stop_listening_done);
-        reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
+		Sequencer *s = ico->find(id);
 
-		if (aPacket->typeAt(0) != Packet::type_string
-		 || aPacket->typeAt(1) != Packet::type_string)
+		if (!s)
 		{
-			reply->setUnsignedAt(0, _invalid);
-			server->send(*reply);
-
-			break;
+			(*server) << id.c_str() << ' ' << _failed 
+				<< " syntax error - unknown scope " << scope.c_str()
+				<< "\r\n";
 		}
-
-		SAP client;
-
-		client.setAddress(aPacket->getStringAt(0));
-		client.setService(aPacket->getStringAt(1));
-
-		// remove any listeners for this client
-		// first in the global queue
-
-		gClientQueue.remove(server, client);
-
-		// then in all the trunks
-
-		gConfiguration.lock();
-		for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+		else
 		{
-			t.current()->removeClient(server, client);
+			s->data(ico, id);
 		}
-		gConfiguration.unlock();
-
-		reply->setUnsignedAt(0, _ok);
-		server->send(*reply);
-
-        break;
 	}
-	case if_shutdown:
-	{
-		log(log_debug, "sequencer") << "shutting down" << logend();
-
-		gConfiguration.lock();
-		for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
-		{
-			gConfiguration.basicRemoveAt(t.current());
-		}
-		gConfiguration.unlock();
-
-		::exit(aPacket->getUnsignedAt(0));
-	}
-    default:
-        break;
-    }
 }

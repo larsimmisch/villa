@@ -72,7 +72,8 @@ public:
 	virtual void connectReject(TextTransport* server) = 0;
 	virtual void connectTimeout(TextTransport* server) = 0;
 
-    // this is more a disconnect, but in our terminology disconnects can be negotiated, which is impossible in this protocol
+    // this is more a disconnect, but in our terminology disconnects 
+	// can be negotiated, which is impossible in this protocol
 	virtual void abort(TextTransport* sender) = 0;
 	
 	// sent whenever packet is received
@@ -82,11 +83,7 @@ public:
 	virtual void stopSending(TextTransport* server) {}
 	virtual void resumeSending(TextTransport* server) {}
 	
-	
-	// you don't have to use the dataReady protocol if you absolutely don't want to
-	// overwrite asynchronous and have your data delivered by the data call
-	virtual int asynchronous(TextTransport* server)	{ return 1; }
-	virtual void data(TextTransport* server, char* data) {}
+	virtual void data(TextTransport* server) {}
 
     virtual void fatal(const char* e) {}
 };

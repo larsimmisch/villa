@@ -93,7 +93,8 @@ enum
     _duplicate,
     _empty,
 	_server_down,
-	_out_of_service
+	_out_of_service,
+	_syntax_error
 };
 
 enum

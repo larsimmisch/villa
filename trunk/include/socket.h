@@ -111,6 +111,8 @@ public:
 
 	virtual void *run_undetached(void *arg);
 	
+	void stop();
+
 	ListenerQueue queue;
 	int hsocket;
 };

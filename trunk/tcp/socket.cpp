@@ -145,7 +145,14 @@ Listener::Listener(int aProtocol, SAP& aService)
 
 Listener::~Listener()
 {
+}
+
+void Listener::stop()
+{
 	closesocket(hsocket);
+	hsocket = -1;
+
+	join(NULL);
 }
 
 void *Listener::run_undetached(void *arg)
@@ -163,7 +170,7 @@ void *Listener::run_undetached(void *arg)
 		if (aSocket < 0)
 		{
 			result = GetLastError();
-			if (result == WSAENOTSOCK) 
+			if (result == WSAENOTSOCK || hsocket == -1) 
 			{
 				return NULL;
 			}
@@ -224,7 +231,7 @@ void Services::remove(Listener* listener)
 
 	basicRemoveAt(listener);
 	
-	delete listener;
+	listener->stop();
 }
 
 Listener* Services::contains(int aProtocol, int aService)
@@ -613,7 +620,7 @@ unsigned Socket::bytesPending()
 	unsigned size;
 
 	int rc = ioctlsocket(hsocket, FIONREAD, (u_long*)&size);
-	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setNonBlocking(int)", GetLastError());
+	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::bytesPending(int)", GetLastError());
 
 	return size;
 }

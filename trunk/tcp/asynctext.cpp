@@ -8,9 +8,8 @@
 
 
 AsyncText::AsyncText(TextTransportClient& aClient, void* aPrivateData)
-	: TextTransport(aPrivateData), client(aClient), incoming(), event(&mutex)
+	: TextTransport(aPrivateData), client(aClient), event(&mutex)
 {
-	start_undetached();
 }
 
 AsyncText::~AsyncText()
@@ -20,26 +19,6 @@ AsyncText::~AsyncText()
 	socket.close();
 
 	event.signal();
-}
-
-void AsyncText::send(const char* aPacket, int expedited)
-{
-	mutex.lock();
-	if (TextTransport::state != connected)	
-	{
-		mutex.unlock();
-		return;	
-	}
-	
-	TextTransport::send(aPacket, expedited);
-	mutex.unlock();
-}
-
-char* AsyncText::receive()
-{
-	char* aPacket = (char*)incoming.dequeue();
-	
-	return aPacket;
 }
 
 void AsyncText::aborted()
@@ -69,7 +48,6 @@ void AsyncText::run()
     try
     {
         int result;
-        char* packet;
 
     	while(1)
     	{
@@ -94,14 +72,11 @@ void AsyncText::run()
     			break;
     		case disconnecting:
     		case connected:
-    			packet = receiveRaw();
-                if (packet == 0)    break;
-            	if(getClient().asynchronous(this))
-                {
-                	incoming.enqueue(packet);
-                    getClient().dataReady(this);
-                }
-            	else getClient().data(this, packet);
+    			result = receiveRaw();
+                if (result == 0)    
+					break;
+
+            	getClient().data(this);
     			break;
     		case dying:
     			return;

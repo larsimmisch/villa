@@ -9,40 +9,55 @@
 #ifndef _INTERFACE_H_
 #define _INTERFACE_H_
 
+#include <map>
+
 #include "list.h"
 #include "packet.h"
-#include "asynctcp.h"
+#include "asynctext.h"
 #include "configuration.h"
 
-class InterfaceConnection : public AsyncTCPNoThread, public List::Link
+class Sequencer;
+
+class InterfaceConnection : public AsyncText, public List::Link
 {
 public:
 
-	InterfaceConnection(TransportClient& client, SAP& local);
+	InterfaceConnection(TextTransportClient& client, SAP& local);
 	virtual ~InterfaceConnection() {}
 
-	void sendConnectDone(unsigned syncMajor, unsigned syncMinor, unsigned result);
+	void add(const std::string &name, Sequencer *sequencer)
+	{
+		omni_mutex_lock l(m_mutex);
 
-	omni_mutex& getMutex()	{ return mutex; }
+		m_calls[name] = sequencer;
+	}
 
-    Packet* staticPacket(unsigned numArgs) { packet->clear(numArgs); return packet; }
+	void remove(const std::string &name)
+	{
+		omni_mutex_lock l(m_mutex);
+
+		m_calls.erase(name);
+	}
+
+	Sequencer *find(const std::string &name)
+	{
+		omni_mutex_lock l(m_mutex);
+
+		std::map<std::string,Sequencer*>::const_iterator i = m_calls.find(name);
+
+		if (i == m_calls.end())
+			return 0;
+
+		return i->second;
+	}
+
+	omni_mutex& getMutex()	{ return m_mutex; }
 
 protected:
 
-	omni_mutex mutex;
-    Packet* packet;
-    char buffer[1024];
-};
+	omni_mutex m_mutex;
 
-class InterfaceConnectionThread : public InterfaceConnection, public omni_thread
-{
-public:
-
-	InterfaceConnectionThread(TransportClient& client, SAP& local) 
-		: InterfaceConnection(client, local) {}
-	virtual ~InterfaceConnectionThread()	{}
-
-	virtual void run()	{ AsyncTCPNoThread::run(); }
+	std::map<std::string,Sequencer*> m_calls;
 };
 
 class InterfaceConnections : public List
@@ -55,7 +70,7 @@ public:
     virtual void  freeLink(Link* aLink) { delete (InterfaceConnection*)aLink; }
 };
 
-class Interface : public TransportClient
+class Interface : public TextTransportClient
 {
 public:
 
@@ -64,36 +79,35 @@ public:
 
 	virtual void run();
 
-	void cleanup(Transport* server);
+	void cleanup(TextTransport *server);
 
 	// protocol of TransportClient
-	virtual void connectRequest(Transport* server, SAP& remote, Packet* initialPacket = 0);
-	virtual void connectRequestTimeout(Transport* server);
+	virtual void connectRequest(TextTransport *server, SAP& remote);
+	virtual void connectRequestTimeout(TextTransport *server);
 	
 	// replies to server.connect from far end
-	virtual void connectConfirm(Transport* server, Packet* initialReply = 0);
-	virtual void connectReject(Transport* server, Packet* initialReply = 0);
-	virtual void connectTimeout(Transport* server);
+	virtual void connectConfirm(TextTransport *server);
+	virtual void connectReject(TextTransport *server);
+	virtual void connectTimeout(TextTransport *server);
 	
 	// must call server.disconnectAccept or server.disconnectReject 
-	virtual void disconnectRequest(Transport* server, Packet* finalPacket = 0);
+	virtual void disconnectRequest(TextTransport *server);
 	
 	// replies to server.disconnect from far end
-	virtual void disconnectConfirm(Transport* server, Packet* finalReply = 0);
-	virtual void disconnectReject(Transport* server, Packet* aPacket = 0);
-	virtual void disconnectTimeout(Transport* server);
+	virtual void disconnectConfirm(TextTransport *server);
+	virtual void disconnectReject(TextTransport *server);
+	virtual void disconnectTimeout(TextTransport *server);
 
-    virtual void abort(Transport* server, Packet* final);
+    virtual void abort(TextTransport *server);
 
 	// sent whenever packet is received
-	virtual void dataReady(Transport* server) {}
+	virtual void dataReady(TextTransport *server) {}
  
 	// flow control
-	virtual void stopSending(Transport* server) {}
-	virtual void resumeSending(Transport* server) {}
+	virtual void stopSending(TextTransport *server) {}
+	virtual void resumeSending(TextTransport *server) {}
 	
-    virtual int asynchronous(Transport* server)  { return 0; }
-    virtual void data(Transport* server, Packet* aPacket);
+    virtual void data(TextTransport *server);
 
 protected:
 
@@ -103,29 +117,25 @@ protected:
 	SAP local;
 };
 
-// really obscure helper class...
-// contains all information necessary to complete the if_connect
-// because if_connect is completed only when the tcp connection 
-// is either established or failed
+// helper class
+// contains all information about an outgoing call initiated by the client
 
 class ConnectCompletion
 {
 public:
 
-	ConnectCompletion(InterfaceConnection& aFace, unsigned aSyncMajor, unsigned aSyncMinor, SAP& aClient)
-		: iface(aFace), syncMajor(aSyncMajor), syncMinor(aSyncMinor), client(aClient) {}
+	ConnectCompletion(InterfaceConnection *iface, const std::string &id,
+		const SAP &local, const SAP &remote, unsigned timeout)
+		: m_interface(iface), m_id(id), m_local(local), m_remote(remote),
+		m_timeout(timeout) {}
+
 	~ConnectCompletion() {}
 
-	void done(unsigned result)	{ iface.sendConnectDone(syncMajor, syncMinor, result); }
-
-	SAP& getClient()	{ return client; }
-
-protected:
-
-	InterfaceConnection& iface;
-	unsigned syncMajor; 
-	unsigned syncMinor;
-	SAP client;
+	InterfaceConnection *m_interface;
+	std::string m_id;
+	SAP m_local;
+	SAP m_remote;
+	unsigned m_timeout;
 };
 
 #endif
