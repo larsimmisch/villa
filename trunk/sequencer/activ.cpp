@@ -52,8 +52,8 @@ BeepAtom::BeepAtom(Sequencer* sequencer, unsigned count) : m_nBeeps(count)
 	m_sample = sequencer->getMedia()->createBeeps(count);
 }
 
-ConferenceAtom::ConferenceAtom(unsigned aConference, unsigned aMode)
- : m_mode(aMode), m_conference(0), m_data(0)
+ConferenceAtom::ConferenceAtom(unsigned aConference, Conference::mode m)
+ : m_mode(m), m_conference(0), m_data(0)
 {
 	m_conference = gConferences[aConference];
 }

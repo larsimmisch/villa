@@ -12,6 +12,7 @@
 #include <set>
 #include <map>
 #include "omnithread.h"
+#include "v3.h"
 #include "switch.h"
 #include "exc.h"
 #include "acuphone.h"
@@ -21,11 +22,15 @@ class Conference
 {
 public:
 	
-	enum mode { listen = 0x01, speak = 0x02, background = 0x04 };
+	enum mode { 
+		listen = V3_CONF_LISTEN, 
+		speak = V3_CONF_SPEAK, 
+		duplex = V3_CONF_DUPLEX 
+	};
 
 	virtual ~Conference() {}
 
-	void add(ProsodyChannel *channel, int aMode);
+	void add(ProsodyChannel *channel, mode m);
 	void remove(ProsodyChannel *channel);
 
 	void lock() 	{ m_mutex.lock(); }
@@ -42,7 +47,7 @@ protected:
 	Conference(unsigned handle, void* aUserData = 0) : m_handle(handle),
 		m_userData(0), m_module(0), m_speakers(0) {}
 
-	typedef std::set<ProsodyChannel*> t_party_set;
+	typedef std::map<ProsodyChannel*,mode> t_party_set;
 
 	omni_mutex m_mutex;
 	int m_module;

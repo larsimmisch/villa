@@ -12,6 +12,7 @@
 #include "timer.h"
 #include "conference.h"
 #include "phone.h"
+#include "v3.h"
 
 #define NOTIFY_START 0x01
 #define NOTIFY_STOP 0x02
@@ -83,12 +84,12 @@ public:
 
 	enum a_mode 
 	{ 
-		discard = 0x01, 
-		pause = 0x02, 
-		mute = 0x04, 
-		restart = 0x08, 
-		dont_interrupt = 0x10, 
-		loop = 0x20 
+		discard = V3_MODE_DISCARD, 
+		pause = V3_MODE_PAUSE, 
+		mute = V3_MODE_MUTE, 
+		restart = V3_MODE_RESTART, 
+		dont_interrupt = V3_MODE_DONT_INTERRUPT, 
+		loop = V3_MODE_LOOP 
 	};
 
 	enum a_flags 
@@ -265,7 +266,7 @@ class ConferenceAtom : public Atom //, public Termination
 {
 public:
 
-	ConferenceAtom(unsigned aConf, unsigned aMode);
+	ConferenceAtom(unsigned handle, Conference::mode m);
 	virtual ~ConferenceAtom() {}
 
 	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
@@ -285,7 +286,7 @@ protected:
 	Conference *m_conference;
 	void *m_data;
 	Time m_started;
-	unsigned m_mode;
+	Conference::mode m_mode;
 };
 
 class Activity : public DList

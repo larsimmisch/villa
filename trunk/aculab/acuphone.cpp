@@ -17,7 +17,7 @@
 #include "names.h"
 #include "acuphone.h"
 #include "fal.h"
-#include "v3error.h"
+#include "v3.h"
 #include "prosody_error.i"
 #include "beep.i"
 

@@ -10,7 +10,7 @@
 
 // adjusted from smclib.c
 
-void Conference::add(ProsodyChannel *channel, int mode)
+void Conference::add(ProsodyChannel *channel, mode m)
 {
 	lock();
 
@@ -26,24 +26,30 @@ void Conference::add(ProsodyChannel *channel, int mode)
 			"Conference::add", "conference full");
 	}
 
-	if (m_parties.begin() != m_parties.end())
+	if (m & listen)
 	{
-		ProsodyChannel *first = *(m_parties.begin());
-		channel->conferenceClone(first);
-		channel->conferenceAdd(first);
+		if (m_parties.begin() != m_parties.end())
+		{
+			ProsodyChannel *first = m_parties.begin()->first;
+			channel->conferenceClone(first);
+			channel->conferenceAdd(first);
+		}
+		else
+			channel->conferenceStart();
 	}
-	else
-		channel->conferenceStart();
 
-	/* 
-	 * Add the new party to the other parties' low-level conferences. 
-	 */
-	for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
-		(*i)->conferenceAdd(channel);
+	if (m & speak)
+	{
+		/* 
+		 * Add the new party to the other parties' low-level conferences. 
+		 */
+		for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
+			i->first->conferenceAdd(channel);
  
-	m_parties.insert(channel);
+		m_parties.insert(t_party_set::value_type(channel, m));
 
-	channel->conferenceEC();
+		channel->conferenceEC();
+	}
 
 	unlock();
 }
@@ -60,23 +66,31 @@ void Conference::remove(ProsodyChannel *channel)
 			"Conference::remove", "party not in this conference");
 	}
 
+	mode m = p->second;
+
 	m_parties.erase(p);
     
-	/* We now need to do the opposite of joining: delete the
-	 * leaving party from the low-level conferences belonging to
-	 * each of the remaining parties, and delete all parties from
-	 * the low-level conference belonging to the leaving party.
-	 * This second action is automatically performed when we abort
-	 * the low-level conference, so we just have to do the first
-	 * of these.
-	 */
-
-	for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
+	if (m & speak)
 	{
-		(*i)->conferenceLeave(channel);
+		/* We now need to do the opposite of joining: delete the
+		 * leaving party from the low-level conferences belonging to
+		 * each of the remaining parties, and delete all parties from
+		 * the low-level conference belonging to the leaving party.
+		 * This second action is automatically performed when we abort
+		 * the low-level conference, so we just have to do the first
+		 * of these.
+		 */
+
+		for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
+		{
+			i->first->conferenceLeave(channel);
+		}
 	}
 
-	channel->conferenceAbort();
+	if (m & listen)
+	{
+		channel->conferenceAbort();
+	}
 
 	unlock();
 }

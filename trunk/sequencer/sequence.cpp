@@ -196,8 +196,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 					return V3_FATAL_SYNTAX;
 				}
 
-				atom = new ConferenceAtom(handle, 
-					Conference::listen | Conference::speak);
+				atom = new ConferenceAtom(handle, Conference::duplex);
 			}
 
 			std::string notifications;
