@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.8 2001/06/19 15:02:51 lars Exp $
+	$Id: acutrunk.cpp,v 1.9 2001/06/24 07:07:45 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -366,7 +366,8 @@ void AculabTrunk::release()
 	int rc = call_release(&xcause);
 	if (rc)
 	{
-		log(log_error, "trunk", getName()) << "call_release failed: " << rc << logend();
+		log(log_error, "trunk", getName()) << "call_release failed: " << rc 
+			<< " in state " << stateName(state) << logend();
 	}
 
 	dispatcher.lock();
@@ -392,7 +393,8 @@ int AculabTrunk::getCause()
 	if (rc != 0)
 	{
 		log(log_error, "trunk", getName()) 
-			<< "call_getcause failed: " << rc << logend();
+			<< "call_getcause failed: " << rc << " in state " 
+			<< stateName(state) << logend();
 
 		return r_failed;
 	}
@@ -627,7 +629,11 @@ void AculabTrunk::onRemoteDisconnect()
 		break;
 	case accepting:
 		client->acceptDone(this, getCause());
-		release();
+		state = idle;
+		disconnect();
+		break;
+	case waiting:
+		disconnect();
 		break;
 	default:
 		log(log_error, "trunk", getName()) << "unhandled state " << stateName(state) << " in onRemoteDisconnect" << logend();
