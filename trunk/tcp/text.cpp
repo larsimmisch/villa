@@ -26,6 +26,8 @@ SocketStream::SocketStream(const Socket &socket) :
 	m_rbuf[0] = '\0';
 	m_pbuf.reserve(512);
 
+    setKeepAlive(1);
+
 	setbuf(0, 0);
 }
 

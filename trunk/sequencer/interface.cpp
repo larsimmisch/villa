@@ -25,6 +25,9 @@ void InterfaceConnection::lost_connection()
 	log(log_info, "sequencer") << "client " 
 		<< m_remote << " aborted" << logend();
 
+    // Villa shortcut
+    ::exit(0);
+
 	// remove all listeners for the disconnected app
 	// first in the global queue
 	gClientQueue.remove(this);
