@@ -287,7 +287,10 @@ public:
     virtual Switch* getSwitch() { return &m_sw; }
 
 	virtual Sample* createFileSample(const char *name) { return new FileSample(this, name); }
-	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime) { return new RecordFileSample(this, name, maxTime); }
+	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime) 
+	{ 
+		return new RecordFileSample(this, name, maxTime); 
+	}
 	virtual Sample* createTouchtones(const char *tt) { return new Touchtones(this, tt); }
 	virtual Sample* createBeeps(int nBeeps) { return new Beep(this, nBeeps); }
 

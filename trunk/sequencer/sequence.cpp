@@ -36,7 +36,8 @@ CTbus *gBus;
 
 Timer Sequencer::timer;
 
-// I use 'this' in the base member initializer list on purpose
+/* The Author hereby solemnly declares that he understands the dangers of passing 
+   'this' to member contructors */
 #pragma warning(disable : 4355)
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 

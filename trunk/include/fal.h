@@ -1,9 +1,9 @@
 /*
 	fal.h
 
-	$Id: fal.h,v 1.3 2003/12/17 23:27:21 lars Exp $
+	$Id$
 
-	Copyright 1995-2001 Lars Immisch
+	Copyright 1995-2004 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */
@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <string>
+#include <direct.h>
 #include <mmsystem.h>
 #include <mmreg.h>
 #include "exc.h"
@@ -119,6 +120,47 @@ public:
 	unsigned encoding;
 };
 
+
+/* filename is a fully qualified file name */
+inline int createPath(const char *filename)
+{
+	char path[_MAX_PATH];
+	char *s;
+	int rc;
+
+	strcpy(path, filename);
+
+	/* normalize to backslashes - this is Windows */
+	for (s = path; *s; ++s)
+	{
+		if (*s == '/')
+			*s = '\\';
+	}
+
+	/* don't deal with non-normalized paths (overzealous) */
+	if (strstr(path, ".\\") || strstr(path, "..\\"))
+		return EINVAL;
+
+	/* Handle drive letter */
+	if (strncmp(path + 1, ":\\", 2) == 0)
+		s = path + 3;
+	else
+		s = path;
+
+	for (s = strchr(s, '\\'); s; s = strchr(s + 1, '\\'))
+	{
+		*s = '\0';
+		rc = _mkdir(path);
+		if (rc < 0 && errno != EEXIST)
+			return errno;
+
+		*s = '\\';
+	}
+	
+
+	return 0;
+}
+
 class RawFileStorage : public Storage
 {
 public:
@@ -126,10 +168,14 @@ public:
 	RawFileStorage(const char* name, bool write = false)
 	{
 		file = fopen(name, write ? "wb" : "rb");
+		if (!file && write)
+		{
+			createPath(name);
+			file = fopen(name, "wb");
+		}
+
 		if (!file)
 		{
-			int x = GetLastError();
-
 			throw FileDoesNotExist(__FILE__, __LINE__, 
 				"RawFileStorage::RawFileStorage", name);
 		}
@@ -281,6 +327,12 @@ public:
  
 		// Open the file for writing
 		hmmio = mmioOpen((char*)file, NULL, MMIO_WRITE | MMIO_CREATE | MMIO_DENYWRITE);
+		if(!hmmio) 
+		{
+			createPath(file);
+			hmmio = mmioOpen((char*)file, NULL, MMIO_WRITE | MMIO_CREATE | MMIO_DENYWRITE);
+		}
+		
 		if(!hmmio) 
 		{ 
 			throw FileDoesNotExist(__FILE__, __LINE__, "WaveBuffers::openForWriting", file);

@@ -33,7 +33,7 @@ class Call:
         print 'connected:', self.device
 
     def ACPT(self, event, user_data):
-        self.send('MLCA %s 0 2 1 play ../test/phone/sitrtoot.al none'
+        self.send('MLCA %s 0 2 1 beep 1 none play ../test/phone/sitrtoot.al none'
                   % self.device)
 ##         self.send('MLCA %s 0 2 1 beep 2'
 ##                   % self.device)
