@@ -26,8 +26,6 @@ SocketStream::SocketStream(const Socket &socket) :
 	m_rbuf[0] = '\0';
 	m_pbuf.reserve(512);
 
-    setKeepAlive(1);
-
 	setbuf(0, 0);
 }
 
@@ -136,12 +134,17 @@ unsigned SocketStream::receive()
 
 	for(;;)
 	{	
-		unsigned rcvd = Socket::receive(m_rbuf + m_rsize, m_rmax - m_rsize - 1);
-		if (rcvd <= 0)
+		int rcvd = Socket::receive(m_rbuf + m_rsize, m_rmax - m_rsize - 1);
+		if (rcvd < 0)
 		{
-			log(log_warning, "text") << m_remote << " receive returned: " << GetLastError()
+			int rc = GetLastError();
+
+			if (rc == WSAEWOULDBLOCK)
+				return 0;
+
+			log(log_warning, "text") << m_remote << " receive returned: " << rc
 				<< logend();
-			return 0;
+			return rcvd;
 		}
 		
 		m_rsize += rcvd;

@@ -162,7 +162,7 @@ int Socket::receive(void* data, unsigned dataLength)
 	if (rc < 0)
 	{
 		rc = GetLastError();
-		return 0;
+		return -1;
 	}
 
 	return rc;
@@ -222,6 +222,12 @@ unsigned Socket::bytesPending()
 void Socket::setReuseAddress(int on)
 {
 	int rc = setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, (char *) &on, sizeof(on));
+	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setReuseAddress(int)", GetLastError());
+}
+
+void Socket::setNonblocking(int on)
+{
+	int rc = ioctlsocket(m_socket, FIONBIO, (u_long *) &on);
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setReuseAddress(int)", GetLastError());
 }
 

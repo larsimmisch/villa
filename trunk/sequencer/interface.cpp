@@ -110,6 +110,10 @@ void Interface::run()
 				InterfaceConnection *ic = new InterfaceConnection(PF_INET,
 					m_listener.accept(remote));
 
+				ic->setNonblocking(1);
+				ic->setKeepAlive(1);
+
+
 				ic->m_remote = remote;
 
 				m_connections.push_back(ic);
@@ -131,15 +135,18 @@ void Interface::run()
 					do
 					{
 						rc = ic->receive();
-						ic->clear();
-						if (!data(ic))
+						if (rc > 0)
 						{
-							exit = true;
-							break;
+							ic->clear();
+							if (!data(ic))
+							{
+								exit = true;
+								break;
+							}
 						}
-					} while (rc);
+					} while (rc > 0);
 
-					if (rc == 0 || exit)
+					if (rc < 0 || exit)
 					{
 						ic->lost_connection();
 						remove.push_back(ic);
@@ -191,6 +198,10 @@ bool Interface::data(InterfaceConnection *ic)
 		if (id == "exit")
 		{
 			return false;
+		}
+		else if (id == "shutdown")
+		{
+			exit(0);
 		}
 
 		ic->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str()
