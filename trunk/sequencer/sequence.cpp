@@ -762,7 +762,7 @@ void Sequencer::completed(Telephone *server, Sample *aSample, unsigned msecs)
 
 void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs, unsigned status)
 {
-	int done, atEnd, notifyStop, started;
+	int done, atEnd, notifyStop;
 	unsigned pos, length, nAtom;
 	std::string id;
 
@@ -791,7 +791,7 @@ void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs,
 		sendAtomDone(id.c_str(), nAtom, status, msecs);
 	}
 
-	if (activity.getState() == Activity::stopping)
+	if (activity.getState() == Activity::stopping || done)
 	{
 		log(log_debug+2, "sequencer", server->getName()) 
 			<< "removing " << *molecule << logend();
@@ -813,9 +813,8 @@ void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs,
 		return;
 	}
 
-	// start the new activity before sending packets to minimize delay
-
-	started = activity.start();
+	// start mext molecule before sending reply to minimise delay
+	activity.start();
 
 	if (atEnd)
 	{

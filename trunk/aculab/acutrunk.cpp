@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.13 2001/07/24 01:02:22 lars Exp $
+	$Id: acutrunk.cpp,v 1.14 2001/08/08 14:26:45 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -378,12 +378,12 @@ void AculabTrunk::release()
 	s_dispatcher.unlock();
 
 	m_state = idle;
-	setName(-1);
 }
 	
 void AculabTrunk::abort()
 {
 	release();
+	setName(-1);
 }
 
 int AculabTrunk::getCause()
@@ -508,29 +508,34 @@ void AculabTrunk::onIdle()
 
 		// restart automatically
 		release();
+		setName(-1);
 		listen();
 
 		break;
 	case connecting:
 		// outgoing failed or stopped
-		m_client->connectDone(this, m_stopped ? r_aborted : cause);
-		m_stopped = false;
 		release();
+		m_client->connectDone(this, m_stopped ? r_aborted : cause);
+		setName(-1);
+		m_stopped = false;
 		break;
 	case connected:
 		m_client->disconnectRequest(this, cause);
 		m_state = disconnecting;
 		break;
 	case disconnecting:
-		m_client->disconnectDone(this, r_ok);
 		release();
+		m_client->disconnectDone(this, r_ok);
+		setName(-1);
 		break;
 	case accepting:
-		m_client->acceptDone(this, cause);
 		release();
+		m_client->acceptDone(this, cause);
+		setName(-1);
 		break;
 	default:
 		release();
+		setName(-1);
 		break;
 	}
 }
