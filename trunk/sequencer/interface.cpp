@@ -213,7 +213,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			char name[32];
 
-			sprintf(name, "Conf[%d]", conf->getHandle());
+			sprintf(name, "conf[%d]", conf->getHandle());
 
 			ic->begin() << V3_OK << ' ' << id.c_str() << " CNFO " << name << end();
 		}
@@ -228,7 +228,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 		(*ic) >> conf;
 
-		if (conf.size() <= 4 || conf.substr(0, 5) != "Conf[")
+		if (conf.size() <= 4 || conf.substr(0, 5) != "conf[")
 		{
 			ic->clear();
 
@@ -239,7 +239,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 		unsigned handle(0);
 
-		sscanf(conf.c_str(), "Conf[%d]", &handle);
+		sscanf(conf.c_str(), "conf[%d]", &handle);
 
 		if (!handle)
 		{
