@@ -1,7 +1,7 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.4 2001/06/19 15:02:51 lars Exp $
+	$Id: acutrunk.h,v 1.5 2001/07/03 23:13:02 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -29,8 +29,8 @@ public:
 	CallEventDispatcher() {}
 	~CallEventDispatcher()	{}
 
-	void lock()		{ mutex.lock(); }
-	void unlock()	{ mutex.unlock(); }
+	void lock()		{ m_mutex.lock(); }
+	void unlock()	{ m_mutex.unlock(); }
 
 	void add(ACU_INT handle, AculabTrunk* trunk);
 	void remove(ACU_INT handle);
@@ -41,8 +41,8 @@ protected:
 
     virtual void* run_undetached(void* arg);
 
-	std::map<ACU_INT, AculabTrunk*> handle_map;
-	omni_mutex mutex;
+	std::map<ACU_INT, AculabTrunk*> m_handle_map;
+	omni_mutex m_mutex;
 };
 
 class AculabTrunk : public Trunk
@@ -50,8 +50,8 @@ class AculabTrunk : public Trunk
 public:
 
 	AculabTrunk(TrunkClient* aClient, int aPort, Telephone* aTelephone = 0) 
-		: Trunk(aClient, aTelephone), handle(-1), port(aPort), 
-		stopped(false) {}
+		: Trunk(aClient, aTelephone), m_handle(-1), m_port(aPort), 
+		m_stopped(false) {}
     virtual ~AculabTrunk() {}
 
 	// Connection establishment 
@@ -74,8 +74,8 @@ public:
     virtual bool hasDetails()		{ return true; }
     virtual bool needDSPSupport()	{ return false; }
 
-	void lock() { mutex.lock(); }
-	void unlock() { mutex.unlock(); }
+	void lock() { m_mutex.lock(); }
+	void unlock() { m_mutex.unlock(); }
 
 	static void start();
 
@@ -107,13 +107,13 @@ protected:
 
 	friend class CallEventDispatcher;
 
-	omni_mutex mutex;
-	ACU_INT handle;
-	int port;
-	bool stopped;
+	omni_mutex m_mutex;
+	ACU_INT m_handle;
+	int m_port;
+	bool m_stopped;
 
-	static siginfo_xparms siginfo[MAXPORT];
-	static CallEventDispatcher dispatcher;
+	static siginfo_xparms s_siginfo[MAXPORT];
+	static CallEventDispatcher s_dispatcher;
 };
 
 #endif

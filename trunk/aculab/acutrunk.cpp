@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.10 2001/06/29 16:04:20 lars Exp $
+	$Id: acutrunk.cpp,v 1.11 2001/07/03 23:13:02 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -14,17 +14,17 @@
 #include <iomanip>
 #include "acutrunk.h"
 
-CallEventDispatcher AculabTrunk::dispatcher;
-struct siginfo_xparms AculabTrunk::siginfo[MAXPORT];
+CallEventDispatcher AculabTrunk::s_dispatcher;
+struct siginfo_xparms AculabTrunk::s_siginfo[MAXPORT];
 
 void CallEventDispatcher::add(ACU_INT handle, AculabTrunk* trunk)
 {
-	handle_map[handle] = trunk;
+	m_handle_map[handle] = trunk;
 }
 
 void CallEventDispatcher::remove(ACU_INT handle)
 {
-	handle_map.erase(handle);
+	m_handle_map.erase(handle);
 }
 
 void* CallEventDispatcher::run_undetached(void* arg)
@@ -50,13 +50,17 @@ void* CallEventDispatcher::run_undetached(void* arg)
 			{
 				lock();
 
-				std::map<ACU_INT, AculabTrunk*>:: iterator i = handle_map.find(event.handle);
+				std::map<ACU_INT, AculabTrunk*>::iterator i = 
+					m_handle_map.find(event.handle);
 
 				unlock();
 
-				if (i == handle_map.end())
+				if (i == m_handle_map.end())
 				{
-					log(log_error, "trunk") << "no device registered for handle : 0x" << std::setbase(16) << event.handle << std::setbase(10) << logend();
+					log(log_error, "trunk") << 
+						"no device registered for handle : 0x" 
+						<< std::setbase(16) << event.handle 
+						<< std::setbase(10) << logend();
 				}
 				else
 				{
@@ -152,11 +156,11 @@ const char* AculabTrunk::eventName(ACU_LONG event)
 
 void AculabTrunk::start()
 { 
-	memset(&AculabTrunk::siginfo, 0, sizeof(AculabTrunk::siginfo));
+	memset(&AculabTrunk::s_siginfo, 0, sizeof(AculabTrunk::s_siginfo));
 
-	call_signal_info(AculabTrunk::siginfo);
+	call_signal_info(AculabTrunk::s_siginfo);
 
-	dispatcher.start(); 
+	s_dispatcher.start(); 
 }
 
 int AculabTrunk::listen()
@@ -165,32 +169,32 @@ int AculabTrunk::listen()
 
 	memset(&incoming, 0, sizeof(incoming));
 
-	omni_mutex_lock l(mutex);
+	omni_mutex_lock l(m_mutex);
 
-	incoming.net = port;
+	incoming.net = m_port;
     incoming.ts = -1;
 	incoming.cnf = CNF_REM_DISC | CNF_CALL_CHARGE;
 
 	// we must lock the global dispatcher before we enter call_openin
 	// to avoid that the the dispatcher dispatches an event for this channel
 	// before it was added to it's map
-	dispatcher.lock();
+	s_dispatcher.lock();
 
     int rc = call_openin(&incoming);
     if (rc != 0)
 	{
-		dispatcher.unlock();
+		s_dispatcher.unlock();
 
 		log(log_error, "trunk") << "call_openin failed: " << rc << logend();
 	}
 
-	handle = incoming.handle;
-	stopped = false;
+	m_handle = incoming.handle;
+	m_stopped = false;
 
-	dispatcher.add(incoming.handle, this);
-	dispatcher.unlock();
+	s_dispatcher.add(incoming.handle, this);
+	s_dispatcher.unlock();
 
-	state = waiting;
+	m_state = waiting;
 
 	return r_ok;
 }
@@ -201,9 +205,9 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 
 	memset(&outdetail, 0, sizeof(outdetail));
 
-	omni_mutex_lock l(mutex);
+	omni_mutex_lock l(m_mutex);
 
-	if (state != idle)
+	if (m_state != idle)
 	{
 		return r_bad_state;
 	}
@@ -213,9 +217,9 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 		return r_invalid;
 	}
 
-	int sigsys = call_type(port);
+	int sigsys = call_type(m_port);
 
-    outdetail.net = port;
+    outdetail.net = m_port;
     outdetail.ts = -1;
 	outdetail.cnf = CNF_REM_DISC | CNF_CALL_CHARGE;
 	outdetail.sending_complete = 1;
@@ -271,7 +275,7 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 	// we must lock the global dispatcher before we enter call_openout
 	// to avoid that the the dispatcher dispatches an event for this channel
 	// before it was added to it's map
-	dispatcher.lock();
+	s_dispatcher.lock();
 
 	int rc = call_openout(&outdetail);
 	if (rc != 0)
@@ -281,25 +285,24 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
         return r_failed;
     }
 
-    handle = outdetail.handle;
+    m_handle = outdetail.handle;
 
-	dispatcher.add(handle, this);
+	s_dispatcher.add(m_handle, this);
+	s_dispatcher.unlock();
 
-	dispatcher.unlock();
-
-	state = connecting;
+	m_state = connecting;
 
 	return r_ok;
 }
 	
 int AculabTrunk::accept()
 {
-	omni_mutex_lock l(mutex);
+	omni_mutex_lock l(m_mutex);
 
-	if (state != collecting_details)
+	if (m_state != collecting_details)
 		return r_bad_state;
 
-	int rc = call_accept(handle);
+	int rc = call_accept(m_handle);
 
 	if (rc)
 	{
@@ -311,7 +314,7 @@ int AculabTrunk::accept()
 		return r_failed;
 	}
 
-	state = accepting;
+	m_state = accepting;
 
 	return r_ok;
 }
@@ -323,13 +326,13 @@ int AculabTrunk::reject(int cause)
 
 int AculabTrunk::disconnect(int cause)
 {
-	omni_mutex_lock l(mutex);
+	omni_mutex_lock l(m_mutex);
 
 	CAUSE_XPARMS xcause;
 
 	memset(&xcause, 0, sizeof(xcause));
 
-	xcause.handle = handle;
+	xcause.handle = m_handle;
 	xcause.cause = cause;
 
 	int rc = call_disconnect(&xcause);
@@ -343,7 +346,7 @@ int AculabTrunk::disconnect(int cause)
 		return r_failed;
 	}
 
-	state = disconnecting;
+	m_state = disconnecting;
 
 	return r_ok;
 }
@@ -361,20 +364,20 @@ void AculabTrunk::release()
 
 	memset(&xcause, 0, sizeof(xcause));
 
-	xcause.handle = handle;
+	xcause.handle = m_handle;
 
 	int rc = call_release(&xcause);
 	if (rc)
 	{
 		log(log_error, "trunk", getName()) << "call_release failed: " << rc 
-			<< " in state " << stateName(state) << logend();
+			<< " in state " << stateName(m_state) << logend();
 	}
 
-	dispatcher.lock();
-	dispatcher.remove(handle);
-	dispatcher.unlock();
+	s_dispatcher.lock();
+	s_dispatcher.remove(m_handle);
+	s_dispatcher.unlock();
 
-	state = idle;
+	m_state = idle;
 	setName(-1);
 }
 	
@@ -387,14 +390,14 @@ int AculabTrunk::getCause()
 {
 	CAUSE_XPARMS cause;
 
-	cause.handle = handle;
+	cause.handle = m_handle;
 
 	int rc = call_getcause(&cause);
 	if (rc != 0)
 	{
 		log(log_error, "trunk", getName()) 
 			<< "call_getcause failed: " << rc << " in state " 
-			<< stateName(state) << logend();
+			<< stateName(m_state) << logend();
 
 		return r_failed;
 	}
@@ -432,7 +435,7 @@ int AculabTrunk::getCause()
 
 void AculabTrunk::onCallEvent(ACU_LONG event)
 {
-	omni_mutex_lock l(mutex);
+	omni_mutex_lock l(m_mutex);
 
 	log(log_debug+2, "trunk", getName()) << eventName(event) << logend();
 
@@ -496,12 +499,12 @@ void AculabTrunk::onIdle()
 
 	// stopTimer();
 
-	switch (state)
+	switch (m_state)
 	{
 	case collecting_details:
 	case waiting:
 		log(log_warning, "trunk", getName()) 
-			<< "incoming call went idle in state " << stateName(state) << logend();
+			<< "incoming call went idle in state " << stateName(m_state) << logend();
 
 		// restart automatically
 		release();
@@ -510,21 +513,21 @@ void AculabTrunk::onIdle()
 		break;
 	case connecting:
 		// outgoing failed or stopped
-		client->connectDone(this, stopped ? r_aborted : cause);
-		stopped = false;
+		m_client->connectDone(this, m_stopped ? r_aborted : cause);
+		m_stopped = false;
 		release();
 		break;
 	case connected:
-		client->disconnectRequest(this, cause);
-		state = disconnecting;
+		m_client->disconnectRequest(this, cause);
+		m_state = disconnecting;
 		break;
 	case disconnecting:
 		release();
-		client->disconnectDone(this, r_ok);
+		m_client->disconnectDone(this, r_ok);
 		break;
 	case accepting:
 		release();
-		client->acceptDone(this, cause);
+		m_client->acceptDone(this, cause);
 		break;
 	default:
 		release();
@@ -534,7 +537,7 @@ void AculabTrunk::onIdle()
 
 void AculabTrunk::onWaitForIncoming()
 {
-	state = waiting;
+	m_state = waiting;
 }
 
 void AculabTrunk::onIncomingCallDetected()
@@ -543,7 +546,7 @@ void AculabTrunk::onIncomingCallDetected()
 	DETAIL_XPARMS details;
 
 	details.timeout = 0;
-	details.handle = handle;
+	details.handle = m_handle;
 
 	int rc = call_details(&details);
 
@@ -561,17 +564,17 @@ void AculabTrunk::onIncomingCallDetected()
 
 	setName(details.ts);
 
-	timeslot.st = details.stream;
-	timeslot.ts = details.ts;
+	m_timeslot.st = details.stream;
+	m_timeslot.ts = details.ts;
 
 	remote.setAddress(details.originating_addr);
 	local.setAddress(details.destination_addr);
 	local.setService(details.stream);
 	local.setSelector(details.ts);
 
-	state = collecting_details;
+	m_state = collecting_details;
 
-	client->connectRequest(this, local, remote);
+	m_client->connectRequest(this, local, remote);
 }
 
 void AculabTrunk::onCallConnected()
@@ -579,7 +582,7 @@ void AculabTrunk::onCallConnected()
 	DETAIL_XPARMS details;
 
 	details.timeout = 0;
-	details.handle = handle;
+	details.handle = m_handle;
 
 	int rc = call_details(&details);
 
@@ -590,19 +593,19 @@ void AculabTrunk::onCallConnected()
 		return;
 	}
 
-	state = connected;
+	m_state = connected;
 
 	if (details.calltype == INCOMING)
 	{
-		client->acceptDone(this, r_ok);
+		m_client->acceptDone(this, r_ok);
 	}
 	else
 	{
-		client->connectDone(this, r_ok);
+		m_client->connectDone(this, r_ok);
 	}
 
-	if (phone)
-		phone->connected(this);
+	if (m_phone)
+		m_phone->connected(this);
 }
 
 void AculabTrunk::onWaitForOutgoing()
@@ -617,7 +620,7 @@ void AculabTrunk::onRemoteDisconnect()
 {
 	int cause;
 
-	switch (state)
+	switch (m_state)
 	{
 	case disconnecting:
 		break;
@@ -625,27 +628,28 @@ void AculabTrunk::onRemoteDisconnect()
 	
 		cause = getCause();
 
-		client->disconnectRequest(this, cause);
+		m_client->disconnectRequest(this, cause);
 
-		state = disconnecting;
+		m_state = disconnecting;
 		break;
 	case accepting:
-		client->acceptDone(this, getCause());
-		state = idle;
+		m_client->acceptDone(this, getCause());
+		m_state = idle;
 		disconnect();
 		break;
 	case waiting:
 		disconnect();
 		break;
 	default:
-		log(log_error, "trunk", getName()) << "unhandled state " << stateName(state) << " in onRemoteDisconnect" << logend();
+		log(log_error, "trunk", getName()) << "unhandled state " 
+			<< stateName(m_state) << " in onRemoteDisconnect" << logend();
 		break;
 	}
 }
 
 void AculabTrunk::onWaitForAccept()
 {
-	state = accepting;
+	m_state = accepting;
 }
 
 void AculabTrunk::onOutgoingProceeding()
@@ -657,7 +661,7 @@ void AculabTrunk::onDetails()
 	DETAIL_XPARMS details;
 
 	details.timeout = 0;
-	details.handle = handle;
+	details.handle = m_handle;
 
 	int rc = call_details(&details);
 
@@ -687,7 +691,7 @@ void AculabTrunk::setName(int ts)
 	{
 		char buffer[MAXSIGSYS + 16];
 
-		sprintf(buffer, "%s[%d,%d]", siginfo[port].sigsys, port, ts);
+		sprintf(buffer, "%s[%d,%d]", s_siginfo[m_port].sigsys, m_port, ts);
 
 		Trunk::setName(buffer);
 	}

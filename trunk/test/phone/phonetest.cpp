@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.16 2001/06/27 20:03:20 lars Exp $
+	$Id: phonetest.cpp,v 1.17 2001/07/03 23:13:02 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -156,15 +156,15 @@ public:
 	}
 
 	virtual void completed(Telephone *server, Sample *sample, unsigned msecs)
-	{
-		log(log_debug, "app", server->getName()) << "sample completed" 
-			<< logend();
-		
+	{		
 		m_mutex.lock();
 		m_active = 0;
 		m_mutex.unlock();
 
 		delete sample;
+
+		log(log_debug, "app", server->getName()) << "sample completed" 
+			<< logend();
 
 		server->disconnect();
 	}

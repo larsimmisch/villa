@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.9 2001/06/26 14:31:23 lars Exp $
+	$Id: acuphone.h,v 1.10 2001/07/03 23:13:02 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -44,20 +44,20 @@ class ProsodyError : public Exception
 public:
 
     ProsodyError(const char *file, int line, const char* function, int rc, Exception* prev = 0)
-		: Exception(file, line, function, "ProsodyError", prev), error(rc) {}
+		: Exception(file, line, function, "ProsodyError", prev), m_error(rc) {}
 
     virtual ~ProsodyError() {}
 
     virtual void printOn(std::ostream& out) const
 	{
 		Exception::printOn(out);
-		out << ": " << prosody_error(error);
+		out << ": " << prosody_error(m_error);
 	}
 
 protected:
 
-	const char* description;
-	int error;
+	const char* m_description;
+	int m_error;
 };
 
 class ProsodyObserver
@@ -79,7 +79,7 @@ public:
 
 	enum { max_observers_per_thread = MAXIMUM_WAIT_OBJECTS };
 
-	ProsodyEventDispatcher() : running(false) {}
+	ProsodyEventDispatcher() : m_running(false) {}
 
 	// if add is called after the thread has been started,
 	// an exception will be thrown
@@ -102,7 +102,7 @@ protected:
 	public:
 
 		DispatcherThread(ProsodyEventDispatcher& d, int o, int l) 
-			: dispatcher(d), offset(o), length(l), 
+			: m_dispatcher(d), m_offset(o), m_length(l), 
 			omni_thread(NULL, PRIORITY_HIGH) {}
 
 		void start() { start_undetached(); }
@@ -111,26 +111,27 @@ protected:
 
 		virtual void* run_undetached(void* arg);
 
-		ProsodyEventDispatcher& dispatcher;
-		int offset;
-		int length;
+		ProsodyEventDispatcher& m_dispatcher;
+		int m_offset;
+		int m_length;
 	};
 
 	friend class DispatcherThread;
 
 	struct ObserverMethod
 	{
-		ObserverMethod(ProsodyObserver* o, ProsodyObserverMethod m) : observer(o), method(m) {} 
+		ObserverMethod(ProsodyObserver* o, ProsodyObserverMethod m) 
+			: m_observer(o), m_method(m) {} 
 
-		ProsodyObserver* observer;
-		ProsodyObserverMethod method;
+		ProsodyObserver *m_observer;
+		ProsodyObserverMethod m_method;
 	};
 
-	bool running;
+	bool m_running;
 	// events and methods are parallel arrays.
-	std::vector<tSMEventId> events;
-	std::vector<ObserverMethod> methods;
-	std::vector<DispatcherThread*> threads;
+	std::vector<tSMEventId> m_events;
+	std::vector<ObserverMethod> m_methods;
+	std::vector<DispatcherThread*> m_threads;
 };
 
 // this is a full duplex Prosody channel
@@ -141,14 +142,14 @@ public:
 	ProsodyChannel();
 	virtual ~ProsodyChannel()
 	{
-		sm_channel_release(channel);
-		smd_ev_free(eventRead);
-		smd_ev_free(eventWrite);
-		smd_ev_free(eventRecog);
+		sm_channel_release(m_channel);
+		smd_ev_free(m_eventRead);
+		smd_ev_free(m_eventWrite);
+		smd_ev_free(m_eventRecog);
 	}
 
 	// cast operator
-	operator tSMChannelId() { return channel; }
+	operator tSMChannelId() { return m_channel; }
 
 	virtual void startEnergyDetector(unsigned qualTime);
 	virtual void stopEnergyDetector();
@@ -174,14 +175,14 @@ protected:
 
 		virtual unsigned getLength();
 
-		virtual Storage* getStorage() { return storage; }
+		virtual Storage* getStorage() { return m_storage; }
 
 	protected:
 		
-		bool recordable;
-		Storage* storage;
-		ProsodyChannel *prosody;
-		std::string name;
+		bool m_recordable;
+		Storage* m_storage;
+		ProsodyChannel *m_prosody;
+		std::string m_name;
 	};
 
 	class RecordFileSample : public FileSample
@@ -189,7 +190,7 @@ protected:
 	public:
 	
 		RecordFileSample(ProsodyChannel *channel, const char* name, unsigned max)
-			: FileSample(channel, name, true), maxTime(max) {}
+			: FileSample(channel, name, true), m_maxTime(max) {}
 		virtual ~RecordFileSample() {}
 
         virtual unsigned start(Telephone *phone);
@@ -202,14 +203,15 @@ protected:
 
 	protected:
 
-		unsigned maxTime;
+		unsigned m_maxTime;
 	};
 
 	class Beep : public Sample
 	{
 	public:
 		
-		Beep(ProsodyChannel *channel, int numBeeps) : beeps(numBeeps), prosody(channel), count(0), offset(0) {}
+		Beep(ProsodyChannel *channel, int numBeeps) : 
+		  m_beeps(numBeeps), m_prosody(channel), m_count(0), m_offset(0) {}
 		virtual ~Beep() {}
 
         virtual unsigned start(Telephone *phone);
@@ -218,25 +220,26 @@ protected:
 		// fills prosody buffers if space available, notifies about completion if done
 		virtual int process(Telephone *phone);
 
-		int beeps;
-		int count;
-		unsigned offset;
-		ProsodyChannel *prosody;
+		int m_beeps;
+		int m_count;
+		unsigned m_offset;
+		ProsodyChannel *m_prosody;
 	};
 
 	class Touchtones : public Sample
 	{
 	public:
 		
-		Touchtones(ProsodyChannel *channel, const char* att) : tt(att), prosody(channel) {}
+		Touchtones(ProsodyChannel *channel, const char* att) 
+			: m_tt(att), m_prosody(channel) {}
 		virtual ~Touchtones() {}
 
         virtual unsigned start(Telephone *phone);
         virtual bool stop(Telephone *phone);
 		virtual int process(Telephone *phone);
 
-		std::string tt;
-		ProsodyChannel *prosody;
+		std::string m_tt;
+		ProsodyChannel *m_prosody;
 	};
 
 	friend class FileSample;
@@ -246,16 +249,16 @@ protected:
 
 	tSMEventId set_event(tSM_INT type);
 
-	tSMChannelId channel;
-	tSMEventId eventRead;
-	tSMEventId eventWrite;
-	tSMEventId eventRecog;
-	struct sm_listen_for_parms listenFor;
-	struct sm_channel_info_parms info;
-	omni_mutex mutex;
-	Sample *current;
+	tSMChannelId m_channel;
+	tSMEventId m_eventRead;
+	tSMEventId m_eventWrite;
+	tSMEventId m_eventRecog;
+	struct sm_listen_for_parms m_listenFor;
+	struct sm_channel_info_parms m_info;
+	omni_mutex m_mutex;
+	Sample *m_current;
 
-	static ProsodyEventDispatcher dispatcher;
+	static ProsodyEventDispatcher s_dispatcher;
 };
 
 class AculabPhone : public Telephone, public ProsodyChannel
@@ -263,7 +266,7 @@ class AculabPhone : public Telephone, public ProsodyChannel
 public:
 
 	AculabPhone(TelephoneClient *client, Trunk* trunk, int switchNo, Timeslot receive = Timeslot(-1, -1), Timeslot transmit = Timeslot(-1,-1), void* aClientData = 0) 
-		: Telephone(client, trunk, receive, transmit, aClientData), sw(switchNo)
+		: Telephone(client, trunk, receive, transmit, aClientData), m_sw(switchNo)
 	{
 		if (trunk)
 			trunk->setTelephone(this);
@@ -273,7 +276,7 @@ public:
 	virtual void connected(Trunk* aTrunk);
 	virtual void disconnected(Trunk *trunk, int cause);
 
-    virtual Switch* getSwitch() { return &sw; }
+    virtual Switch* getSwitch() { return &m_sw; }
 
 	virtual Sample* createFileSample(const char *name) { return new FileSample(this, name); }
 	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime) { return new RecordFileSample(this, name, maxTime); }
@@ -283,9 +286,9 @@ public:
 	virtual void startEnergyDetector(unsigned qualTime) { ProsodyChannel::startEnergyDetector(qualTime); }
 	virtual void stopEnergyDetector() { ProsodyChannel::stopEnergyDetector(); }
 
-	virtual const char* getName() { return trunk ? trunk->getName() : NULL; }
+	virtual const char* getName() { return m_trunk ? m_trunk->getName() : NULL; }
 
-	static void start() { dispatcher.start(); }
+	static void start() { s_dispatcher.start(); }
 
 protected:
 
@@ -293,7 +296,7 @@ protected:
 	virtual void onWrite(tSMEventId id);
 	virtual void onRecog(tSMEventId id);
 
-	AculabSwitch sw;
+	AculabSwitch m_sw;
 };
 
 #endif
