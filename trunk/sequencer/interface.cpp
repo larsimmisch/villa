@@ -69,7 +69,7 @@ void Interface::run()
 
 				m_connections.push_back(ic);
 
-				log(log_debug, "sequencer") << "client " << remote << " attached" << logend();
+				log(log_info, "sequencer") << "client " << remote << " attached" << logend();
 
 				ic->begin() << "sequence protocol 0.2" << end();
 			}
@@ -97,10 +97,10 @@ void Interface::run()
 					if (rc == 0 || exit)
 					{
 						if (rc == 0)
-							log(log_debug, "sequencer") << "client " 
+							log(log_info, "sequencer") << "client " 
 								<< ic->m_remote << " aborted" << logend();
 						else
-							log(log_debug, "sequencer") << "client "
+							log(log_info, "sequencer") << "client "
 								<< ic->m_remote << " disconnected " << logend();
 
 						// remove all listeners for the disconnected app

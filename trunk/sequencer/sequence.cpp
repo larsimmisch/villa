@@ -284,8 +284,16 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 	lock();
 
-	m_activity[channel].add(*molecule);
-	checkCompleted();
+	try
+	{
+		m_activity[channel].add(*molecule);
+		checkCompleted();
+	}
+	catch(...)
+	{
+		unlock();
+		throw;
+	}
 
 	unlock();
 
@@ -975,6 +983,7 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 		m_callref = INVALID_CALLREF;
 		gMediaPool.release(m_media);
 		m_media = 0;
+		m_id.erase();
 
 		if (m_interface)
 		{
@@ -1295,7 +1304,7 @@ int main(int argc, char* argv[])
 
 		if (rc)
 		{
-			log(log_error, "app") << "sw_mode_switch("<< sw << ") failed: " << rc
+			log(log_error, "sequencer") << "sw_mode_switch("<< sw << ") failed: " << rc
 				<< logend();
 
 			return rc;
@@ -1305,13 +1314,13 @@ int main(int argc, char* argv[])
 		{
 			gBus = new H100;
 
-			log(log_debug, "app") << "using H.100 for switching" << logend();
+			log(log_info, "sequencer") << "using H.100 for switching" << logend();
 		}
 		else if (swmode.ct_buses & 1 << SWMODE_CTBUS_SCBUS)
 		{
 			gBus = new SCbus;
 
-			log(log_debug, "app") << "using SCbus for switching" << logend();
+			log(log_info, "sequencer") << "using SCbus for switching" << logend();
 		}
 
 		for (unsigned index = 0; 1; index++)
@@ -1391,7 +1400,7 @@ int main(int argc, char* argv[])
 		}
 
 		nmodules = sm_get_modules();
-		log(log_debug, "sequencer") 
+		log(log_info, "sequencer") 
 			 << nmodules << " prosody modules found" << logend();
 
 		if (firmware)
