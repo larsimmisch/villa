@@ -40,10 +40,15 @@ Timer Sequencer::timer;
 #pragma warning(disable : 4355)
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
-  :	m_activity(this), m_configuration(aConfiguration), m_connectComplete(0),
+  :	m_configuration(aConfiguration), m_connectComplete(0),
 	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), m_interface(0),
 	m_callref(INVALID_CALLREF), m_trunk(0), m_media(0), m_closing(false)
 {
+	for (int i = 0; i < MAXCHANNELS; ++i)
+	{
+		m_activity[i] = this;
+	}
+
 	m_receive = gBus->allocate();
 	m_transmit = gBus->allocate();
 
@@ -53,7 +58,7 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
 }
 
 Sequencer::Sequencer(InterfaceConnection *server) 
-  :	m_activity(this), m_configuration(0), m_connectComplete(0),
+  :	m_configuration(0), m_connectComplete(0),
 	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), m_interface(server),
 	m_callref(INVALID_CALLREF), m_trunk(0), m_media(0), m_closing(false)
 {
@@ -87,9 +92,11 @@ void Sequencer::lost_connection()
 
 int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 {
+	unsigned channel;
 	unsigned mode;
 	unsigned priority;
 
+	(*server) >> channel;
 	(*server) >> mode;
 	(*server) >> priority;
 
@@ -97,7 +104,16 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 	{
 		server->clear();
 
-		server->syntax_error(id) << "expecting jobid, mode and priority" << end(); 
+		server->syntax_error(id) << "expecting channel, jobid, mode and priority" << end(); 
+
+		return V3_FATAL_SYNTAX;
+	}
+
+	if (channel >= MAXCHANNELS)
+	{
+		server->clear();
+
+		server->syntax_error(id) << "invalid channel" << end(); 
 
 		return V3_FATAL_SYNTAX;
 	}
@@ -239,7 +255,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 	lock();
 
-	m_activity.add(*molecule);
+	m_activity[channel].add(*molecule);
 	checkCompleted();
 
 	unlock();
@@ -261,7 +277,11 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 		return V3_FATAL_SYNTAX;
 	}
 
-	Molecule* molecule = m_activity.find(mid);
+	Molecule* molecule = 0;
+	for (int i = 0; i < MAXCHANNELS && !molecule; ++i)
+	{
+		molecule = m_activity[i].find(mid);
+	}
 
 	if (!molecule) 
 	{
@@ -284,7 +304,7 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 	}
 	else
 	{
-		m_activity.remove(molecule);
+		m_activity[molecule->getChannel()].remove(molecule);
 
 		server->begin() << V3_OK << ' ' << id.c_str() 
 			<< " MLCD " << m_id.c_str() << " removed" << end();
@@ -315,39 +335,43 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 
 	omni_mutex_lock lock(m_mutex);
 
-	for (ActivityIter i(m_activity); !i.isDone(); i.next())
+	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
-		Molecule *molecule = i.current();
-
-		if (molecule->getMode() & Molecule::dont_interrupt)  
+		for (ActivityIter ai(m_activity[i]); !ai.isDone(); ai.next())
 		{
-			done = false;
-			continue;
-		}
+			Molecule *molecule = ai.current();
 
-		if (molecule->getPriority() >= fromPriority && molecule->getPriority() <= toPriority)
-		// if active, stop and send ack when stopped, else remove and send ack immediately
-		if (molecule->isActive() && immediately)
-		{
-			done = false;	
+			if (molecule->getMode() & Molecule::dont_interrupt)  
+			{
+				done = false;
+				continue;
+			}
 
-			molecule->setMode(Molecule::discard);
-			molecule->stop(this);
-			
-			log(log_debug, "sequencer") << "stopped molecule " 
-				<< molecule->getId() << logend();
+			if (molecule->getPriority() >= fromPriority && molecule->getPriority() <= toPriority)
+			// if active, stop and send ack when stopped, else remove and send ack immediately
+			if (molecule->isActive() && immediately)
+			{
+				done = false;	
 
-			checkCompleted();
-		}
-		else
-		{
-			log(log_debug, "sequencer") << "removing molecule "  
-				<< molecule->getId() << logend();
+				molecule->setMode(Molecule::discard);
+				molecule->stop(this);
+				
+				log(log_debug, "sequencer") << "stopped molecule " 
+					<< molecule->getId() << logend();
 
-			m_activity.remove(molecule);
+				checkCompleted();
+			}
+			else
+			{
+				log(log_debug, "sequencer") << "removing molecule "  
+					<< molecule->getId() << logend();
+
+				m_activity[i].remove(molecule);
+			}
 		}
 	}
 
+	// Todo: also send MLDP when stop was asynchronous
 	if (done)
 	{
 		server->begin() << V3_OK << ' ' << id.c_str()
@@ -489,6 +513,18 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 	return rc;
 }
 
+bool Sequencer::channelsIdle()
+{
+	bool idle(true);
+
+	for (int i = 0; i < MAXCHANNELS; ++i)
+	{
+		idle = m_activity[i].getState() == Activity::idle && idle;
+	}
+
+	return idle;
+}
+
 int Sequencer::disconnect(int cause)
 {
 	int rc = V3_OK;
@@ -496,19 +532,22 @@ int Sequencer::disconnect(int cause)
 	omni_mutex_lock l(m_mutex);
 	m_disconnecting = m_callref;
 
-	if (m_activity.getState() == Activity::active)
+	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
-		log(log_debug, "sequencer", getName()) 
-			<< "disconnect - stopping activity" << logend();
+		if (m_activity[i].getState() == Activity::active)
+		{
+			log(log_debug, "sequencer", getName()) 
+				<< "disconnect - stopping channel " << i << logend();
 
-		m_activity.stop();
+			m_activity[i].stop();
+		}
 	}
 
 	checkCompleted();
 
-	if (m_activity.getState() == Activity::idle)
+	if (channelsIdle())
 	{
-		log(log_debug, "sequencer", getName()) << "disconnect - activity idle" << logend();
+		log(log_debug, "sequencer", getName()) << "disconnect - all channels idle" << logend();
 
 		m_media->disconnected(m_trunk);
 		rc = m_trunk->disconnect(m_callref, cause);
@@ -534,19 +573,22 @@ int Sequencer::close(const std::string &id)
 		return V3_ERROR_PROTOCOL_VIOLATION;
 	}
 
-	if (m_activity.getState() == Activity::active)
+	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
-		log(log_debug, "sequencer", getName()) 
-			<< "close - stopping activity" << logend();
+		if (m_activity[i].getState() == Activity::active)
+		{
+			log(log_debug, "sequencer", getName()) 
+				<< "close - stopping channel " << i << logend();
 
-		m_activity.stop();
+			m_activity[i].abort();
+		}
 	}
 
 	checkCompleted();
 
-	if (m_activity.getState() == Activity::idle)
+	if (channelsIdle())
 	{
-		log(log_debug, "sequencer", getName()) << "close - activity idle" << logend();
+		log(log_debug, "sequencer", getName()) << "close - all channels idle" << logend();
 
 		idle = true;
 		gMediaPool.release(m_media);
@@ -720,10 +762,6 @@ void Sequencer::transferDone(Trunk *server, unsigned callref, int result)
 	log(log_debug, "sequencer", getName()) 
 		<< "transfer succeeded" << logend();
 
-	m_activity.stop();
-
-	checkCompleted();
-
 /* Todo
 
 	lock();
@@ -746,19 +784,22 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	omni_mutex_lock lock(m_mutex);
 
 	// if we are active, stop
-	if (m_activity.getState() == Activity::active)
+	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
-		log(log_debug, "sequencer", getName()) 
-			<< "disconnect request - stopping activity" << logend();
+		if (m_activity[i].getState() == Activity::active)
+		{
+			log(log_debug, "sequencer", getName()) 
+				<< "disconnect request - stopping channel " << i << logend();
 
-		m_activity.stop();
+			m_activity[i].abort();
+		}
 	}
 
 	checkCompleted();
 
 	// notify client unless already disconnecting or still stopping
 	if (m_interface && m_disconnecting != INVALID_CALLREF 
-		&& m_activity.getState() == Activity::idle)
+		&& channelsIdle())
 	{
 		m_interface->begin() << V3_EVENT << " RDIS " << getName() 
 			<< end();
@@ -884,7 +925,7 @@ void Sequencer::remoteRinging(Trunk *server, unsigned callref)
 
 void Sequencer::started(Media *server, Sample *aSample)
 {
-	Molecule* m = (Molecule*)aSample->getUserData(0);
+	Molecule* m = (Molecule*)aSample->getUserData();
 
 	if (m->notifyStart())
 	{
@@ -902,13 +943,13 @@ void Sequencer::started(Media *server, Sample *aSample)
 
 void Sequencer::completed(Media *server, Sample *aSample, unsigned msecs)
 {
-	completed(server, (Molecule*)(aSample->getUserData(0)), msecs, aSample->getStatus());
+	completed(server, (Molecule*)(aSample->getUserData()), msecs, aSample->getStatus());
 }
 
 void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, unsigned status)
 {
 	bool done, atEnd, notifyStop, start(true);
-	unsigned pos, length, nAtom;
+	unsigned pos, length, nAtom, channel;
 	std::string id;
 	std::string jobid;
 
@@ -918,6 +959,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	// the molecule will be changed after the done. Grab all necesssary information before done.
 
+	channel = molecule->getChannel();
 	nAtom = molecule->currentAtom();
 	atEnd = molecule->atEnd();
 	notifyStop = molecule->notifyStop();
@@ -937,12 +979,12 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 		sendAtomDone(id.c_str(), nAtom, status, msecs);
 	}
 
-	if (m_activity.getState() == Activity::stopping || done)
+	if (m_activity[channel].getState() == Activity::stopping || done)
 	{
 		log(log_debug+2, "sequencer", server->getName()) 
 			<< "removing " << *molecule << logend();
 
-		m_activity.remove(molecule);
+		m_activity[channel].remove(molecule);
 	}
 	else
 	{
@@ -989,7 +1031,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	// start next molecule before sending reply to minimise delay
 	if (start)
-		m_activity.start();
+		m_activity[channel].start();
 
 	if (atEnd && done)
 	{

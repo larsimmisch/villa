@@ -3,7 +3,7 @@ simple sequencer client:
 
 allocate background channel, start play and deallocate
 
-$Id: background.py,v 1.2 2004/01/12 21:48:06 lars Exp $
+$Id: background.py,v 1.3 2004/01/15 17:18:59 lars Exp $
 """
 
 import sys,getopt
@@ -29,7 +29,7 @@ class Background:
         self.device = event['device']
         self.sequencer.devices[self.device] = self
         print 'allocated:', self.device
-        self.send('MLCA %s 2 1 play ../test/phone/sitrtoot none'
+        self.send('MLCA %s 0 2 1 play ../test/phone/sitrtoot none'
                   % self.device)
 
     def BGRC(self, event, data):

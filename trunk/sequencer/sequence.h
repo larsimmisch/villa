@@ -18,6 +18,7 @@
 #include "queue.h"
 #include "configuration.h"
 
+#define MAXCHANNELS 2
 #define SEQUENCER_PORT 2104
 
 class Sequencer : public TrunkClient, public MediaClient
@@ -119,6 +120,8 @@ public:
 	void addCompleted(Media* server, Molecule* molecule, unsigned msecs, unsigned reason);
 	void checkCompleted();
 
+	bool channelsIdle();
+
 	// called when connection to client is lost
 	void lost_connection();
 
@@ -142,7 +145,7 @@ protected:
 	unsigned m_callref;
 	AculabMedia *m_media;
 	ClientQueue::Item *m_clientSpec;
-	Activity m_activity;
+	Activity m_activity[MAXCHANNELS];
 	CompletedQueue m_delayedCompletions;
 	omni_mutex m_mutex;
 	ConnectCompletion *m_connectComplete;

@@ -16,10 +16,6 @@
 #define NOTIFY_START 0x01
 #define NOTIFY_STOP 0x02
 
-#define INDEX_MOLECULE 0
-#define INDEX_CHANNEL 1
-
-
 // the model here is strictly asynchronous. if an atom/molecule is to be stopped, stop is called,
 // but succesful stopping is expected to be signalled by a done with completed 0
 // if new Atoms are synchronously stoppable, they must call Sequencer::completed(...)
@@ -47,10 +43,11 @@ class Atom : public DList::DLink
 {
 public:
 
-	Atom() : m_sample(0), m_notifications(0) {}
+	Atom() : m_sample(0), m_channel(0), m_notifications(0) {}
 	virtual ~Atom() {}
 
-	virtual int start(Sequencer* sequencer);
+	/* channel is typically 0..1 - it is intended for mixing/parallel jobs */
+	virtual int start(Sequencer* sequencer, unsigned channel = 0);
 	virtual int stop(Sequencer* sequencer);
 
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return true; }
@@ -62,19 +59,21 @@ public:
 
 	void setNotifications(int notify)	{ m_notifications = notify; }
 
+	unsigned getChannel() { return m_channel; }
+
 	bool notifyStart() const { return (m_notifications & NOTIFY_START) != 0; }
 	bool notifyStop() const { return (m_notifications & NOTIFY_STOP) != 0; }
 
 	virtual void printOn(std::ostream& out) = 0;
 
-	// no error checking - subclasses are expected to set m_sample
-	void setUserData(int index, void *data) { m_sample->setUserData(index, data); }
-	void *getUserData(int index) { return m_sample->getUserData(index); }
+	// no error checking - if m_sample is NULL or invalid, it is a bug
+	void setUserData(void *data) { m_sample->setUserData(data); }
+	void *getUserData() { return m_sample->getUserData(); }
 
 protected:
 
 	Sample *m_sample;
-
+	unsigned m_channel;
 	unsigned m_notifications;
 };
 
@@ -102,7 +101,7 @@ public:
 	Molecule(unsigned mode, int aPriority, const std::string &id);
 	virtual ~Molecule();	
 
-	virtual int start(Sequencer* sequencer);
+	virtual int start(Sequencer* sequencer, unsigned channel = 0);
 	virtual int stop(Sequencer* sequencer);
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason);
 	virtual bool setPos(unsigned aPosition);
@@ -289,26 +288,28 @@ public:
 
 	enum e_state { idle, active, stopping };
 
-	Activity(Sequencer* sequencer) : m_sequencer(sequencer), m_state(idle) {}
+	Activity(Sequencer* sequencer = 0) : m_sequencer(sequencer), m_state(idle) {}
 	virtual ~Activity();
 
 	virtual Molecule* add(Molecule& newMolecule);
 	virtual void remove(Molecule* aMolecule);
 
-	virtual int start();
-	virtual int stop();
+	virtual bool start();
+	virtual bool stop();
+
+	virtual bool abort();
 
 	virtual Molecule* find(const std::string &id);
 
 	e_state getState() const { return m_state; }
 	void setState(e_state s) { m_state = s; }
 
+	e_state m_state;
+	Sequencer* m_sequencer;
+
 protected:
 
 	virtual void freeLink(List::Link* anAtom);
-
-	e_state m_state;
-	Sequencer* m_sequencer;
 
 };
 

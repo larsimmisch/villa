@@ -20,8 +20,9 @@ char* copyString(const char* aString)
 	return s;
 }
 
-int Atom::start(Sequencer *sequencer)
+int Atom::start(Sequencer *sequencer, unsigned channel)
 {
+	m_channel = channel;
 	m_sample->start(sequencer->getMedia());
 
 	return true;
@@ -158,9 +159,11 @@ void Molecule::freeLink(List::Link* anAtom)
 	delete (Atom*)anAtom;
 }
 
-int Molecule::start(Sequencer* sequencer)
+int Molecule::start(Sequencer* sequencer, unsigned channel)
 {
 	int started(0);
+
+	m_channel = channel;
 
 	if (!isStopped())
 	{
@@ -207,8 +210,8 @@ int Molecule::start(Sequencer* sequencer)
 
 	if (m_current)
 	{
-		m_current->setUserData(INDEX_MOLECULE, this);
-		started = m_current->start(sequencer);
+		m_current->setUserData(this);
+		started = m_current->start(sequencer, channel);
 	}
 
 	m_flags &= ~stopped;
@@ -423,9 +426,9 @@ void Activity::freeLink(List::Link* aMolecule)
 	delete (Molecule*)aMolecule;
 }
 
-int Activity::start()
+bool Activity::start()
 {
-	int started;
+	bool started;
 	Molecule* molecule;
 
 	started = 0;
@@ -454,14 +457,36 @@ int Activity::start()
 	return started;
 }
 
-int Activity::stop()
+bool Activity::stop()
 {
-	int stopped = 0;
+	bool stopped(false);
 
-	if (head) 
+	if (head)
+	{
 		stopped = ((Molecule*)head)->stop(m_sequencer);
+	}
 
 	setState(stopped ? idle : stopping);
+
+	return stopped;
+}
+
+bool Activity::abort()
+{
+	bool stopped(false);
+
+	if (head)
+	{
+		stopped = ((Molecule*)head)->stop(m_sequencer);
+		removeAfter(head);
+	}
+
+	setState(stopped ? idle : stopping);
+
+	if (stopped)
+	{
+		empty();
+	}
 
 	return stopped;
 }
