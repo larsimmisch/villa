@@ -42,9 +42,12 @@ public:
 
 	void* getUserData() 	{ return m_userData; }
 
+/* Lars: protected commented out - I suspect a VC 6 bug with protected constructors
+
 protected:
 
 	friend class Conferences;
+*/
 
 	Conference(unsigned handle, void* aUserData = 0) : m_handle(handle),
 		m_userData(0), m_module(0), m_closed(false), m_speakers(0), m_listeners(0) {}
