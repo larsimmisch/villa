@@ -1,300 +1,177 @@
-// timer.cpp
+#pragma warning (disable : 4786)
+
+#include <utility>
+#include <vector>
+#include <assert.h>
 
 #include "timer.h"
 
-#include <stdio.h>
-#include <assert.h>
-#include <process.h>
-
-using namespace std;
-
-// this is yucky. I use the undocumented _assert function because
-// the proper "assert" macro is only evaluated if NDEBUG is undefined.
-
-extern "C" _CRTIMP void __cdecl _assert(void *, void *, unsigned);
-
-_CRTIMP void __cdecl _assert(void *, void *, unsigned);
-
-#define assert__(exp) (void)( (exp) || (_assert(#exp, __FILE__, __LINE__), 0) )
-
-class CSLock
+Timer::TimerID::TimerID(unsigned long delta, unsigned i,
+		TimerClient *client, unsigned user)
+	: m_abs_sec(0), m_abs_nsec(0), m_id(i), m_client(client), m_data(user)
 {
-public:
-
-	CSLock(CRITICAL_SECTION* cs) : m_CS(cs) { EnterCriticalSection(m_CS); }
-	~CSLock() { LeaveCriticalSection(m_CS); }
-
-protected:
-
-	CRITICAL_SECTION* m_CS;
-};
-
-static unsigned __stdcall threadAction(void* arg)
-{
-    T_CAsyncTimer* asyncTimer = (T_CAsyncTimer*)arg;
-
-	asyncTimer->Run();
-
-	return 0;
+	omni_thread::get_time(&m_abs_sec, &m_abs_nsec,
+			delta / 1000, (delta % 1000) * 1000000);
 }
 
-T_CAsyncTimer::TimerID::TimerID(CTkvs_ct kvs) : id(0), removed(false)
+bool Timer::TimerID::is_expired(void) const
 {
-	CTerror error;
+	unsigned long abs_sec;
+	unsigned long abs_nsec;
 
-	if (CTkvs_GetUInt(kvs, Message_ECTF_EventQualifier, &id, &error) != CT_statusOK)
-		return;
+	omni_thread::get_time(&abs_sec, &abs_nsec);
 
-	if (CTkvs_GetUInt(kvs, ASR_ECTF_InitialTimeout, &time.LowPart, &error) != CT_statusOK)
-		return;
-
-	if (CTkvs_GetInt(kvs, ASR_ECTF_FinalTimeout, &time.HighPart, &error) != CT_statusOK)
-		return;
-}
-
-CTstatus T_CAsyncTimer::TimerID::WriteEventData(CTkvs_ct kvs, CTerror* error)
-{
-	CTstatus status = CTkvs_PutUInt(kvs, Message_ECTF_EventQualifier, id, error);
-	if (status != CT_statusOK)
-		return status;
-
-	status = CTkvs_PutUInt(kvs, ASR_ECTF_InitialTimeout, time.LowPart, error);
-	if (status != CT_statusOK)
-		return status;
-
-	status = CTkvs_PutInt(kvs, ASR_ECTF_FinalTimeout, time.HighPart, error);
-
-	return status;
-}
-
-T_CAsyncTimer::T_CAsyncTimer() : m_Active(false), m_Terminated(false), m_IDCounter(0)
-{
-	InitializeCriticalSection(&m_CS);
-}
-
-T_CAsyncTimer::~T_CAsyncTimer()
-{
-	if (m_Active)
+	if (abs_sec == m_abs_sec)
 	{
-		m_Active = false;
-
-		// signal the timer as soon as possible
-		LARGE_INTEGER t;
-
-		t.QuadPart = -1;
-
-		assert__(SetWaitableTimer(m_Handle, &t, 0, NULL, NULL, FALSE));
-
-		if (m_TID != GetCurrentThreadId())
-		{
-			// The following line may deadlock (which is bizarre)
-			// assert__(WaitForSingleObject(m_Thread, INFINITE) == WAIT_OBJECT_0);
-
-			// so we poll instead
-			EnterCriticalSection(&m_CS);
-
-			while(!m_Terminated)
-			{
-				LeaveCriticalSection(&m_CS);
-
-				Sleep(20);
-
-				EnterCriticalSection(&m_CS);
-			}
-
-			LeaveCriticalSection(&m_CS);
-		}
-
-		CancelWaitableTimer(m_Handle);
-
-		CloseHandle(m_Handle);
-		CloseHandle(m_Thread);
-
-		CTerror error;
-
-		CT_Shutdown(&error);
-	}
-
-	DeleteCriticalSection(&m_CS);
-}
-
-bool T_CAsyncTimer::Start()
-{
-	if (m_Active)
-		return true;
-
-	CTerror error;
-
-	CT_Initialize(&error);
-
-	if (error != CT_errorOK)
-		return false;
-
-	m_Handle = CreateWaitableTimer(NULL, FALSE, NULL);
-	if (!m_Handle)
-	{
-		CT_Shutdown(&error);
-		return false;
-	}
-
-	m_Active = true;
-
-	m_Thread = (void*)_beginthreadex(NULL, 0, threadAction, this, 0 /* running */, &m_TID);
-	if (!m_Thread)
-	{
-		CT_Shutdown(&error);
-		CloseHandle(m_Handle);
-		m_Active = false;
-	}
-
-	return m_Active;
-}
-
-void T_CAsyncTimer::Set(const TimerID &timer)
-{
-	assert__(SetWaitableTimer(m_Handle, &timer.time, 0, NULL, NULL, FALSE));
-}
-
-void T_CAsyncTimer::Stop()
-{
-    CancelWaitableTimer(m_Handle);
-}
-
-void T_CAsyncTimer::Wait()
-{
-	assert__(WaitForSingleObject(m_Handle, INFINITE) == WAIT_OBJECT_0);
-}
-
-T_CAsyncTimer::TimerID T_CAsyncTimer::Add(unsigned delta, CTses_ct session)
-{
-	SYSTEMTIME s;
-	FILETIME f;
-
-	CSLock lock(&m_CS);
-
-	GetSystemTime(&s);
-
-	assert__(SystemTimeToFileTime(&s, &f));
-
-	LARGE_INTEGER t;
-
-	memcpy(&t, &f, sizeof(t));
-
-	ULONGLONG d = delta;
-
-	d *= 10000;
-
-	t.QuadPart += d;
-
-	unsigned id = ++m_IDCounter;
-
-	if (!id)
-		++id;
-
-	TimerID tid(t, id, session);
-
-	pair<set<TimerID>::iterator,bool> i = m_Timers.insert(tid);
-
-	assert__(i.second);
-
-	if (i.first == m_Timers.begin())
-		Set(tid);
-
-	return tid;
-}
-
-bool T_CAsyncTimer::Remove(const TimerID& id)
-{
-	CSLock lock(&m_CS);
-
-	set<TimerID>::iterator i = m_Timers.find(id);
-
-	if (i == m_Timers.end() || i->removed)
-		return false;
-
-	// we cannot safely remove the due timer (it may already be signalled),
-	// so we have to mark it as removed
-
-	if (i == m_Timers.begin())
-	{
-		i->removed = true;
+		return abs_nsec >= m_abs_nsec;
 	}
 	else
+		return abs_sec >= m_abs_sec;
+}
+
+void Timer::TimerID::stop(Timer &timer)
+{
+	if (m_id)
 	{
-		m_Timers.erase(i);
+		timer.remove(*this);
+		m_id = 0;
+		m_abs_sec = 0;
+		m_abs_nsec = 0;
 	}
+}
+
+bool Timer::start(void)
+{
+	omni_mutex_lock l(m_mutex);
+
+	if (m_active)
+		return true;
+
+	m_active = true;
+
+	start_undetached();
 
 	return true;
 }
 
-void T_CAsyncTimer::Run()
+bool Timer::run(void)
 {
-	CTerror error;
-	CTkvs_ct eventData, event;
-	CTtranInfo tranInfo;
+	{
+		omni_mutex_lock l(m_mutex);
 
-	assert__(CTkvs_Create(&eventData, &error) == CT_statusOK);
-	assert__(CTkvs_Create(&event, &error) == CT_statusOK);
+		if (m_active)
+			return true;
 
-	CTtran_Initialize(tranInfo, eventData);
+		m_active = true;
+	}
 
-	assert__(CTkvs_PutSymbol(event, Message_ECTF_EventID, ISDN_DTB_TimerExpiry, &error) == CT_statusOK);
+	run_undetached(NULL);
 
+	return true;
+}
+
+Timer::TimerID Timer::add(unsigned delta,
+								   TimerClient *client,
+								   unsigned user)
+{
+	omni_mutex_lock l(m_mutex);
+
+	unsigned i = ++m_id_counter;
+
+	if (!i)
+		++i;
+
+	TimerID tid(delta, i, client, user);
+
+	std::pair<std::set<TimerID>::iterator,bool> j = m_timers.insert(tid);
+
+	assert(j.second);
+
+	// we must wake up the timer thread - it needs to readjust it's timedwait
+	if (j.first == m_timers.begin())
+		m_condition.signal();
+
+	return tid;
+}
+
+bool Timer::remove(const TimerID& tid)
+{
+	if (!tid.is_valid())
+		return false;
+
+	omni_mutex_lock l(m_mutex);
+
+	std::set<TimerID>::iterator i = m_timers.find(tid);
+
+	if (i == m_timers.end())
+		return false;
+
+	m_timers.erase(i);
+
+	return true;
+}
+
+void *Timer::run_undetached(void *arg)
+{
 	for(;;)
 	{
-		// we lock the CriticalSection before we read m_Active.
-		// this is conservative and assumes pthread mutex semantics
+		m_mutex.lock();
+
+		if (!m_active)
 		{
-			CSLock lock(&m_CS);
+			m_mutex.unlock();
 
-			if (!m_Active)
-			{
-				CTkvs_Destroy(eventData, &error);
-				CTkvs_Destroy(event, &error);
-
-				m_Terminated = true;
-
-				return;
-			}
+			return NULL;
 		}
 
-		Wait();
-
+		// wait for the condition
+		if (m_timers.size())
 		{
-			CSLock lock(&m_CS);
+			const TimerID& tid = *m_timers.begin();
 
-			if (m_Timers.size() == 0)
-			{
-				continue;
-			}
+			m_condition.timedwait(tid.m_abs_sec, tid.m_abs_nsec);
+		}
+		else
+		{
+			m_condition.wait();
+		}
 
-			LARGE_INTEGER t;
-			
-			// in this loop, we send all timers with the same time
-			for (set<TimerID>::iterator i = m_Timers.begin(); i != m_Timers.end(); ++i)
-			{
-				if (i->removed)
-					continue;
+		if (m_timers.size() == 0)
+		{
+			m_mutex.unlock();
 
-				// break out if no timer with the same time can be found
-				if (i != m_Timers.begin() && i->time.QuadPart > t.QuadPart)
-					break;
+			continue;
+		}
 
-				t = i->time;
+		// we want to signal the timers with the mutex unlocked to
+		// avoid deadlocks, which are possible if the clients
+		// use mutexes, too (which they should).
 
-				CTerror error;
+		std::vector<TimerID> due_timers;
 
-				// signal timer to application
-				assert__(i->WriteEventData(event, &error) == CT_statusOK);
+		// pre-allocating the vector to 5 is a space/time-tradeoff.
+		// I expect the average number to be one,
+		// so this is classical engineering overdimensioning
+		due_timers.reserve(5);
 
-				assert__(CTses_PutEvent(i->session, event, &tranInfo) == CT_statusOK);
-			}
+		// send all expired timers
+		std::set<TimerID>::iterator i;
+		for (i = m_timers.begin(); i != m_timers.end(); ++i)
+		{
+			if (!i->is_expired())
+				break;
 
-			m_Timers.erase(m_Timers.begin(), i);
+			due_timers.push_back(*i);
+		}
 
-			i = m_Timers.begin();
-			if (i != m_Timers.end())
-				Set(*i);
+		m_timers.erase(m_timers.begin(), i);
+
+		m_mutex.unlock();
+
+		std::vector<TimerID>::iterator j;
+		for (j = due_timers.begin(); j != due_timers.end(); ++j)
+		{
+			j->m_client->on_timer(*j);
 		}
 	}
 }

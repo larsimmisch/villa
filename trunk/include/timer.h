@@ -1,16 +1,10 @@
-// Timer.h
+// timer.h
 
-#ifndef TIMER_H_
-#define TIMER_H_
-
-#pragma warning (disable : 4786)
-
-#define _WIN32_WINNT 0x0400
-
-#define INCL_DOSDATETIME
-#include <windows.h>
+#ifndef TIMER_H
+#define TIMER_H
 
 #include <set>
+#include <omnithread.h>
 
 class TimerClient;
 
@@ -20,66 +14,90 @@ public:
 
 	struct TimerID
 	{
-		TimerID() : id(0), removed(false) {}
-		TimerID(const LARGE_INTEGER& t, unsigned i, TimerClient *client, void *userData) : time(t), id(i), session(s), removed(false) {}
+		TimerID(void) throw() :
+			m_abs_sec(0), m_abs_nsec(0), m_id(0), m_client(0), m_data(0)
+		{}
 
-		bool operator==(const TimerID& a) const 
-		{ 
-			return (time.QuadPart == a.time.QuadPart) && (id == a.id);
-		} 
-		bool operator<(const TimerID& a) const 
-		{ 
-			if (time.QuadPart == a.time.QuadPart)
-				return id < a.id;
-			else
-				return time.QuadPart < a.time.QuadPart;
+		TimerID(unsigned long delta, unsigned i,
+			TimerClient *client, unsigned user);
+
+		bool operator==(const TimerID &a) const throw()
+		{
+			return (m_abs_sec == a.m_abs_sec)
+				&& (m_abs_nsec == a.m_abs_nsec) && (m_id == a.m_id);
 		}
 
-		void invalidate() { id = 0; }
-		bool isValid() { return id != 0; }
+		bool operator<(const TimerID &a) const throw()
+		{
+			if (m_abs_sec == a.m_abs_sec)
+			{
+				if (m_abs_nsec == a.m_abs_nsec)
+					return m_id < a.m_id;
+				else
+					return m_abs_nsec < a.m_abs_nsec;
+			}
+			else
+				return m_abs_sec < a.m_abs_sec;
+		}
 
-		LARGE_INTEGER time;
-		TimerClient* client;
-		void *data;
-		unsigned long id;
-		bool removed;
+		void stop(Timer &timer);
+
+		void invalidate(void) throw() { m_id = 0; }
+		bool is_valid(void) const throw() { return m_id != 0; }
+
+		bool is_expired(void) const;
+
+		unsigned long m_abs_sec;
+		unsigned long m_abs_nsec;
+		unsigned long m_id;
+		TimerClient *m_client;
+		unsigned m_data;
 	};
 
-	Timer();
-	virtual ~Timer();
+	Timer(void) :
+		m_condition(&m_mutex), m_active(false), m_id_counter(0)
+	{}
 
-	// returns a unique Timer ID
-	TimerID add(unsigned delta, TimerClient *client, void *userData);
+	virtual ~Timer() {}
 
-	// returns true if id removed, false if id not found
-	bool remove(const TimerID& id);
+	/// returns a unique TimerID, delta is in ms
+	TimerID add(unsigned delta, TimerClient *client, unsigned user = 0);
+
+	/// returns true if id removed, false if id not found
+	bool remove(const TimerID &id);
+
+	/// call start once to start the timer thread
+	bool start(void);
+
+	/// call run to execute the timer thread synchronously
+	bool run(void);
 
 protected:
 
-	void set(const TimerID& timer);
-	void stop();
-	void wait();
+	virtual void *run_undetached(void *arg);
 
-	std::set<TimerID> m_Timers;
+private:
 
-	HANDLE m_Handle;
-	bool m_Terminated;	// needed for thread termination workaround
-	unsigned long m_IDCounter;
-	unsigned m_TID;
-	omni_mutex mutex;
+	std::set<TimerID> m_timers;
+
+	omni_mutex m_mutex;
+	omni_condition m_condition;
+
+	bool m_active;
+	unsigned long m_id_counter;
 
 private:
 
 	// no copying or assignment
 	Timer(const Timer&);
-	Timer& operator=(const Timer&);
+	Timer &operator=(const Timer&);
 };
 
 class TimerClient
 {
 public:
 
-	virtual void onTimer(const Timer::TimerID id, void* userData) = 0;
+	virtual void on_timer(const Timer::TimerID &id) = 0;
 };
 
-#endif
+#endif // AWW_TIMER_H
