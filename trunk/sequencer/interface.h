@@ -59,6 +59,8 @@ public:
 		return i->second;
 	}
 
+	void lost_connection();
+
 	omni_mutex& getMutex()	{ return m_mutex; }
 
 	typedef std::map<std::string,Sequencer*> t_calls;

@@ -20,6 +20,47 @@ extern ClientQueue gClientQueue;
 extern ConfiguredTrunks gConfiguration;
 extern Conferences gConferences;
 
+void InterfaceConnection::lost_connection()
+{
+	log(log_info, "sequencer") << "client " 
+		<< m_remote << " aborted" << logend();
+
+	// remove all listeners for the disconnected app
+	// first in the global queue
+	gClientQueue.remove(this);
+
+	// then in all the trunks
+
+	gConfiguration.lock();
+	for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+	{
+		t.current()->removeClient(this);
+	}
+	gConfiguration.unlock();
+
+	// tell all sequencers we have lost the connection
+	const InterfaceConnection::t_calls &calls = get_calls();
+
+	for (InterfaceConnection::t_calls::const_iterator i = calls.begin();
+		i != calls.end(); ++i)
+	{
+		i->second->lost_connection();
+	}
+
+	// force close all conferences opened by this app
+	/*
+	gConferences.lock();
+	for (ConferencesIterator c(gConferences); !c.isDone(); c.next())
+	{
+		if (c.current()->getUserData() == ic)
+		{
+			gConferences.close(c.current()->getHandle(), 1);
+		}
+	}
+	gConferences.unlock();
+	*/
+
+}
 
 Interface::Interface(SAP& local)
 {
@@ -48,6 +89,7 @@ void Interface::run()
 				 i != m_connections.end(); ++i)
 			{
 				FD_SET((*i)->fd(), &read);
+				FD_SET((*i)->fd(), &except);
 			}
 
 			// maxfd is ignored on Windows
@@ -96,50 +138,14 @@ void Interface::run()
 
 					if (rc == 0 || exit)
 					{
-						if (rc == 0)
-							log(log_info, "sequencer") << "client " 
-								<< ic->m_remote << " aborted" << logend();
-						else
-							log(log_info, "sequencer") << "client "
-								<< ic->m_remote << " disconnected " << logend();
-
-						// remove all listeners for the disconnected app
-						// first in the global queue
-						gClientQueue.remove(ic);
-
-						// then in all the trunks
-
-						gConfiguration.lock();
-						for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
-						{
-							t.current()->removeClient(ic);
-						}
-						gConfiguration.unlock();
-
-						// tell all sequencers we have lost the connection
-						const InterfaceConnection::t_calls &calls = ic->get_calls();
-
-						for (InterfaceConnection::t_calls::const_iterator i = calls.begin();
-							i != calls.end(); ++i)
-						{
-							i->second->lost_connection();
-						}
-
-						// force close all conferences opened by this app
-						/*
-						gConferences.lock();
-						for (ConferencesIterator c(gConferences); !c.isDone(); c.next())
-						{
-							if (c.current()->getUserData() == ic)
-							{
-								gConferences.close(c.current()->getHandle(), 1);
-							}
-						}
-						gConferences.unlock();
-						*/
-
+						ic->lost_connection();
 						remove.push_back(ic);
 					}
+				}
+				if (FD_ISSET(ic->fd(), &except))
+				{
+					ic->lost_connection();
+					remove.push_back(ic);
 				}
 			}
 

@@ -204,7 +204,7 @@ class AculabPRITrunkConfiguration : public TrunkConfiguration
 {
 public:
 
-	AculabPRITrunkConfiguration() : lines(30) {}
+	AculabPRITrunkConfiguration(int l = 30) : lines(l) {}
 	virtual ~AculabPRITrunkConfiguration();
 
 	virtual int isDigital()		{ return 1; }
