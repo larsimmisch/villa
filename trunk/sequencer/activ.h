@@ -182,7 +182,8 @@ class RecordAtom : public Atom
 {
 public:
 
-	RecordAtom(unsigned channel, Sequencer* sequencer, const char* aFile, unsigned aTime);
+	RecordAtom(unsigned channel, Sequencer* sequencer, const char* aFile, 
+			   unsigned aTime, unsigned aSilence);
 	virtual ~RecordAtom() { delete m_file; delete m_sample; }
 
 	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
@@ -195,6 +196,7 @@ public:
 protected:
 
 	char *m_file;
+	unsigned m_silence;
 	unsigned m_time;
 };
 

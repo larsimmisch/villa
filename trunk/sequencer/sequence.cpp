@@ -166,12 +166,15 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 			else if (type == "rec")
 			{
 				std::string file;
-				unsigned max;
+				unsigned maxtime;
+				unsigned maxsilence;
 
 				(*server) >> file;
 				(*server) >> max;
+				(*server) >> maxsilence;
 
-				atom = new RecordAtom(channel, this, file.c_str(), max);
+				atom = new RecordAtom(channel, this, file.c_str(), maxtime, 
+									  maxsilence);
 			}
 			else if (type == "dtmf")
 			{
@@ -210,8 +213,8 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 				{
 					server->clear();
 
-					server->syntax_error(id) << "invalid conference descriptor" 
-						<< end(); 
+					server->syntax_error(id) 
+						<< "invalid conference descriptor" << end();
 
 					return V3_FATAL_SYNTAX;
 				}

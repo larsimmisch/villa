@@ -39,15 +39,17 @@ PlayAtom::PlayAtom(unsigned channel, Sequencer* sequencer,
 	m_sample = sequencer->getMedia()->createFileSample(aFile);
 }
  
-RecordAtom::RecordAtom(unsigned channel, Sequencer* sequencer, 
-					   const char* aFile, unsigned aTime) : Atom(channel), m_time(aTime)
+RecordAtom::RecordAtom(unsigned channel, Sequencer* sequencer,
+					   const char* aFile, unsigned aTime, unsigned aSilence) 
+	: Atom(channel), m_time(aTime), m_silence(aSilence)
 {
 	m_file = copyString(aFile); 
 
-	m_sample = sequencer->getMedia()->createRecordFileSample(aFile, aTime);
+	m_sample = sequencer->getMedia()->createRecordFileSample(aFile, aTime, 
+															 aSilence);
 }
 
-BeepAtom::BeepAtom(unsigned channel, Sequencer* sequencer, 
+BeepAtom::BeepAtom(unsigned channel, Sequencer* sequencer,
 				   unsigned count) : Atom(channel), m_nBeeps(count) 
 {
 	m_sample = sequencer->getMedia()->createBeeps(count);

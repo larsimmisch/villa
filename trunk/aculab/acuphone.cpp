@@ -785,7 +785,8 @@ int ProsodyChannel::FileSample::process(Media *phone)
 			if (!submit(phone))
 			{
 				// Villa test
-				log(log_error, "phone", phone->getName()) << "premature end of data" << logend();
+				log(log_error, "phone", phone->getName()) 
+					<< "premature end of data" << logend();
 				stop(phone);
 				return replay.status;
 			}
@@ -813,8 +814,7 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 	record.elimination = kSMDRecordToneElimination;
 	record.max_octets = 0;
 	record.max_elapsed_time = m_maxTime;
-	// this shouldn't be hardcoded...
-	record.max_silence = 2000;
+	record.max_silence = m_maxSilence;
 
 	omni_mutex_lock(m_prosody->m_mutex);
 

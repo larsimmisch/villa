@@ -194,8 +194,10 @@ protected:
 	{
 	public:
 	
-		RecordFileSample(ProsodyChannel *channel, const char* name, unsigned max)
-			: FileSample(channel, name, true), m_maxTime(max) {}
+		RecordFileSample(ProsodyChannel *channel, const char* name, 
+						 unsigned maxTime, unsigned maxSilence)
+			: FileSample(channel, name, true), m_maxTime(max), 
+			m_maxSilence(maxSilence) {}
 		virtual ~RecordFileSample() {}
 
         virtual unsigned start(Media *phone);
@@ -209,6 +211,7 @@ protected:
 	protected:
 
 		unsigned m_maxTime;
+		unsigned m_maxSilence;
 	};
 
 	class Beep : public Sample
@@ -285,9 +288,10 @@ public:
     virtual Switch* getSwitch() { return &m_sw; }
 
 	virtual Sample* createFileSample(const char *name) { return new FileSample(this, name); }
-	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime) 
-	{ 
-		return new RecordFileSample(this, name, maxTime); 
+	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime,
+										   unsigned maxSilence)
+	{
+		return new RecordFileSample(this, name, maxTime, maxSilence);
 	}
 	virtual Sample* createTouchtones(const char *tt) { return new Touchtones(this, tt); }
 	virtual Sample* createBeeps(int nBeeps) { return new Beep(this, nBeeps); }
