@@ -1,5 +1,5 @@
 /*
-	Copyright 1995-2001 Lars Immisch
+	Copyright 1995-2003 Lars Immisch
 
 	created: Tue Jul 25 16:05:02 GMT+0100 1995
 
@@ -1017,7 +1017,59 @@ int main(int argc, char* argv[])
 			trunk->start();
 		}
 
-		// start interface here
+		if (gConfiguration.numElements() == 0)
+		{
+			int card = 0;
+			int nports = call_nports();
+			if (nports)
+			{
+				for (int m = 0; m < nports;)
+				{
+					struct sysinfo_xparms sysinfo;
+					memset(&sysinfo, 0, sizeof(sysinfo));
+					sysinfo.net = m;
+					int rc = call_system_info(&sysinfo);
+					if (rc)
+					{
+						log(log_error, "sequencer") 
+							<< "call_system_info() returned: " << rc << logend();
+					}
+
+					int lines = 0;
+
+					switch(sysinfo.cardtype)
+					{
+					case C_REV4:
+					case C_REV5:
+					case C_PM4:
+						lines = 30;
+						break;
+					case C_BR4:
+					case C_BR8:
+						lines = 2;
+						break;
+					default:
+						log(log_error, "sequencer") 
+							<< "unsupported card type " << sysinfo.cardtype << logend();
+						return 0;
+					}
+
+					for (int n = 0; n < sysinfo.nphys; ++n)
+					{
+						AculabPRITrunkConfiguration* trunk = new AculabPRITrunkConfiguration();
+
+						trunk->init(m + n, card, lines);
+
+						gConfiguration.add(trunk);
+
+						trunk->start();
+					}
+
+					m += sysinfo.nphys;
+					++card;
+				}
+			}
+		}
 
 		if (gConfiguration.numElements() == 0)
 		{
@@ -1026,6 +1078,8 @@ int main(int argc, char* argv[])
 
 			return 0;
 		}
+
+		// start interface here
 
 		AculabTrunk::start();
 		AculabMedia::start();

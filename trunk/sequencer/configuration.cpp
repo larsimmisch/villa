@@ -42,6 +42,19 @@ AculabPRITrunkConfiguration::~AculabPRITrunkConfiguration()
 		delete sequencers[index];
 }
 
+void AculabPRITrunkConfiguration::init(int d, int sw, int l)
+{
+	char buffer[32];
+
+	sprintf(buffer, "Aculab%d", d);
+
+	name = copyString(buffer);
+
+	device = d;
+	swdevice = sw;
+	lines = l;
+}
+
 int AculabPRITrunkConfiguration::readFromKey(RegistryKey& key)
 {
 	if (!TrunkConfiguration::readFromKey(key))	return 0;

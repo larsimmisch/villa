@@ -217,6 +217,7 @@ public:
 
 	virtual unsigned numLines()	{ return lines; }
 
+	virtual void init(int d, int sw, int l);
 	virtual int readFromKey(RegistryKey& key);
 
 	virtual void start();
