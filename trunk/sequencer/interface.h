@@ -12,7 +12,7 @@
 #include <map>
 
 #include "list.h"
-#include "packet.h"
+#include "rphone.h"
 #include "asynctext.h"
 #include "configuration.h"
 
@@ -37,6 +37,17 @@ public:
 		omni_mutex_lock l(m_mutex);
 
 		m_calls.erase(name);
+	}
+
+	std::basic_iostream<char> &syntax_error(const std::string &id)
+	{
+		clear();
+
+		(*this) << _syntax_error << ' ' << id.c_str() 
+			<< " syntax error - ";
+
+		return *this;
+
 	}
 
 	Sequencer *find(const std::string &name)

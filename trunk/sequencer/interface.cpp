@@ -168,8 +168,7 @@ void Interface::data(TextTransport *server)
 			return;
 		}
 
-		(*server) << _syntax_error << ' ' << id.c_str() 
-			<< " syntax error\r\n";
+		(*server) << _syntax_error << " syntax error - expecting id and scope\r\n";
 
 		return;
 	}
@@ -182,8 +181,9 @@ void Interface::data(TextTransport *server)
 
 		if (!server->good())
 		{
-			(*server) << _syntax_error << id.c_str() 
-				<< " syntax error\r\n";
+			server->clear();
+
+			(*server) << _syntax_error << " syntax error - expecting command\r\n";
 
 			return;
 		}
@@ -223,8 +223,7 @@ void Interface::data(TextTransport *server)
 			{
 				server->clear();
 
-				(*server) << id.c_str() << _syntax_error 
-					<< " syntax error\r\n";
+				(*server) << _syntax_error << " syntax error - expecting trunk name and DID\r\n";
 				return;
 			}
 

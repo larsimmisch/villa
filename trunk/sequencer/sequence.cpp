@@ -67,8 +67,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 	{
 		server->clear();
 
-		(*server) << _syntax_error << ' ' << id.c_str() 
-			<< " syntax error\r\n";
+		server->syntax_error(id) << "expecting mode and priority\r\n"; 
 
 		return _syntax_error;
 	}
@@ -178,19 +177,26 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &id)
 {
-/* Todo
 
-	omni_mutex_lock lock(mutex);
+	std::string mid;
 
-	unsigned syncMajor = aPacket->getSyncMajor();
-	unsigned syncMinor = aPacket->getSyncMinor();
+	(*server) >> mid;
 
-	Molecule* molecule = activity.find(syncMinor);
+	if (!server->good())
+	{
+		server->syntax_error(id) << "expecting <molecule id>\r\n";
+		return _syntax_error;
+	}
+
+	Molecule* molecule = activity.find(mid);
 
 	if (!molecule) 
 	{
-		log(log_error, "sequencer") << "discard molecule: (" << syncMajor << ", "
-			<< syncMinor << ") not found" << logend();
+		log(log_error, "sequencer") << "discard molecule: (" << mid.c_str() 
+			<< ") not found" << logend();
+
+		(*server) << id.c_str() << ' ' << _invalid << " invalid molecule "
+			<< mid.c_str() << "\r\n";
 
 		return _invalid;
 	}
@@ -205,32 +211,31 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 	}
 	else
 	{
-		packet->clear(1);
-		packet->setSync(syncMajor, molecule->getSyncMinor());
-		packet->setContent(phone_discard_molecule_done);
-		packet->setUnsignedAt(0, _ok);
-
 		activity.remove(molecule);
 
-		tcp.send(*packet);
+		(*server) << id.c_str() << ' ' << _ok << " molecule " << m_id.c_str()
+			<< " removed\r\n";
 	}
 
-*/
 	return _ok;
 }
 
 int Sequencer::discardByPriority(InterfaceConnection *server, const std::string &id)
 {
-/* Todo
-
-	unsigned syncMajor = aPacket->getSyncMajor();
-
-	Molecule* molecule;
 	int discarded = 0;
+	int fromPriority;
+	int toPriority;
+	int immediately;
 
-	unsigned fromPriority = aPacket->getUnsignedAt(0);
-	unsigned toPriority = aPacket->getUnsignedAt(1);
-	int immediately = aPacket->getUnsignedAt(2);
+	(*server) >> fromPriority;
+	(*server) >> toPriority;
+	(*server) >> immediately;
+
+	if (!server->good())
+	{
+		server->syntax_error(id) << "expecting <fromPriority> <toPriority> <immediately>\r\n";
+		return _syntax_error;
+	}
 
 	log(log_debug, "sequencer") << "discarding molecules with " << fromPriority 
 		<< " <= priority <= " << toPriority << logend();
@@ -239,9 +244,10 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 
 	for (ActivityIter i(activity); !i.isDone(); i.next())
 	{
-		molecule = i.current();
+		Molecule *molecule = i.current();
 
-		if (molecule->getMode() & Molecule::dont_interrupt)  continue;
+		if (molecule->getMode() & Molecule::dont_interrupt)  
+			continue;
 
 		if (molecule->getPriority() >= fromPriority && molecule->getPriority() <= toPriority)
 		// if active, stop and send ack when stopped, else remove and send ack immediately
@@ -250,8 +256,8 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 			molecule->setMode(Molecule::discard);
 			molecule->stop(this);
 			
-			log(log_debug, "sequencer") << "stopped molecule (" << syncMajor 
-				<< ", " << molecule->getSyncMinor() << ')' << logend();
+			log(log_debug, "sequencer") << "stopped molecule " 
+				<< molecule->getId() << logend();
 
 			checkCompleted();
 		}
@@ -260,42 +266,24 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 			discarded++;
 			activity.remove(molecule);
 			
-			log(log_debug, "sequencer") << "removed molecule (" << syncMajor 
-				<< ", " << molecule->getSyncMinor() << ')' << logend();
+			log(log_debug, "sequencer") << "removed molecule "  
+				<< molecule->getId() << logend();
 		}
 	}
 
 	if (discarded)
 	{
-		packet->clear(2);
-		packet->setSync(syncMajor, 0);
-		packet->setContent(phone_discard_molecule_priority_done);
-		packet->setUnsignedAt(0, _ok);
-		packet->setUnsignedAt(discarded, _ok);
-
-		tcp.send(*packet);
+		(*server) << id.c_str() << ' ' << _ok << " removed molecules with priorities from " 
+			<< fromPriority << " to " << toPriority << "\r\n";
 	}
 
-*/
 	return _ok;
 }
 
 void Sequencer::sendAtomDone(const char *id, unsigned nAtom, unsigned status, unsigned msecs)
 {
-/* Todo
-
-	lock();
-	packet->clear(3);
-	packet->setSync(0, syncMinor);
-	packet->setContent(phone_atom_done);
-	packet->setUnsignedAt(0, nAtom);
-	packet->setUnsignedAt(1, status);
-	packet->setUnsignedAt(2, msecs);
- 
-	tcp.send(*packet);
-	unlock();
-
-*/
+	(*m_interface) << id << ' ' << _event << " atom-done " 
+		<< nAtom << ' ' << status << ' ' << msecs << "\r\n";
 }
 
 void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned length)
@@ -447,30 +435,6 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 
 	checkCompleted();
 
-	return _ok;
-}
-
-int Sequencer::abort(InterfaceConnection *server, const std::string &id)
-{
-/* Todo
-
-	lock();
-
-#ifdef __RECOGNIZER__
-	if (recognizer) delete recognizer;
-	recognizer = 0;
-#endif
-
-	unlock();
-
-	Timer::sleep(200);
-	
-	log(log_debug, "sequencer") << "aborting..." << logend();
-
-	checkCompleted();
-
-	phone->abort();
-*/
 	return _ok;
 }
 
@@ -670,13 +634,6 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 		}
 	}
 
-/* Todo
-	packet->clear(0);
-	packet->setContent(phone_disconnect);
- 
-	tcp.disconnect(indefinite, packet);
-*/
-
 	unlock();
 }
 
@@ -786,22 +743,13 @@ void Sequencer::started(Telephone *server, Sample *aSample)
 
 	if (m->notifyStart())
 	{
-		log(log_debug, "sequencer", server->getName()) << "sent atom_started for 0, " 
+		log(log_debug, "sequencer", server->getName()) << "sent atom-started for " 
 			<< m->getId() << ", " 
 			<< m->currentAtom() << logend();
- 
-/* Todo
 
-		lock();
-		packet->clear(1);
-		packet->setSync(0, m->getSyncMinor());
-		packet->setContent(phone_atom_started);
-		packet->setUnsignedAt(0, m->currentAtom());
- 
-		tcp.send(*packet);
-		unlock();
-
-*/
+		
+		(*m_interface) << m->getId() << ' ' << _event << " atom-started "
+			<< m->currentAtom() << "\r\n";
 	}
 }
 
@@ -834,7 +782,7 @@ void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs,
 	if (notifyStop)
 	{
 		log(log_debug, "sequencer", server->getName()) 
-			<< "sent atom_done for " 
+			<< "sent atom-done for " 
 			<< ", " << id.c_str() << ", " << nAtom << std::endl 
 			<< *molecule << logend();
 
@@ -875,23 +823,8 @@ void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs,
 
 void Sequencer::touchtone(Telephone* server, char tt)
 {
-/* Todo
-
-	char s[2];
-
-	s[0] = tt;
-	s[1] = '\0';
-
-	lock();
-
-	packet->clear(1);
-	packet->setContent(phone_touchtones);
-	packet->setStringAt(0, s);
-
-	tcp.send(*packet);
-	unlock();
-
-*/
+	(*m_interface) << server->getName() << ' ' << _event << " touchtone " << tt 
+		<< "\r\n";
 }
 
 void Sequencer::fatal(Telephone* server, const char* e)
@@ -948,8 +881,6 @@ void Sequencer::data(InterfaceConnection* server, const std::string &id)
 		reject(server, id);
 	else if (command == "disconnect")
 		disconnect(server, id);
-	else if (command == "abort")
-		abort(server, id);
 	else if (command == "transfer")
 		transfer(server, id);
 	else

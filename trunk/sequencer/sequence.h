@@ -39,7 +39,6 @@ public:
  
 	int transfer(InterfaceConnection *server, const std::string &id);
 	int disconnect(InterfaceConnection *server, const std::string &id);
-	int abort(InterfaceConnection *server, const std::string &id);
 
 	int accept(InterfaceConnection *server, const std::string &id);
 	int reject(InterfaceConnection *server, const std::string &id);
