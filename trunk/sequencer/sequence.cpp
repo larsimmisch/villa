@@ -26,8 +26,6 @@
 #include "interface.h"
 #include "getopt.h"
 
-int debug = 0;
-
 bitset<1024> SCBus;
 
 Log cout_log(std::cout);
@@ -592,7 +590,9 @@ void Sequencer::sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status
 
 void Sequencer::sendMoleculeDone(unsigned syncMajor, unsigned syncMinor, unsigned status, unsigned pos, unsigned length)
 {
-	if (debug > 3) cout << "send molecule done for: " << syncMajor << "." << syncMinor << " status: " << status << " pos: " << pos << " length: " << length << endl;
+	log(log_debug + 2, "sequencer")
+		<< "send molecule done for: " << syncMajor << "." << syncMinor << " status: " << status << " pos: " 
+		<< pos << " length: " << length << logend();
 
 	lock();
 	packet->clear(3);
@@ -1068,6 +1068,8 @@ void Sequencer::transferFailed(Trunk *server, int cause)
 void Sequencer::disconnectRequest(Trunk *server, int cause)
 {
 	log(log_debug, "sequencer") << "telephone disconnect request" << logend();
+
+	server->disconnectAccept();
 
 	lock();
 
@@ -1642,8 +1644,6 @@ int main(int argc, char* argv[])
 
 	rc = WSAStartup(MAKEWORD(2,0), &wsa);
 
-	cout << "sequence starting." << endl;
-
 	/*
 	 * commandline parsing
 	 */
@@ -1651,8 +1651,8 @@ int main(int argc, char* argv[])
 		switch(c) 
 		{
 		case 'd':
-			debug = atoi(optarg);
-			cout << "debug level " << debug << endl;
+			set_log_level(atoi(optarg));
+			cout << "debug level " << atoi(optarg) << endl;
 			break;
 		case 'l':
 			cout << "logging to: " << optarg << endl;
@@ -1680,7 +1680,8 @@ int main(int argc, char* argv[])
 
 			if (!trunk->readFromKey(key))
 			{
-				cout << "error reading trunk description: " << szKey << endl;
+				log(log_error, "sequencer") 
+					<< "error reading trunk description: " << szKey << logend();
 				return 2;
 			}
 
@@ -1693,7 +1694,8 @@ int main(int argc, char* argv[])
 
 		if (gConfiguration.numElements() == 0)
 		{
-			cout << "no trunks configured - nothing to do" << endl;
+			log(log_error, "sequencer") 
+				 << "no trunks configured - nothing to do" << logend();
 
 			return 0;
 		}
@@ -1709,8 +1711,6 @@ int main(int argc, char* argv[])
 		Interface iface(local);
 
 		iface.run();
-
-		cout << "normal shutdown" << endl;
 
 	}
 	catch (const char* e)

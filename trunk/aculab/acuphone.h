@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.4 2001/05/20 20:02:44 lars Exp $
+	$Id: acuphone.h,v 1.5 2001/05/27 21:15:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -174,7 +174,12 @@ protected:
 
 		Storage* allocateStorage(const char *name, bool isRecordable);
 
-		virtual unsigned getLength() { return storage ? storage->getLength() : 0; }
+		virtual unsigned getLength() 
+		{ 
+			return storage ? 
+				storage->getLength() * 1000 / storage->bytesPerSecond
+				: 0; 
+		}
 
 		virtual Storage* getStorage() { return storage; }
 

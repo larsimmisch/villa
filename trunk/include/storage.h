@@ -1,7 +1,7 @@
 /*
 	buffers.h
 
-	$Id: storage.h,v 1.2 2001/05/20 20:02:44 lars Exp $
+	$Id: storage.h,v 1.3 2001/05/27 21:15:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -124,6 +124,14 @@ public:
 		{
 			throw FileDoesNotExist(name);
 		}
+
+		// compute the length - we've got no header 
+
+		fseek(file, 0, SEEK_END);
+
+		length = ftell(file);
+
+		fseek(file, 0, SEEK_SET);
 	}
 
 	virtual ~RawFileStorage()
@@ -161,23 +169,11 @@ public:
 		return fseek(file, pos, SEEK_SET) == 0;
 	}
 
-	virtual unsigned getLength()
-	{
-		// we've got no header 
-
-		unsigned pos = ftell(file);
-
-		fseek(file, 0, SEEK_END);
-
-		unsigned bytes = ftell(file);
-
-		fseek(file, pos, SEEK_SET);
-
-		return bytes;
-	}
+	virtual unsigned getLength() { return length; }
 
 protected:
 
+	unsigned length;
 	FILE* file;
 };
 

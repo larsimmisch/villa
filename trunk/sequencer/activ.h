@@ -31,7 +31,7 @@ struct Time
 
 	unsigned operator-(const Time &b)
 	{
-		return (sec - b.sec) * 1000 - (nsec - b.nsec) * 1000000;
+		return (sec - b.sec) * 1000 - (nsec - b.nsec) / 1000000;
 	}
 };
 

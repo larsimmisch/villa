@@ -17,8 +17,12 @@ std::ostream& Log::log(int loglevel, const char *logclass, const char *name)
 
 		char fill = log_os.fill('0');
 
-		log_os << std::setw(2) << time->tm_year % 100 << '-' << std::setw(2) << time->tm_mon << '-' << std::setw(2) << time->tm_mday << ' ' 
-			<< std::setw(2) << time->tm_hour << ':' << std::setw(2) << time->tm_min << ':' << std::setw(2) << time->tm_sec;
+		log_os << std::setw(2) << time->tm_year % 100 << '-' 
+			<< std::setw(2) << time->tm_mon + 1 << '-' 
+			<< std::setw(2) << time->tm_mday << ' ' 
+			<< std::setw(2) << time->tm_hour << ':' 
+			<< std::setw(2) << time->tm_min << ':' 
+			<< std::setw(2) << time->tm_sec;
 
 		log_os.fill(fill);
 

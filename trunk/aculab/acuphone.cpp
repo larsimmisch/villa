@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.5 2001/05/20 20:02:44 lars Exp $
+	$Id: acuphone.cpp,v 1.6 2001/05/27 21:15:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -14,45 +14,10 @@
 #include <iomanip>
 #include <typeinfo.h>
 #include "mvswdrvr.h"
+#include "names.h"
 #include "acuphone.h"
 #include "prosody_error.i"
 #include "beep.i"
-
-const char* result_name(int r)
-{
-	switch (r)
-	{
-	case r_ok:
-		return "r_ok";
-	case r_timeout:
-		return "r_timeout";
-	case r_aborted: 
-		return "r_aborted";
-	case r_rejected: 
-		return "r_rejected";
-	case r_disconnected:
-		return "r_disconnected";
-	case r_failed:
-		return "r_failed";
-	case r_invalid: 
-		return "r_invalid";
-	case r_busy:
-		return "r_busy";
-	case r_not_available:
-		return "r_not_available";
-	case r_no_dialtone:
-		return "r_no_dialtone";
-	case r_empty:
-		return "r_empty";
-	case r_bad_state:
-		return "r_bad_state";
-	case r_number_changed:
-		return "r_number_changed";
-	default:
-		return "unknown";
-	}
-};
-
 
 ProsodyEventDispatcher ProsodyChannel::dispatcher;
 
@@ -480,13 +445,17 @@ unsigned ProsodyChannel::FileSample::start(Telephone *phone)
 {
 	struct sm_replay_parms start;
 
+	long offset = position * storage->bytesPerSecond / 1000;
+
 	start.channel = prosody->channel;
 	start.background = kSMNullChannelId;
 	start.speed = 100;
 	start.agc = 0;
 	start.volume = 0;
 	start.type = storage->encoding;
-	start.data_length = storage->getLength();
+	start.data_length = storage->getLength() - offset;
+
+	storage->setPos(offset);
 
 	omni_mutex_lock(phone->getMutex());
 
