@@ -10,6 +10,7 @@
 
 #include "omnithread.h"
 #include "conference.h"
+#include "socket.h"
 #include "rphone.h"
 #include "sequence.h"
 #include "configuration.h"
@@ -20,192 +21,191 @@ extern ClientQueue gClientQueue;
 extern ConfiguredTrunks gConfiguration;
 extern Conferences gConferences;
 
-InterfaceConnection::InterfaceConnection(TextTransportClient& aClient, SAP& local) 
-: TextTransport(aClient)
-{
-    listen(local);
-}
 
-Interface::Interface(SAP& aLocal) : unused(1), local(aLocal)
+Interface::Interface(SAP& local)
 {
-	connections.addFirst(new InterfaceConnection(*this, local));
+	m_listener.setReuseAddress(1);
+	m_listener.bind(local);
+	m_listener.listen();
 }
 
 void Interface::run()
 {
-	((InterfaceConnection*)connections.getHead())->run();
-}
+	fd_set read;
+	fd_set write;
+	fd_set except;
 
-void Interface::cleanup(TextTransport *server)
-{
-	// remove all listeners for the disconnected app
-
-	// first in the global queue
-
-	log(log_debug, "sequencer") << "client aborted" << logend();
-
-	gClientQueue.remove((InterfaceConnection*)server);
-
-	// then in all the trunks
-
-	gConfiguration.lock();
-	for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+	for(;;)
 	{
-		t.current()->removeClient((InterfaceConnection*)server);
-	}
-	gConfiguration.unlock();
-
-	// force close all conferences opened by this app
-	/*
-	gConferences.lock();
-	for (ConferencesIterator c(gConferences); !c.isDone(); c.next())
-	{
-		if (c.current()->getUserData() == server)
+		try
 		{
-			gConferences.close(c.current()->getHandle(), 1);
+			FD_ZERO(&read);
+			FD_ZERO(&write);
+			FD_ZERO(&except);
+
+			FD_SET(m_listener.fd(), &read);
+
+			for (std::list<InterfaceConnection*>::iterator i = m_connections.begin(); 
+				 i != m_connections.end(); ++i)
+			{
+				FD_SET((*i)->fd(), &read);
+			}
+
+			// maxfd is ignored on Windows
+			int rc = select(0, &read, &write, &except, 0);
+			if (rc == SOCKET_ERROR)
+			{
+				throw SocketError(__FILE__, __LINE__, "Interface::run()", GetLastError());
+			}
+
+			if (FD_ISSET(m_listener.fd(), &read))
+			{
+				SAP remote;
+
+				// accept the connection
+				InterfaceConnection *ic = new InterfaceConnection(PF_INET,
+					m_listener.accept(remote));
+
+				ic->m_remote = remote;
+
+				m_connections.push_back(ic);
+
+				log(log_debug, "sequencer") << "client " << remote << " attached" << logend();
+
+				ic->begin() << "sequence protocol 0.2" << end();
+			}
+
+			std::vector<InterfaceConnection*> remove;
+
+			for (i = m_connections.begin(); i != m_connections.end(); ++i)
+			{
+				bool exit(false);
+				InterfaceConnection *ic = *i;
+
+				if (FD_ISSET(ic->fd(), &read))
+				{
+					rc = ic->receive();
+					ic->clear();
+
+					if (rc)
+					{
+						exit = !data(ic);			
+					}
+					if (rc == 0 || exit)
+					{
+						if (rc == 0)
+							log(log_debug, "sequencer") << "client " 
+								<< ic->m_remote << " aborted" << logend();
+						else
+							log(log_debug, "sequencer") << "client "
+								<< ic->m_remote << " disconnected " << logend();
+
+						// remove all listeners for the disconnected app
+						// first in the global queue
+						gClientQueue.remove(ic);
+
+						// then in all the trunks
+
+						gConfiguration.lock();
+						for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+						{
+							t.current()->removeClient(ic);
+						}
+						gConfiguration.unlock();
+
+						// force close all conferences opened by this app
+						/*
+						gConferences.lock();
+						for (ConferencesIterator c(gConferences); !c.isDone(); c.next())
+						{
+							if (c.current()->getUserData() == ic)
+							{
+								gConferences.close(c.current()->getHandle(), 1);
+							}
+						}
+						gConferences.unlock();
+						*/
+
+						remove.push_back(ic);
+					}
+				}
+			}
+
+			// delete and close all dead connections
+			for (std::vector<InterfaceConnection*>::iterator j = remove.begin();
+				 j != remove.end(); ++j)
+			{
+				m_connections.remove(*j);
+				delete *j;
+			}
+		}
+		catch (const Exception& e)
+		{
+			log(log_error, "sequencer") << e << logend();
 		}
 	}
-	gConferences.unlock();
-	*/
 }
 
-void Interface::connectRequest(TextTransport *server, SAP& remote)
-{
-	omni_mutex_lock lock(mutex);
-
-	unused--;
-
-	log(log_debug, "sequencer") << "client attached from " << remote << logend();
-
-/*
-	if (unused == 0)
-	{
-		log(log_debug, "sequencer") << "spawning new interface listener" << logend();
-
-		connections.addFirst(new InterfaceConnection(*this, local));
-		unused++;
-	}
-*/
-	server->accept();
-
-	server->begin() << "sequence protocol 0.2" << end();
-}
-
-void Interface::connectRequestTimeout(TextTransport *server)
-{
-	SAP remote;
-
-    server->listen(local, indefinite);
-}
-
-void Interface::connectConfirm(TextTransport *server)
-{
-	// we don't connect currently
-}
-
-void Interface::connectReject(TextTransport *server)
-{
-	// we don't connect currently
-}
-
-void Interface::connectTimeout(TextTransport *server)
-{
-	// we don't connect currently
-}
-
-void Interface::disconnectRequest(TextTransport *server)
-{
-	SAP remote;
-
-	omni_mutex_lock lock(mutex);
-	
-	unused++;
-
-	server->disconnectAccept();
-
-    server->listen(local, indefinite);
-
-	cleanup(server);
-}
-
-void Interface::abort(TextTransport *server)
-{
-	SAP remote;
-
-	omni_mutex_lock lock(mutex);
-	
-	unused++;
-
-	cleanup(server);
-
-    server->listen(local, indefinite);
-}
-
-void Interface::data(TextTransport *server)
+bool Interface::data(InterfaceConnection *ic)
 {
     // this is the main packet inspection method...
-	InterfaceConnection* ico = (InterfaceConnection*)server;
 
 	std::string id;
 	std::string scope;
 
+	(*ic) >> id;
+	(*ic) >> scope;
 
-	(*server) >> id;
-	(*server) >> scope;
-
-	if (server->eof())
+	if (ic->eof())
 	{
-		server->clear();
+		ic->clear();
 
 		// exit from telnet - does not restrict tid usage
 		if (id == "exit")
 		{
-			server->disconnect();
-			server->listen(local);
-
-			return;
+			return false;
 		}
 
-		server->begin() << _syntax_error 
+		ic->begin() << _syntax_error 
 			<< " syntax error - expecting id and scope" << end();
 
-		return;
+		return true;
 	}
 
 	if (scope == "global")
 	{
 		std::string command;
 
-		(*server) >> command;
+		(*ic) >> command;
 
 		if (!command.size())
 		{
-			server->clear();
+			ic->clear();
 
-			server->begin() << _syntax_error << 
+			ic->begin() << _syntax_error << 
 				" syntax error - expecting command" << end();
 
-			return;
+			return true;
 		}
 
 		if (command == "describe")
 		{
-			server->begin();
+			ic->begin();
 
 			for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
 			{
-				(*server) << id.c_str() << ' ' << _ok << ' '
+				(*ic) << id.c_str() << ' ' << _ok << ' '
 					<< c.current()->getName() << ' ' 
 					<< c.current()->getNumber() << ' '
 					<< (c.current()->isDigital() ? "digital" : "analog")
 					<< "\n";
 			}
 
-			(*server) << end();
+			(*ic) << end();
 		}
 		else if (command == "open-conference")
 		{
-			Conference *conf = gConferences.create(server);
+			Conference *conf = gConferences.create(ic);
 
 			if (conf)
 			{
@@ -213,12 +213,12 @@ void Interface::data(TextTransport *server)
 
 				sprintf(name, "Conf[%d]", conf->getHandle());
 
-				server->begin() << id.c_str() << ' ' << _ok 
+				ic->begin() << id.c_str() << ' ' << _ok 
 					<< " global open-conference-done " << name << end();
 			}
 			else
 			{
-				server->begin() << id.c_str() << _failed 
+				ic->begin() << id.c_str() << _failed 
 					<< " global open-conference-done" << end();
 			}
 		}
@@ -226,15 +226,16 @@ void Interface::data(TextTransport *server)
 		{
 			std::string conf;
 
-			(*server) >> conf;
+			(*ic) >> conf;
 
 			if (conf.size() <= 4 || conf.substr(0, 5) != "Conf[")
 			{
-				server->clear();
+				ic->clear();
 
-				server->begin() << id.c_str() << ' ' << _syntax_error << 
+				ic->begin() << id.c_str() << ' ' << _syntax_error << 
 					" global close-conference-done" << end();
-				return;
+
+				return true;
 			}
 
 			unsigned handle(0);
@@ -243,20 +244,20 @@ void Interface::data(TextTransport *server)
 
 			if (!handle)
 			{
-				server->begin() << _syntax_error << 
+				ic->begin() << _syntax_error << 
 					" global close-conference-done" << end();
 
-				return;
+				return true;
 			}
 
 			if (gConferences.close(handle))
 			{
-				server->begin() << id.c_str() << ' ' << _ok 
+				ic->begin() << id.c_str() << ' ' << _ok 
 					<< " global close-conference-done" << end();
 			}
 			else
 			{
-				server->begin() << id.c_str() << ' ' << _failed 
+				ic->begin() << id.c_str() << ' ' << _failed 
 					<< " global close-conference-done" << end();
 			}
 		}
@@ -265,17 +266,18 @@ void Interface::data(TextTransport *server)
 			std::string trunkname;
 			std::string spec;
 
-			(*server) >> trunkname;
-			(*server) >> spec;
+			(*ic) >> trunkname;
+			(*ic) >> spec;
 
 			if (!trunkname.size() | !spec.size())
 			{
-				server->clear();
+				ic->clear();
 
-				server->begin() << _syntax_error 
+				ic->begin() << _syntax_error 
 					<< " syntax error - expecting trunk name and DID" 
 					<< end();
-				return;
+
+				return true;
 			}
 
 			TrunkConfiguration* trunk = 0;
@@ -294,14 +296,14 @@ void Interface::data(TextTransport *server)
 						<< "attempted to add listen for invalid trunk " 
 						<< trunkname.c_str() << logend();
 
-					server->begin() << id.c_str() << ' ' << _invalid 
+					ic->begin() << id.c_str() << ' ' << _invalid 
 						<< " invalid trunk " << trunkname.c_str() << end();
 
-					return;
+					return true;
 				}
 	
 
-				trunk->enqueue(id, detail, ico);
+				trunk->enqueue(id, detail, ic);
 
 				log(log_debug, "sequencer") << "id " << id.c_str() 
 					<< " added listen for " << trunk->getName() 
@@ -310,7 +312,7 @@ void Interface::data(TextTransport *server)
 			}
 			else
 			{
-				gClientQueue.enqueue(id, detail, ico);
+				gClientQueue.enqueue(id, detail, ic);
 
 				log(log_debug, "sequencer") << "id " << id.c_str()
 					<< " added listen for any trunk " << logend();
@@ -328,14 +330,14 @@ void Interface::data(TextTransport *server)
 			// remove any listeners for this client
 			// first in the global queue
 
-			gClientQueue.remove(server, client);
+			gClientQueue.remove(ic, client);
 
 			// then in all the trunks
 
 			gConfiguration.lock();
 			for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
 			{
-				t.current()->removeClient(server, client);
+				t.current()->removeClient(ic, client);
 			}
 			gConfiguration.unlock();
 
@@ -352,7 +354,7 @@ void Interface::data(TextTransport *server)
 				<< logend();
 
 			ConnectCompletion* complete = 
-				new ConnectCompletion(*ico, aPacket->getSyncMajor(), aPacket->getSyncMinor(), client);
+				new ConnectCompletion(*ic, aPacket->getSyncMajor(), aPacket->getSyncMinor(), client);
 
 			if (trunk)
 			{
@@ -374,14 +376,14 @@ void Interface::data(TextTransport *server)
 				delete complete;
 
 				reply->setUnsignedAt(0, result);
-				server->send(*reply);
+				ic->send(*reply);
 			}
 */
 		}
 		else if (command == "stop-listening")
 		{
 /*
-			reply = ((InterfaceConnection*)server)->staticPacket(1);
+			reply = ((InterfaceConnection*)ic)->staticPacket(1);
 			reply->setContent(if_stop_listening_done);
 			reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
 
@@ -389,7 +391,7 @@ void Interface::data(TextTransport *server)
 			 || aPacket->typeAt(1) != Packet::type_string)
 			{
 				reply->setUnsignedAt(0, _invalid);
-				server->send(*reply);
+				ic->send(*reply);
 
 				break;
 			}
@@ -402,43 +404,45 @@ void Interface::data(TextTransport *server)
 			// remove any listeners for this client
 			// first in the global queue
 
-			gClientQueue.remove(server, client);
+			gClientQueue.remove(ic, client);
 
 			// then in all the trunks
 
 			gConfiguration.lock();
 			for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
 			{
-				t.current()->removeClient(server, client);
+				t.current()->removeClient(ic, client);
 			}
 			gConfiguration.unlock();
 
 			reply->setUnsignedAt(0, _ok);
-			server->send(*reply);
+			ic->send(*reply);
 */
 		}
 		else
 		{
 			// syntax error
 
-			server->begin() << id.c_str() << ' ' << _failed 
+			ic->begin() << id.c_str() << ' ' << _failed 
 				<< " syntax error - unknown command " << command.c_str()
 				<< end();
 		}
 	}
 	else
 	{
-		Sequencer *s = ico->find(scope);
+		Sequencer *s = ic->find(scope);
 
 		if (!s)
 		{
-			server->begin() << id.c_str() << ' ' << _failed 
+			ic->begin() << id.c_str() << ' ' << _failed 
 				<< " syntax error - unknown scope " << scope.c_str()
 				<< end();
 		}
 		else
 		{
-			s->data(ico, id);
+			s->data(ic, id);
 		}
 	}
+
+	return true;
 }

@@ -9,20 +9,19 @@
 #ifndef _INTERFACE_H_
 #define _INTERFACE_H_
 
+#include <list>
 #include <map>
-
-#include "list.h"
 #include "rphone.h"
 #include "text.h"
 #include "configuration.h"
 
 class Sequencer;
 
-class InterfaceConnection : public TextTransport, public List::Link
+class InterfaceConnection : public SocketStream
 {
 public:
 
-	InterfaceConnection(TextTransportClient& client, SAP& local);
+	InterfaceConnection(int protocol = PF_INET, int s = -1) : SocketStream(protocol, s) {}
 	virtual ~InterfaceConnection() {}
 
 	void add(const std::string &name, Sequencer *sequencer)
@@ -67,21 +66,10 @@ public:
 protected:
 
 	omni_mutex m_mutex;
-
 	std::map<std::string,Sequencer*> m_calls;
 };
 
-class InterfaceConnections : public List
-{
-public:
-
-	InterfaceConnections() {}
-	virtual ~InterfaceConnections() { empty(); }
-
-    virtual void  freeLink(Link* aLink) { delete (InterfaceConnection*)aLink; }
-};
-
-class Interface : public TextTransportClient
+class Interface
 {
 public:
 
@@ -90,37 +78,14 @@ public:
 
 	virtual void run();
 
-	void cleanup(TextTransport *server);
-
-	// protocol of TransportClient
-	virtual void connectRequest(TextTransport *server, SAP& remote);
-	virtual void connectRequestTimeout(TextTransport *server);
-	
-	// replies to server.connect from far end
-	virtual void connectConfirm(TextTransport *server);
-	virtual void connectReject(TextTransport *server);
-	virtual void connectTimeout(TextTransport *server);
-	
-	// must call server.disconnectAccept or server.disconnectReject 
-	virtual void disconnectRequest(TextTransport *server);
-	
-    virtual void abort(TextTransport *server);
-
-	// sent whenever packet is received
-	virtual void dataReady(TextTransport *server) {}
- 
-	// flow control
-	virtual void stopSending(TextTransport *server) {}
-	virtual void resumeSending(TextTransport *server) {}
-	
-    virtual void data(TextTransport *server);
+	// return false if connectio should be closed
+    bool data(InterfaceConnection *server);
 
 protected:
 
-	unsigned unused;
-	omni_mutex mutex;
-	InterfaceConnections connections;
-	SAP local;
+	Socket m_listener;
+	omni_mutex m_mutex;
+	std::list<InterfaceConnection*> m_connections;
 };
 
 // helper class

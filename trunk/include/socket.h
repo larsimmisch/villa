@@ -25,97 +25,6 @@
 #include "sap.h"
 
 class Socket;
-class Listener;
-
-class ListenerQueue : public DList
-{
-public:
-
-	class Item : public DList::DLink
-	{
-	public:
-
-		Item(Listener* aListener) 
-			: result(0), listener(aListener), event(&mutex) {}
-
-		omni_mutex mutex;
-		omni_condition event;
-		SAP sap;
-		int hsocket;
-		Listener* listener;
-		unsigned result;
-	};
-	
-	ListenerQueue();
-	virtual ~ListenerQueue();
-	
-	Item* enqueue(Listener* aListener);
-	Item* dequeue();
-	
-	void cancel(Item* item);
-	
-protected:
-
-	virtual void freeLink(List::Link* aLink);
-	
-	ListenerQueue(ListenerQueue&);
-};
-
-class Services : private Set
-{
-public:
-
-	class Key : public List::Link
-	{
-		public:
-
-		Key(int aProtocol, int aService) : service(aService), protocol(aProtocol) {}
-		virtual ~Key() {}
-
-		int service;
-		int protocol;
-	};
-
-	Services(int size) : mutex(), Set(size) { }
-	virtual ~Services() { empty(); }
-
-	void lock() 	{ mutex.lock(); }
-	void unlock()	{ mutex.unlock(); }
-
-	ListenerQueue::Item* add(int protocol, SAP& aService);
-	void remove(ListenerQueue::Item* anItem);
-	void remove(Listener* aListener);
-
-	protected:
-
-	friend class ListenerQueue; // for mutex
-
-	Listener* contains(int aProtocol, int aService);
-
-	virtual void empty();
-	virtual int hasKey(List::Link* anItem, const char* key) { return 0; }
-	virtual int isEqual(List::Link* anItem, List::Link* anotherItem) 
-		{ return ((Key*)anItem)->service == ((Key*)anotherItem)->service && ((Key*)anItem)->protocol == ((Key*)anotherItem)->protocol; }
-	virtual int hasIndex(List::Link* anItem, int anIndex)	{ return 0; }
-	virtual unsigned hashAssoc(List::Link* anItem);
-		
-	omni_mutex mutex;
-};				
-
-class Listener : public Services::Key, public omni_thread
-{
-public:
-
-	Listener(int aProtocol, SAP& aService);
-	virtual ~Listener();
-
-	virtual void *run_undetached(void *arg);
-	
-	void stop();
-
-	ListenerQueue queue;
-	int hsocket;
-};
 
 class InvalidAddress : public Exception
 {
@@ -125,7 +34,7 @@ public:
         const char* fileName,
         int lineNumber,
         const char* function,
-        SAP& address,
+        const SAP& address,
         const Exception* previous = 0);
 
 	virtual ~InvalidAddress() {}
@@ -161,12 +70,14 @@ public:
  
     enum { infinite = -1 };
 		
-	Socket(int aProtocol = PF_INET);
+	Socket(int protocol = PF_INET, int s = -1);
 	~Socket();
 
-	void bind(SAP& local, int single = 0);
-	void listen(SAP& remote);
-	void connect(SAP& remote);
+	void bind(SAP& local);
+	void listen(int backlog = 5);
+	void connect(const SAP& remote);
+	int accept(SAP &remote);
+	void close();
 
 	int send(void* data, unsigned dataLength);	// returns no of bytes sent. 0 means queue is full
 	int receive(void* data, unsigned dataLength);	// returns no of bytes received
@@ -182,32 +93,27 @@ public:
     void setNonblocking(int on);
     void setReuseAddress(int on);
 
+	int fd() const { return m_socket; } 
+	int protocol() const { return m_protocol; }
+
 	void getName(SAP& name);
 	void getPeerName(SAP& name);
 
-	// use close to abort asynchronous pending listen or connects
-	void close();
-
 	int rejected();
 
-	static void fillSocketAddress(SAP& aSAP, void* socketAddress);
+	static void fillSocketAddress(const SAP& aSAP, void* socketAddress);
 	static void fillSAP(void* socketAddress, SAP& aSAP);
 
 	static void init();
 
-protected:
+	SAP m_local;
+	SAP m_remote;
 
-	friend class ListenerQueue;
-	friend class Listener;
-#pragma warning(disable: 4251)
-	static Services services;
-#pragma warning(default: 4251)
+protected:
 	
-	int hsocket;
-    int nonblocking;
-	int protocol;
-	ListenerQueue::Item* waiting;
-	Listener* listener;
+	int m_socket;
+    int m_nonblocking;
+	int m_protocol;
 };
 
 #endif

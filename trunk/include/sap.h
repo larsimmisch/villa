@@ -1,7 +1,7 @@
 /*
  	SAP.h
 
-	$Id: sap.h,v 1.2 2001/05/20 20:02:44 lars Exp $
+	$Id: sap.h,v 1.3 2003/07/23 22:20:36 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -118,9 +118,16 @@ protected:
 
 static std::ostream& operator<<(std::ostream& out, const SAP& aSAP)
 {
-	aSAP.getAddress() ?  out << aSAP.getAddress() : out << "NULL"; out << ',';
-	aSAP.getService() ?  out << aSAP.getService() : out << "NULL"; out << ',';
-	aSAP.getSelector() ? out << aSAP.getSelector() : out << "NULL"; out << '.';
+	out << '(';
+	if (aSAP.getAddress())
+		out << aSAP.getAddress();
+	out << ',';
+	if (aSAP.getService())
+		out << aSAP.getService(); 
+	out << ',';
+	if (aSAP.getSelector())
+		out << aSAP.getSelector();
+	out << ')';
 
 	return out;
 }

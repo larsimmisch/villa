@@ -10,15 +10,13 @@
 #include "socket.h"
 #include "omnithread.h"
 
-Services Socket::services(3);
-
 HMODULE hWinsock;
 
 InvalidAddress::InvalidAddress(
 		const char* fileName, 
 		int lineNumber,
 		const char* function,
-		SAP& anAddress,
+		const SAP& anAddress,
 		const Exception* prev)
  : Exception(fileName, lineNumber, function, "invalid address", prev), address(anAddress)
 {
@@ -67,198 +65,14 @@ const char* SocketError::name(unsigned long error)
 	return aName;
 } 
 
-ListenerQueue::ListenerQueue()
+Socket::Socket(int protocol, int s) 
+ : m_protocol(protocol), m_socket(s), m_nonblocking(0)
 {
-}
-
-ListenerQueue::~ListenerQueue()
-{
-}
-
-ListenerQueue::Item* ListenerQueue::enqueue(Listener* aListener)
-{	
-	omni_mutex_lock lock(Socket::services.mutex);
-
-	Item* item = new Item(aListener);
-
-	addLast(item);
-
-	return item;
-}
-
-ListenerQueue::Item* ListenerQueue::dequeue()
-{
-	omni_mutex_lock lock(Socket::services.mutex);
-
-	Item* item = (Item*)removeFirst();
-
-	return item;
-}
-
-void ListenerQueue::cancel(Item* item)
-{
-	omni_mutex_lock lock(Socket::services.mutex);
-
-	if (!item) return;
-
-	item->result = WSAEINTR;
-	item->event.signal();
-
-	remove(item);
-}
-
-void ListenerQueue::freeLink(List::Link* aLink)
-{
-	delete (Item*)aLink;
-}
-
-Listener::Listener(int aProtocol, SAP& aService) 
-: Services::Key(aProtocol, 0), queue(), hsocket(-1)
-{
-	struct sockaddr_in localAddress;
-	int len;
-	int rc;
-
-	Socket::fillSocketAddress(aService, &localAddress);
-
-	hsocket = ::socket(protocol, SOCK_STREAM, 0);
-	if (hsocket < 0)	throw SocketError(__FILE__, __LINE__, "Listener::Listener(int,SAP&)", GetLastError());
-
-	localAddress.sin_family = aProtocol;
-	rc = ::bind(hsocket, (sockaddr*)&localAddress, sizeof(localAddress));
-	if (rc < 0) 	throw SocketError(__FILE__, __LINE__, "Listener::Listener(int,SAP&)", GetLastError());
-
-	if (localAddress.sin_port == 0)
+	if (s == -1)
 	{
-		len = sizeof(localAddress);
-		rc = ::getsockname(hsocket, (sockaddr*)&localAddress, &len);
-		Socket::fillSAP(&localAddress, aService);
+		m_socket = ::socket(m_protocol, SOCK_STREAM, 0);
+		if (m_socket < 0)	throw SocketError(__FILE__, __LINE__, "Socket::Socket()", GetLastError());
 	}
-
-	service = htons(localAddress.sin_port);
-
-	rc = ::listen(hsocket, 5);
-	if (rc < 0) 	throw SocketError(__FILE__, __LINE__, "Listener::Listener(int,SAP&)", GetLastError());
-
-	start_undetached();
-}
-
-Listener::~Listener()
-{
-}
-
-void Listener::stop()
-{
-	closesocket(hsocket);
-	hsocket = -1;
-
-	join(NULL);
-}
-
-void *Listener::run_undetached(void *arg)
-{
-	int aSocket;
-	int size;
-	unsigned result;
-	ListenerQueue::Item* item;
-	struct sockaddr_in remoteAddress;
-
-	while(1)
-	{
-		size = sizeof(remoteAddress);
-		aSocket = ::accept(hsocket, (sockaddr*)&remoteAddress, &size);
-		if (aSocket < 0)
-		{
-			result = GetLastError();
-			if (result == WSAENOTSOCK || hsocket == -1) 
-			{
-				return NULL;
-			}
-		}
-		else result = 0;
-
-		Socket::services.lock();
-		item = queue.dequeue();
-		if (item)
-		{
-			if (result == 0) Socket::fillSAP(&remoteAddress, item->sap);
-			item->result = result;
-			item->hsocket = aSocket;
-			item->event.signal();
-		}
-		else
-		{
-			closesocket(aSocket);
-		}
-		Socket::services.unlock();
-	}
-}
-
-ListenerQueue::Item* Services::add(int protocol, SAP& aService)
-{
-	Listener* listener;
-	ListenerQueue::Item* item;
-	omni_mutex_lock lock(mutex);
-
-	listener = aService.getService() ? contains(protocol, atoi(aService.getService())) : 0;
-	if (listener)
-	{
-		item = listener->queue.enqueue(listener);
-	}
-	else
-	{
-		listener = new Listener(protocol, aService);
-		item = listener->queue.enqueue(listener);
-
-		basicAdd(listener);
-	}
-
-	return item;
-}
-
-void Services::remove(ListenerQueue::Item* item)
-{
-	omni_mutex_lock lock(mutex);
-
-	item->listener->queue.cancel(item);
-
-	item->listener = 0;
-}
-
-void Services::remove(Listener* listener)
-{
-	omni_mutex_lock lock(mutex);
-
-	basicRemoveAt(listener);
-	
-	listener->stop();
-}
-
-Listener* Services::contains(int aProtocol, int aService)
-{ 
-	omni_mutex_lock lock(mutex);
-
-	Key key(aProtocol, aService);
-
-	return (Listener*)basicAt(&key); 
-}
-
-unsigned Services::hashAssoc(List::Link* anItem)
-{ 
-	unsigned value = ((Listener*)anItem)->protocol;
-	value += ((Listener*)anItem)->service;
-	
-	return value;
-}
-
-void Services::empty()
-{ 
-	for(AssocIter i(*this);!i.isDone();i.next())	delete (Listener*)i.current(); 
-}
-
-Socket::Socket(int aProtocol) 
- : protocol(aProtocol), hsocket(-1), waiting(0), listener(0)
-{
 }
 
 Socket::~Socket()
@@ -268,116 +82,74 @@ Socket::~Socket()
 
 void Socket::close()
 {
-	if (waiting)
+	if (m_socket != -1)
 	{
-		services.remove(waiting);
-	}
-
-	if (listener && listener->queue.getSize() == 0)
-	{
-		services.remove(listener);
-	}
-
-	if (hsocket != -1)
-	{
-		int rc = closesocket(hsocket);
+		int rc = closesocket(m_socket);
 
 		if (rc < 0) SocketError(__FILE__, __LINE__, "Socket::~Socket()", GetLastError());
 	}
-
-	hsocket = -1;
-	waiting = 0;
+	m_socket = -1;
 }
 
-void Socket::bind(SAP& local, int single)
+void Socket::bind(SAP& local)
 {
-	if (single)
+	struct sockaddr_in localAddress;
+	int len;
+	int rc;
+
+	Socket::fillSocketAddress(local, &localAddress);
+	m_local = local;
+
+	localAddress.sin_family = m_protocol;
+	rc = ::bind(m_socket, (sockaddr*)&localAddress, sizeof(localAddress));
+	if (rc < 0) 	throw SocketError(__FILE__, __LINE__, "Socket::bind(SAP&,int)", GetLastError());
+
+	if (localAddress.sin_port == 0)
 	{
-		struct sockaddr_in localAddress;
-		int len;
-		int rc;
-
-		Socket::fillSocketAddress(local, &localAddress);
-
-		hsocket = ::socket(protocol, SOCK_STREAM, 0);
-		if (hsocket < 0)	throw SocketError(__FILE__, __LINE__, "Socket::bind(SAP&,int)", GetLastError());
-
-		localAddress.sin_family = protocol;
-		rc = ::bind(hsocket, (sockaddr*)&localAddress, sizeof(localAddress));
-		if (rc < 0) 	throw SocketError(__FILE__, __LINE__, "Socket::bind(SAP&,int)", GetLastError());
-
-		if (localAddress.sin_port == 0)
-		{
-			len = sizeof(localAddress);
-			rc = ::getsockname(hsocket, (sockaddr*)&localAddress, &len);
-			Socket::fillSAP(&localAddress, local);
-		}
-	}
-	else
-	{
-		waiting = services.add(protocol, local);
-		listener = waiting->listener;
+		len = sizeof(localAddress);
+		rc = ::getsockname(m_socket, (sockaddr*)&localAddress, &len);
+		Socket::fillSAP(&localAddress, local);
 	}
 }
 
-void Socket::listen(SAP& remote)
+void Socket::listen(int backlog)
 {
-	unsigned result;
-	
-	if (waiting)
-	{
-		waiting->mutex.lock();
-		waiting->event.wait();
-		waiting->mutex.unlock();
-
-		hsocket = waiting->hsocket;
-		result = waiting->result;
-		delete waiting;
-		waiting = 0;
-
-		if (hsocket < 0)
-			throw SocketError(__FILE__, __LINE__, "Socket::listen(SAP&,SAP&,int)", result);
-	}
-	else
-	{
-		// just one thread will service this connection
-
-		struct sockaddr_in remoteAddress;
-		int aSocket;
-		int size;
-
-		result = ::listen(hsocket, 1);
-		if (result < 0) 	throw SocketError(__FILE__, __LINE__, "Listener::Listener(int,SAP&)", GetLastError());
-
-		size = sizeof(remoteAddress);
-		aSocket = ::accept(hsocket, (sockaddr*)&remoteAddress, &size);
-		if (aSocket < 0)
-			throw SocketError(__FILE__,__LINE__, "Socket::listen(SAP&, unsigned)", GetLastError());
-
-		closesocket(hsocket);
-		hsocket = aSocket;
-
-		fillSAP(&remoteAddress, remote);
-	}
+	unsigned result = ::listen(m_socket, backlog);
+	if (result < 0) 	throw SocketError(__FILE__, __LINE__, "Listener::Listener(int,SAP&)", GetLastError());
 }
 
-void Socket::connect(SAP& remote)
+int Socket::accept(SAP &remote)
+{
+	struct sockaddr_in remoteAddress;
+	int size = sizeof(remoteAddress);
+	int s = ::accept(m_socket, (sockaddr*)&remoteAddress, &size);
+	if (s < 0)
+		throw SocketError(__FILE__,__LINE__, "Socket::listen(SAP&, unsigned)", GetLastError());
+
+	fillSAP(&remoteAddress, remote);
+
+	return s;
+}
+
+void Socket::connect(const SAP& remote)
 {
 	struct sockaddr_in remoteAddress;
 
-	hsocket = socket(protocol, SOCK_STREAM, 0);
-	if (hsocket < 0)	SocketError(__FILE__, __LINE__, "Socket::connect(SAP&,int)", GetLastError());
+	m_socket = socket(m_protocol, SOCK_STREAM, 0);
+	if (m_socket < 0)	SocketError(__FILE__, __LINE__, "Socket::connect(SAP&,int)", GetLastError());
 
 	fillSocketAddress(remote, &remoteAddress);
 
-	int rc = ::connect(hsocket, (sockaddr*)&remoteAddress, sizeof(remoteAddress));
+	int rc = ::connect(m_socket, (sockaddr*)&remoteAddress, sizeof(remoteAddress));
 	if (rc < 0) 
 		throw SocketError(__FILE__, __LINE__, "Socket::connect(SAP&,int)", GetLastError());
+
+	m_remote = remote;
 }
 
 int Socket::send(void* data, unsigned dataLength)
 {
-	int rc = ::send(hsocket, (char*)data, dataLength, 0);
+	int rc = ::send(m_socket, (char*)data, dataLength, 0);
 	if (rc < 0) 
 		throw SocketError(__FILE__, __LINE__, "Socket::send()", GetLastError());
 	
@@ -386,7 +158,7 @@ int Socket::send(void* data, unsigned dataLength)
 
 int Socket::receive(void* data, unsigned dataLength)
 {
-	int rc = ::recv(hsocket, (char*)data, dataLength, 0);
+	int rc = ::recv(m_socket, (char*)data, dataLength, 0);
 	if (rc < 0)
 	{
 		rc = GetLastError();
@@ -398,13 +170,13 @@ int Socket::receive(void* data, unsigned dataLength)
 
 void Socket::setReceiveQueueLength(unsigned aLength)
 {
-	int rc = setsockopt(hsocket, SOL_SOCKET, SO_RCVBUF, (char*)&aLength, sizeof(aLength));
+	int rc = setsockopt(m_socket, SOL_SOCKET, SO_RCVBUF, (char*)&aLength, sizeof(aLength));
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setReceiveQueueLength(unsigned)", GetLastError());
 }
 
 void Socket::setSendQueueLength(unsigned aLength)
 {	
-	int rc = setsockopt(hsocket, SOL_SOCKET, SO_SNDBUF, (char*)&aLength, sizeof(aLength));
+	int rc = setsockopt(m_socket, SOL_SOCKET, SO_SNDBUF, (char*)&aLength, sizeof(aLength));
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setSendQueueLength(unsigned)", GetLastError());
 }
 
@@ -419,20 +191,20 @@ void Socket::setLingerTimeout(unsigned aTimeout)
 		l.l_linger = aTimeout / 1000; // l_linger is seconds.
 	}
 	
-	int rc = setsockopt(hsocket, SOL_SOCKET, SO_LINGER, (char*)&l, sizeof(l));
+	int rc = setsockopt(m_socket, SOL_SOCKET, SO_LINGER, (char*)&l, sizeof(l));
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setLingerTimeout(unsigned)", GetLastError());
 }
 
 void Socket::setNoDelay(int on)
 {
 
-	int rc = setsockopt(hsocket, IPPROTO_TCP, TCP_NODELAY, (char*)&on, sizeof(on));
+	int rc = setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&on, sizeof(on));
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setNoDelay(int)", GetLastError());
 }
 
 void Socket::setKeepAlive(int on)
 {
-	int rc = setsockopt(hsocket, SOL_SOCKET, SO_KEEPALIVE, (char*)&on, sizeof(on));
+	int rc = setsockopt(m_socket, SOL_SOCKET, SO_KEEPALIVE, (char*)&on, sizeof(on));
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setKeepAlive(int)", GetLastError());
 }
 
@@ -441,7 +213,7 @@ unsigned Socket::bytesPending()
 {
 	unsigned size;
 
-	int rc = ioctlsocket(hsocket, FIONREAD, (u_long*)&size);
+	int rc = ioctlsocket(m_socket, FIONREAD, (u_long*)&size);
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::bytesPending(int)", GetLastError());
 
 	return size;
@@ -449,7 +221,7 @@ unsigned Socket::bytesPending()
 
 void Socket::setReuseAddress(int on)
 {
-	int rc = setsockopt(hsocket, SOL_SOCKET, SO_REUSEADDR, (char *) &on, sizeof(on));
+	int rc = setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, (char *) &on, sizeof(on));
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setReuseAddress(int)", GetLastError());
 }
 
@@ -463,7 +235,7 @@ void Socket::getName(SAP& name)
 	struct sockaddr_in localAddress;
 	int len = sizeof(localAddress);
 
-	int rc = ::getsockname(hsocket, (sockaddr*)&localAddress, &len);
+	int rc = ::getsockname(m_socket, (sockaddr*)&localAddress, &len);
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::getName(SAP&)", GetLastError());
 
 	Socket::fillSAP(&localAddress, name);
@@ -474,13 +246,13 @@ void Socket::getPeerName(SAP& name)
 	struct sockaddr_in localAddress;
 	int len = sizeof(localAddress);
 
-	int rc = ::getpeername(hsocket, (sockaddr*)&localAddress, &len);
+	int rc = ::getpeername(m_socket, (sockaddr*)&localAddress, &len);
 	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::getPeerName(SAP&)", GetLastError());
 
 	Socket::fillSAP(&localAddress, name);
 }
 
-void Socket::fillSocketAddress(SAP& aSAP, void* anAddress)
+void Socket::fillSocketAddress(const SAP& aSAP, void* anAddress)
 {	
 	struct in_addr inAddress;
 	struct sockaddr_in *socketAddress = (struct sockaddr_in*)anAddress;

@@ -54,38 +54,4 @@ public:
     virtual void fatal(Exception& e)  { std::cerr << e; }
 };
 
-class TextTransport;
-
-class TextTransportClient
-{
-public:
-
-	TextTransportClient() {}
-	virtual ~TextTransportClient() {}
-	
-	// must call server.accept or server.reject
-	virtual void connectRequest(TextTransport* server, SAP& remote) = 0;
-	virtual void connectRequestTimeout(TextTransport* server) = 0;
-	
-	// replies to server.connect from far end
-	virtual void connectConfirm(TextTransport* server) = 0;
-	virtual void connectReject(TextTransport* server) = 0;
-	virtual void connectTimeout(TextTransport* server) = 0;
-
-    // this is more a disconnect, but in our terminology disconnects 
-	// can be negotiated, which is impossible in this protocol
-	virtual void abort(TextTransport* sender) = 0;
-	
-	// sent whenever packet is received
-	virtual void dataReady(TextTransport* server) {}
- 
-	// flow control
-	virtual void stopSending(TextTransport* server) {}
-	virtual void resumeSending(TextTransport* server) {}
-	
-	virtual void data(TextTransport* server) {}
-
-    virtual void fatal(const char* e) {}
-};
-
 #endif
