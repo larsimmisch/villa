@@ -932,10 +932,10 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 				{
 				case kSMRecordHowTerminatedLength: 
 				case kSMRecordHowTerminatedMaxTime:
-					m_status = V3_TIMEOUT;
+					m_status = V3_WARNING_TIMEOUT;
 					break;
 				case kSMRecordHowTerminatedSilence:
-					m_status = V3_SILENCE;
+					m_status = V3_ENDSILENCE;
 					break;
 				case kSMRecordHowTerminatedAborted:
 					m_status = V3_ABORTED;

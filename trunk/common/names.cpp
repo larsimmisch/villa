@@ -12,12 +12,12 @@ const char* result_name(int r)
 		return "aborted";
 	case V3_DISCONNECTED:
 		return "disconnected";
-	case V3_SILENCE:
-		return "silence";
-	case V3_TIMEOUT:
-		return "timeout";
-	case V3_WARNING_EMPTY:
-		return "empty";
+	case V3_ENDSILENCE:
+		return "end silence";
+	case V3_WARNING_TIMEOUT:
+		return "timeout (warning)";
+	case V3_WARNING_SILENCE:
+		return "silence (warning)";
 	case V3_ERROR_FAILED:
 		return "failed";
 	case V3_ERROR_INVALID_STATE: 

@@ -182,7 +182,7 @@ public:
 
 	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
 	virtual unsigned getLength()	{ return m_sample->getLength(); }
-	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? V3_WARNING_EMPTY : V3_OK; }
+	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? V3_WARNING_SILENCE : V3_OK; }
 	virtual bool isGrowing() { return true; }
 
 	virtual void printOn(std::ostream& out)  { out << "RecordAtom(" << m_file << ", " << time << ')'; }

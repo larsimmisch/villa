@@ -16,13 +16,13 @@
 
 /* completion codes */
 #define V3_OK 200
-#define V3_SILENCE 201
-#define V3_TIMEOUT 202
-#define V3_ABORTED 203
-#define V3_DISCONNECTED 204
+#define V3_ENDSILENCE 201 /* operation ended with silence, but produced data */
+#define V3_ABORTED 202 /* operation was aborted */
+#define V3_DISCONNECTED 203 /* operation ended by disconnect */
 
 /* warnings */
-#define V3_WARNING_EMPTY 400
+#define V3_WARNING_SILENCE 400 /* operation got only silence */
+#define V3_WARNING_TIMEOUT 401 
 
 /* errors */
 #define V3_ERROR_FAILED 500

@@ -276,7 +276,7 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 		log(log_warning, "sequencer") << "Molecule is empty. will not be added." 
 			<< logend();
 
-		return V3_WARNING_EMPTY;
+		return V3_WARNING_SILENCE;
 	}
 
 	lock();
