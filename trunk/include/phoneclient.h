@@ -1,7 +1,7 @@
 /*
 	phoneclient.h
 
-	$Id: phoneclient.h,v 1.2 2000/10/18 11:11:54 lars Exp $
+	$Id: phoneclient.h,v 1.3 2000/10/18 16:58:43 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -53,6 +53,9 @@ public:
 
 	TelephoneClient() {}
 	virtual ~TelephoneClient() {}
+
+	virtual void disconnected(Telephone *server) = 0;
+	virtual void connected(Telephone *server) = 0;
 
 	// sent whenever a touchtone is received
 	virtual void touchtone(Telephone* server, char tt) = 0;

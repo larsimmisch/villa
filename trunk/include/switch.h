@@ -3,7 +3,7 @@
 
 	Copyright 1995-2000 ibp (uk) Ltd.
 
-	$Id: switch.h,v 1.1 2000/10/02 15:52:14 lars Exp $
+	$Id: switch.h,v 1.2 2000/10/18 16:58:43 lars Exp $
 
 	Author: Lars Immisch <lars@ibp.de>
 */
@@ -12,6 +12,7 @@
 #define _SWITCH_H_
 
 #include <ostream>
+#include <string>
 #include "exc.h"
 
 class SwitchError : public Exception
@@ -22,7 +23,11 @@ public:
 		: Exception(file, line,  function, "SwitchError", prev), switchFunc(aSwitchFunction), result(aResult) {}
 	virtual ~SwitchError() {}
 
-	virtual void printOn(std::ostream& aStream);
+	virtual void printOn(std::ostream& out) const
+	{
+		Exception::printOn(out);
+		out << switchFunc << " failed: " << result;
+	}
 
 protected:
 
@@ -30,77 +35,65 @@ protected:
 	int result;
 };
 
-class Slot;
+class Timeslot;
 
 class Switch
 {
 public:
 
-	Switch(void* io, int is32bit = 1, int aDevice = 0, const char* aName = 0) 
-		: ioctl(io), is32(is32bit), device(aDevice), name(aName) {}
+	Switch(int aDevice = 0, const char* aName = 0) : device(aDevice), name(aName) {}
 	virtual ~Switch()	{}
 	
-	virtual void listen(Slot a, Slot b);
-	virtual void listen(Slot a, char pattern);
-	virtual void connect(Slot a, Slot b);
-	virtual void disable(Slot a);
-	virtual char sample(Slot a);
+	virtual void listen(const Timeslot &a, const Timeslot &b) = 0;
+	virtual void listen(const Timeslot &a, char pattern) = 0;
+	virtual void connect(const Timeslot &a, const Timeslot &b)
+	{
+		listen(a, b);
+		listen(b, a);
+	}
+
+	virtual void disable(const Timeslot &a) = 0;
+	virtual char sample(const Timeslot &a) = 0;
 	
-	virtual Slot query(Slot a);
+	virtual Timeslot query(const Timeslot &a) = 0;
 	
-	virtual const char* getName()	{ return name; }
+	virtual const char* getName() const { return name.c_str(); }
 
 	virtual int contains(Switch* aSwitch) { return 0; }
 
-	int operator==(Switch& aSwitch);
+	bool operator==(const Switch& other) const
+	{
+		return (name == other.name && device == other.device);
+	}
 
     int device;
 
 protected:
 	
-	const char* name;
-	void* ioctl;
-	int is32;
+	std::string name;
 };
 
-class Slot
+class Timeslot
 {
 public:
 
-	Slot(int stream = 0, int timeslot = 0) : st(stream), ts(timeslot) {}
-	~Slot() {}
+	Timeslot(int stream = 0, int timeslot = 0) : st(stream), ts(timeslot) {}
+	~Timeslot() {}
 		
-	void listenTo(Slot& b, Switch& aSwitch)		{ aSwitch.listen(*this, b);  }
-	void connectTo(Slot& b, Switch& aSwitch)	{ aSwitch.connect(*this, b); }
+	void listenTo(Timeslot& b, Switch& aSwitch)		{ aSwitch.listen(*this, b);  }
+	void connectTo(Timeslot& b, Switch& aSwitch)	{ aSwitch.connect(*this, b); }
 	
-	Slot operator~()	{ return Slot(st > 7 ? st - 8 : st + 8, ts); }
-	int operator==(Slot& s)	{ return (st == s.st && ts == s.ts); }
+	Timeslot operator~()	{ return Timeslot(st > 7 ? st - 8 : st + 8, ts); }
+	int operator==(Timeslot& s)	{ return (st == s.st && ts == s.ts); }
 
-	friend std::ostream& operator<<(std::ostream& out, const Slot& s)	{ out << s.st << ':' << s.ts; return out; }
+	friend std::ostream& operator<<(std::ostream& out, const Timeslot& s)
+	{ 
+		out << s.st << ':' << s.ts; 
+		return out; 
+	}
 
-	unsigned st:8;
-	unsigned ts:8;
-};
-
-class MVIP
-{
-public:
-
-	enum { max_streams = 8 };
-
-	MVIP();
-	~MVIP() {}
-	
-	Slot allocate();
-	Slot allocate(Slot aSlot);
-	void release(Slot aSlot);
-
-	int inUse(Slot aSlot);
-	int inUse(unsigned aStream);
-	
-protected:
-	
-	unsigned streams[max_streams];
+	unsigned st;
+	unsigned ts;
 };
 
 #endif

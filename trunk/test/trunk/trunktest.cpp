@@ -1,7 +1,7 @@
 /*
 	trunktest.cpp
 
-	$Id: trunktest.cpp,v 1.1 2000/10/02 15:52:14 lars Exp $
+	$Id: trunktest.cpp,v 1.2 2000/10/18 16:58:43 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include "aculab/acutrunk.h"
+#include "mvip.h"
 
 using namespace std;
 
@@ -93,7 +94,9 @@ int main(int argc, char* argv[])
 {
 	Application app;
 
-	AculabTrunk trunk(0, &app);
+	AculabTrunk trunk(&app, 0);
+
+	AculabTrunk::start();
 
 	trunk.listen();
 

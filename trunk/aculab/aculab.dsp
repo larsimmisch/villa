@@ -41,7 +41,7 @@ RSC=rc.exe
 # PROP Intermediate_Dir "Release"
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /YX /FD /c
-# ADD CPP /nologo /MD /W3 /GX /O2 /I ".." /I "..\include" /D "NDEBUG" /D "WIN32" /D "_MBCS" /D "_LIB" /D "_WINSTATIC" /FD /c
+# ADD CPP /nologo /MD /W3 /GX /O2 /I ".." /I "..\include" /D "NDEBUG" /D "_LIB" /D "_WINSTATIC" /D "WIN32" /D "_MBCS" /FD /c
 # SUBTRACT CPP /YX
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
 # ADD RSC /l 0x409 /d "NDEBUG"
@@ -65,7 +65,7 @@ LIB32=link.exe -lib
 # PROP Intermediate_Dir "Debug"
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I ".." /I "..\include" /D "_DEBUG" /D "WIN32" /D "_MBCS" /D "_LIB" /D "_WINSTATIC" /FR /FD /GZ /c
+# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I ".." /I "..\include" /D "_DEBUG" /D "_LIB" /D "_WINSTATIC" /D "WIN32" /D "_MBCS" /FR /FD /GZ /c
 # SUBTRACT CPP /YX
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
@@ -87,6 +87,10 @@ LIB32=link.exe -lib
 # PROP Default_Filter "cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 # Begin Source File
 
+SOURCE=.\acuphone.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\acutrunk.cpp
 # End Source File
 # Begin Source File
@@ -101,13 +105,53 @@ SOURCE=.\clnt.c
 
 SOURCE=.\common.c
 # End Source File
+# Begin Source File
+
+SOURCE=.\smbesp.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\smclib.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\smfwcaps.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\smlib.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\smnt.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\smwavlib.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\swlib.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\swnt.c
+# End Source File
 # End Group
 # Begin Group "Header Files"
 
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
+SOURCE=.\acuphone.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\acutrunk.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\buffers.h
 # End Source File
 # Begin Source File
 
@@ -124,6 +168,57 @@ SOURCE=..\include\phone.h
 # Begin Source File
 
 SOURCE=..\include\phoneclient.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\smbesp.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\smclib.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\smdrvr.h
+
+!IF  "$(CFG)" == "aculab - Win32 Release"
+
+# Begin Custom Build
+InputPath=.\smdrvr.h
+
+"prosody_error.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+	perl ..\scripts\extract-error.pl ERR_SM prosody_error < $(InputPath) > prosody_error.i
+
+# End Custom Build
+
+!ELSEIF  "$(CFG)" == "aculab - Win32 Debug"
+
+# Begin Custom Build
+InputPath=.\smdrvr.h
+
+"prosody_error.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
+	perl ..\scripts\extract-error.pl ERR_SM prosody_error < $(InputPath) > prosody_error.i
+
+# End Custom Build
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=.\smfwcaps.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\smosintf.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\smwavlib.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\switch.h
 # End Source File
 # End Group
 # End Target

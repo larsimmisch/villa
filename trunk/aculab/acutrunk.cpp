@@ -1,7 +1,7 @@
 /*
-	acuphone.cpp
+	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.1 2000/10/02 15:52:14 lars Exp $
+	$Id: acutrunk.cpp,v 1.2 2000/10/18 16:58:43 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -160,7 +160,7 @@ int AculabTrunk::listen()
 	incoming.cnf = CNF_REM_DISC | CNF_CALL_CHARGE;
 
 	// we must lock the global dispatcher before we enter call_openin
-	// to avoid that the the dispatcher gets an event for this channel
+	// to avoid that the the dispatcher dispatches an event for this channel
 	// before it was added to it's map
 	dispatcher.lock();
 
@@ -183,7 +183,7 @@ int AculabTrunk::listen()
 	return r_ok;
 }
 
-int AculabTrunk::connect(SAP& aLocalSAP, SAP& aRemoteSAP, unsigned aTimeout)
+int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 {
     OUT_XPARMS outdetail;
 
@@ -194,7 +194,7 @@ int AculabTrunk::connect(SAP& aLocalSAP, SAP& aRemoteSAP, unsigned aTimeout)
 		return r_bad_state;
 	}
 
-    if (aRemoteSAP.getAddress() == 0)   
+    if (remote.getAddress() == 0)   
 	{
 		return r_invalid;
 	}
@@ -203,10 +203,10 @@ int AculabTrunk::connect(SAP& aLocalSAP, SAP& aRemoteSAP, unsigned aTimeout)
 
     outdetail.net = port;
     outdetail.ts = -1;
-    strcpy(outdetail.destination_addr, aRemoteSAP.getAddress());
-    if (aLocalSAP.getAddress()) 
+    strcpy(outdetail.destination_addr, remote.getAddress());
+    if (local.getAddress()) 
 	{
-		strcpy(outdetail.originating_addr, aLocalSAP.getAddress());
+		strcpy(outdetail.originating_addr, local.getAddress());
 	}
 	else
 	{
@@ -460,8 +460,6 @@ void AculabTrunk::onIdle()
 {
 	int cause = getCause();
 
-	release();
-
 	// stopTimer();
 
 	switch (state)
@@ -488,14 +486,15 @@ void AculabTrunk::onIdle()
 		state = disconnecting;
 		break;
 	case disconnecting:
+		release();
 		client->disconnectDone(this, r_ok);
-		state = idle;
 		break;
 	case accepting:
-		client->acceptDone(this, cause);
 		release();
+		client->acceptDone(this, cause);
 		break;
 	default:
+		release();
 		break;
 	}
 }
@@ -527,8 +526,8 @@ void AculabTrunk::onIncomingCallDetected()
 		return;
 	}
 
-	slot.st = details.stream;
-	slot.ts = details.ts;
+	timeslot.st = details.stream;
+	timeslot.ts = details.ts;
 
 	remote.setAddress(details.originating_addr);
 	local.setAddress(details.destination_addr);
@@ -566,6 +565,9 @@ void AculabTrunk::onCallConnected()
 	{
 		client->connectDone(this, r_ok);
 	}
+
+	if (phone)
+		phone->connected(this);
 }
 
 void AculabTrunk::onWaitForOutgoing()
@@ -585,6 +587,8 @@ void AculabTrunk::onRemoteDisconnect()
 	case connected:
 		state = disconnecting;
 		client->disconnectRequest(this, getCause());
+		if (phone)
+			phone->disconnected(this, getCause());
 		break;
 	case accepting:
 		client->acceptDone(this, getCause());

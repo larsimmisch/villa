@@ -1,15 +1,19 @@
 /*
-	acuphone.h
+	acutrunk.h
 
-	$Id: acutrunk.h,v 1.1 2000/10/02 15:52:14 lars Exp $
+	$Id: acutrunk.h,v 1.2 2000/10/18 16:58:43 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
 	Author: Lars Immisch <lars@ibp.de>
 */
 
+#ifndef _ACUTRUNK_H_
+#define _ACUTRUNK_H_
+
 #pragma warning (disable: 4786)
 
+#include <vector>
 #include <map>
 #include "omnithread.h"
 #include "phone.h"
@@ -22,7 +26,7 @@ class CallEventDispatcher : public omni_thread
 {
 public:
 
-	CallEventDispatcher() { start_undetached(); }
+	CallEventDispatcher() {}
 	~CallEventDispatcher()	{}
 
 	void lock()		{ mutex.lock(); }
@@ -31,9 +35,11 @@ public:
 	void add(ACU_INT handle, AculabTrunk* trunk);
 	void remove(ACU_INT handle);
 
-    virtual void* run_undetached(void* arg);
+	void start() {  start_undetached(); }
 
 protected:
+
+    virtual void* run_undetached(void* arg);
 
 	std::map<ACU_INT, AculabTrunk*> handle_map;
 	omni_mutex mutex;
@@ -43,13 +49,13 @@ class AculabTrunk : public Trunk
 {
 public:
 
-	AculabTrunk(int aPort, TrunkClient* aClient, Telephone* aTelephone = 0) 
+	AculabTrunk(TrunkClient* aClient, int aPort, Telephone* aTelephone = 0) 
 		: Trunk(aClient, aTelephone), handle(-1), port(aPort), stopped(false) {}
     virtual ~AculabTrunk() {}
 
 	// Connection establishment 
 	virtual int listen();
-	virtual int connect(SAP& aLocalSAP, SAP& aRemoteSAP, unsigned aTimeout = indefinite);
+	virtual int connect(const SAP& local, const SAP& remote, unsigned aTimeout = indefinite);
 	
 	// must be called by client after a t_connect_request
 	virtual int accept();
@@ -69,6 +75,8 @@ public:
 
 	void lock() { mutex.lock(); }
 	void unlock() { mutex.unlock(); }
+
+	static void start() { dispatcher.start(); }
 
 protected:
 
@@ -103,3 +111,5 @@ protected:
 
 	static CallEventDispatcher dispatcher;
 };
+
+#endif
