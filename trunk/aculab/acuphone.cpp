@@ -628,9 +628,7 @@ Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isR
 		std::string file(aName);
 		file += ".wav";
 
-		storage = new WavFileStorage(file.c_str(), isRecording);
-		storage->encoding = kSMDataFormat8KHzALawPCM;
-		storage->bytesPerSecond = 8000;
+		storage = new WavFileStorage(file.c_str(), kSMDataFormat8KHzALawPCM, isRecording);
 
 		return storage;
 	}
@@ -639,21 +637,15 @@ Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isR
 
 	if (_stricmp(dot, "ul") == 0)
 	{
-		storage = new RawFileStorage(aName, isRecording);
-		storage->encoding = kSMDataFormat8KHzULawPCM;
-		storage->bytesPerSecond = 8000;
+		storage = new RawFileStorage(aName, kSMDataFormat8KHzULawPCM, isRecording);
 	}
 	else if (_stricmp(dot, "al") == 0)
 	{
-		storage = new RawFileStorage(aName, isRecording);
-		storage->encoding = kSMDataFormat8KHzALawPCM;
-		storage->bytesPerSecond = 8000;
+		storage = new RawFileStorage(aName, kSMDataFormat8KHzALawPCM, isRecording);
 	}
 	else if (_stricmp(dot, "wav") == 0)
 	{
-		storage = new WavFileStorage(aName, isRecording);
-		storage->encoding = kSMDataFormat8KHzALawPCM;
-		storage->bytesPerSecond = 8000;
+		storage = new WavFileStorage(aName, kSMDataFormat8KHzALawPCM, isRecording);
 	}
 	else
 	{
@@ -666,22 +658,21 @@ Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isR
 unsigned ProsodyChannel::FileSample::getLength() 
 { 
 	return m_storage ? 
-		m_storage->getLength() * 1000 / m_storage->bytesPerSecond
-		: 0; 
+		m_storage->getLength() * 1000 / m_storage->m_bytesPerSecond	: 0; 
 }
 
 unsigned ProsodyChannel::FileSample::start(Media *phone)
 {
 	struct sm_replay_parms start;
 
-	long offset = m_position * m_storage->bytesPerSecond / 1000;
+	long offset = m_position * m_storage->m_bytesPerSecond / 1000;
 
 	memset(&start, 0, sizeof(start));
 
 	start.channel = m_prosody->m_channel;
 	start.background = kSMNullChannelId;
 	start.speed = 100;
-	start.type = m_storage->encoding;
+	start.type = m_storage->m_encoding;
 	start.data_length = m_storage->getLength() - offset;
 
 	m_storage->setPos(offset);
@@ -719,7 +710,7 @@ unsigned ProsodyChannel::FileSample::submit(Media *phone)
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_put_replay_data", rc);
 
-	m_position += data.length * 1000 / m_storage->bytesPerSecond;
+	m_position += data.length * 1000 / m_storage->m_bytesPerSecond;
 
 	return data.length;
 }
@@ -747,7 +738,7 @@ bool ProsodyChannel::FileSample::stop(Media *phone, unsigned status)
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
 
-	m_position = p.offset * 1000 / m_storage->bytesPerSecond;
+	m_position = p.offset * 1000 / m_storage->m_bytesPerSecond;
 
 
 	log(log_debug+1, "phone", phone->getName()) 
@@ -815,7 +806,7 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 
 	record.channel = m_prosody->m_channel;
 	record.alt_data_source = kSMNullChannelId;
-	record.type = m_storage->encoding;
+	record.type = m_storage->m_encoding;
 	record.elimination = 0;
 	record.max_octets = 0;
 	record.max_elapsed_time = m_maxTime;
@@ -884,7 +875,7 @@ unsigned ProsodyChannel::RecordFileSample::receive(Media *phone)
 
 	m_storage->write(data.data, data.length);
 
-	m_position += data.length * 1000 / m_storage->bytesPerSecond;
+	m_position += data.length * 1000 / m_storage->m_bytesPerSecond;
 
 	return m_position;
 }
