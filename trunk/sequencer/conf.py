@@ -1,14 +1,15 @@
 """
-conference background sequencer client:
+conference test sequencer client:
 
-allocate conference, background channel, add background to conference
-listen, add caller to conference
+allocate conference, listen, add callers to conference
 
 $Id$
 """
 
 import sys,getopt
 from sequencer import *
+
+caller = 0
 
 class Conftest:
 
@@ -25,19 +26,6 @@ class Conftest:
     def CNFO(self, event, data):
         self.conf = event['device']
         print 'conference is: ', self.conf
-        self.send('BGRO') 
-
-    def BGRO(self, event, data):
-        self.background = event['device']
-        self.sequencer.devices[self.background] = self
-        print 'allocated:', self.background
-        # add background to conference on channel 0
-        self.send('MLCA %s 0 0 1 conf %s speak'
-                  % (self.background, self.conf))
-        # play loop in background on channel 1
-        self.send('MLCA %s 1 32 1 play ../test/phone/wiese.al none'
-                  % self.background)
-        # wait for caller
         self.send('LSTN any any')
 
     def LSTN(self, event, data):
@@ -50,12 +38,17 @@ class Conftest:
         print 'connected:', self.device
 
     def ACPT(self, event, data):
-        self.send('MLCA %s 0 0 1 conf %s duplex'
-                  % (self.background, self.conf))
-    
-    def BGRC(self, event, data):
-        sys.exit(0)
+        mode = 'duplex'
+        
+        global caller
+        caller = caller + 1
 
+        if caller == 2:
+            mode = 'speak'
+        
+        self.send('MLCA %s 0 0 1 conf %s %s'
+                  % (self.device, self.conf, mode))
+    
     def MLCA(self, event, data):
         pass
 
