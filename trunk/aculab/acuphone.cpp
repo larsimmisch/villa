@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.3 2000/11/06 13:10:59 lars Exp $
+	$Id: acuphone.cpp,v 1.4 2001/01/11 13:06:48 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -164,7 +164,7 @@ void ProsodyEventDispatcher::dispatch(int offset)
 {
 	if (offset >= methods.size())
 	{
-		log(log_error, "phone") << "ProsodyEventDispatcher::dispatch: offset " << offset << " out of bounds" << logend;
+		log(log_error, "phone") << "ProsodyEventDispatcher::dispatch: offset " << offset << " out of bounds" << logend();
 		return;
 	}
 
