@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.10 2001/07/03 23:13:02 lars Exp $
+	$Id: acuphone.h,v 1.11 2001/09/11 22:11:27 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -165,11 +165,11 @@ protected:
 
 		virtual ~FileSample();
 
-        virtual unsigned start(Telephone *phone);
-        virtual bool stop(Telephone *phone);
-		virtual unsigned submit(Telephone *phone);
+        virtual unsigned start(Media *phone);
+        virtual bool stop(Media *phone);
+		virtual unsigned submit(Media *phone);
 		// fills prosody buffers if space available, notifies about completion if done
-		virtual int process(Telephone *phone);
+		virtual int process(Media *phone);
 
 		Storage* allocateStorage(const char *name, bool isRecordable);
 
@@ -193,11 +193,11 @@ protected:
 			: FileSample(channel, name, true), m_maxTime(max) {}
 		virtual ~RecordFileSample() {}
 
-        virtual unsigned start(Telephone *phone);
-        virtual bool stop(Telephone *phone);
-		virtual unsigned receive(Telephone *phone);
+        virtual unsigned start(Media *phone);
+        virtual bool stop(Media *phone);
+		virtual unsigned receive(Media *phone);
 		// empties prosody buffers if data available, notifies about completion if done
-		virtual int process(Telephone *phone);
+		virtual int process(Media *phone);
 
 		virtual bool isOutgoing()	{ return false; }
 
@@ -214,11 +214,11 @@ protected:
 		  m_beeps(numBeeps), m_prosody(channel), m_count(0), m_offset(0) {}
 		virtual ~Beep() {}
 
-        virtual unsigned start(Telephone *phone);
-        virtual bool stop(Telephone *phone);
-		virtual unsigned submit(Telephone *phone);
+        virtual unsigned start(Media *phone);
+        virtual bool stop(Media *phone);
+		virtual unsigned submit(Media *phone);
 		// fills prosody buffers if space available, notifies about completion if done
-		virtual int process(Telephone *phone);
+		virtual int process(Media *phone);
 
 		int m_beeps;
 		int m_count;
@@ -234,9 +234,9 @@ protected:
 			: m_tt(att), m_prosody(channel) {}
 		virtual ~Touchtones() {}
 
-        virtual unsigned start(Telephone *phone);
-        virtual bool stop(Telephone *phone);
-		virtual int process(Telephone *phone);
+        virtual unsigned start(Media *phone);
+        virtual bool stop(Media *phone);
+		virtual int process(Media *phone);
 
 		std::string m_tt;
 		ProsodyChannel *m_prosody;
@@ -261,20 +261,18 @@ protected:
 	static ProsodyEventDispatcher s_dispatcher;
 };
 
-class AculabPhone : public Telephone, public ProsodyChannel
+class AculabMedia : public Media, public ProsodyChannel
 {
 public:
 
-	AculabPhone(TelephoneClient *client, Trunk* trunk, int switchNo, Timeslot receive = Timeslot(-1, -1), Timeslot transmit = Timeslot(-1,-1), void* aClientData = 0) 
-		: Telephone(client, trunk, receive, transmit, aClientData), m_sw(switchNo)
+	AculabMedia(MediaClient *client, int switchNo, Timeslot receive = Timeslot(-1, -1), Timeslot transmit = Timeslot(-1,-1), void* aClientData = 0) 
+		: Media(client, receive, transmit, aClientData), m_sw(switchNo), m_trunk(0)
 	{
-		if (trunk)
-			trunk->setTelephone(this);
 	}
-	virtual ~AculabPhone() {}
+	virtual ~AculabMedia() {}
 
 	virtual void connected(Trunk* aTrunk);
-	virtual void disconnected(Trunk *trunk, int cause);
+	virtual void disconnected(Trunk *trunk);
 
     virtual Switch* getSwitch() { return &m_sw; }
 
@@ -297,6 +295,7 @@ protected:
 	virtual void onRecog(tSMEventId id);
 
 	AculabSwitch m_sw;
+	Trunk *m_trunk;
 };
 
 #endif

@@ -1,7 +1,7 @@
 /*
 	phoneclient.h
 
-	$Id: phoneclient.h,v 1.5 2001/05/20 20:02:44 lars Exp $
+	$Id: phoneclient.h,v 1.6 2001/09/11 22:11:27 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -15,7 +15,7 @@
 #include "sap.h"
 
 class Trunk;
-class Telephone;
+class Media;
 class Sample;
 
 class TrunkClient
@@ -52,24 +52,20 @@ public:
 	virtual void remoteRinging(Trunk* server) {}
 };
 
-class TelephoneClient : public TrunkClient 
+class MediaClient
 {
 public:
 
-	TelephoneClient() {}
-	virtual ~TelephoneClient() {}
-
-	virtual void disconnected(Telephone *server) = 0;
-	virtual void connected(Telephone *server) = 0;
+	MediaClient() {}
+	virtual ~MediaClient() {}
 
 	// sent whenever a touchtone is received
-	virtual void touchtone(Telephone* server, char tt) = 0;
+	virtual void touchtone(Media* server, char tt) = 0;
 
     // sent whenever a Sample is started
-    virtual void started(Telephone* server, Sample* sample) = 0;
+    virtual void started(Media* server, Sample* sample) = 0;
 
     // sent whenever a Sample is successfully sent
-    virtual void completed(Telephone* server, Sample* sample, unsigned msecs) = 0;
-	
+    virtual void completed(Media* server, Sample* sample, unsigned msecs) = 0;	
 };
 #endif

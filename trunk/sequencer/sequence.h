@@ -18,7 +18,7 @@
 #include "queue.h"
 #include "configuration.h"
 
-class Sequencer : public TelephoneClient
+class Sequencer : public TrunkClient, public MediaClient
 {
 public:
 
@@ -88,33 +88,29 @@ public:
 	virtual void transferDone(Trunk *server);
 	virtual void transferFailed(Trunk *server, int cause);
 
-	// TelephoneClient protocol
-
-	// unused
-	virtual void disconnected(Telephone *server) {};
-	virtual void connected(Telephone *server) {};
+	// MediaClient protocol
 
 	// sent whenever a touchtone is received
-	virtual void touchtone(Telephone *server, char tt);
+	virtual void touchtone(Media *server, char tt);
 
 	// sent whenever a sample is started
-	virtual void started(Telephone *server, Sample *aSample);
+	virtual void started(Media *server, Sample *aSample);
 
 	// sent whenever a Sample is sent
-	virtual void completed(Telephone *server, Sample *aSample, 
+	virtual void completed(Media *server, Sample *aSample, 
 		unsigned msecs);
 
-	virtual void completed(Telephone *server, Molecule *molecule, 
+	virtual void completed(Media *server, Molecule *molecule, 
 		unsigned msecs, unsigned reason);
 	
-	virtual void aborted(Telephone *sender, int cause) {}
+	virtual void aborted(Media *sender, int cause) {}
 
-	virtual void fatal(Telephone *server, const char *e);
-	virtual void fatal(Telephone *server, Exception& e);
+	virtual void fatal(Media *server, const char *e);
+	virtual void fatal(Media *server, Exception& e);
 
 	void data(InterfaceConnection* server, const std::string &id);
 
-	void addCompleted(Telephone* server, Molecule* molecule, unsigned msecs, unsigned reason);
+	void addCompleted(Media* server, Molecule* molecule, unsigned msecs, unsigned reason);
 	void checkCompleted();
 
 	// todo: needed?
@@ -122,13 +118,14 @@ public:
 
 	// void loadSwitch(const char* aName, int is32bit = 1, int aDevice = 0)	{ phone.loadSwitch(aName, aDevice); }
 
-	static Timer& getTimer()				{ return timer; }
-	Telephone*	getPhone()				{ return phone; }
+	static Timer& getTimer()		{ return timer; }
+	Media*	getMedia()				{ return m_media; }
 
 protected:
 
 	TrunkConfiguration *configuration;
-	Telephone *phone;
+	Trunk *m_trunk;
+	Media *m_media;
 	ClientQueue::Item *clientSpec;
 	Activity activity;
 	CompletedQueue delayedCompletions;

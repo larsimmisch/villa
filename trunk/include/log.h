@@ -11,7 +11,6 @@
 #include <omnithread.h>
 
 // this is a definition of a custom streambuf that outputs nothing
-// this is needed by Loggable
 template<class _char_t, class _traits = std::char_traits<_char_t> > 
 class basic_nullbuf: public std::basic_streambuf<_char_t, _traits> 
 {

@@ -28,20 +28,20 @@ int Atom::start(Sequencer *sequencer, void *userData)
 {
 	m_sample->setUserData(userData);
 
-	m_sample->start(sequencer->getPhone());
+	m_sample->start(sequencer->getMedia());
 
 	return true;
 }
 
 int Atom::stop(Sequencer *sequencer)
 {
-	return m_sample->stop(sequencer->getPhone());
+	return m_sample->stop(sequencer->getMedia());
 }
 
 PlayAtom::PlayAtom(Sequencer* sequencer, const char* aFile)
 { 
 	m_file = copyString(aFile);
-	m_sample = sequencer->getPhone()->createFileSample(aFile);
+	m_sample = sequencer->getMedia()->createFileSample(aFile);
 }
  
 RecordAtom::RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime)
@@ -49,12 +49,12 @@ RecordAtom::RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime)
 {
 	m_file = copyString(aFile); 
 
-	m_sample = sequencer->getPhone()->createRecordFileSample(aFile, aTime);
+	m_sample = sequencer->getMedia()->createRecordFileSample(aFile, aTime);
 }
 
 BeepAtom::BeepAtom(Sequencer* sequencer, unsigned count) : m_nBeeps(count) 
 {
-	m_sample = sequencer->getPhone()->createBeeps(count);
+	m_sample = sequencer->getMedia()->createBeeps(count);
 }
 
 ConferenceAtom::ConferenceAtom(unsigned aConference, unsigned aMode)
@@ -88,7 +88,7 @@ int ConferenceAtom::start(Sequencer* sequencer, void* aUserData)
 
 	m_userData = aUserData;
 
-	// me = conf->add(sequencer->getPhone()->getSlot(), sequencer->getPhone()->getSwitch(), mode);
+	// me = conf->add(sequencer->getMedia()->getSlot(), sequencer->getMedia()->getSwitch(), mode);
 
 	// started.now();
 
@@ -104,7 +104,7 @@ int ConferenceAtom::stop(Sequencer* sequencer)
 	// conf->remove(me);
 	m_me = 0;
 
-	// sequencer->addCompleted(sequencer->getPhone(), (Molecule*)userData, 0, now - started);
+	// sequencer->addCompleted(sequencer->getMedia(), (Molecule*)userData, 0, now - started);
 
 	return 1;
 }
@@ -113,7 +113,7 @@ TouchtoneAtom::TouchtoneAtom(Sequencer* sequencer, const char* att)
 {
 	m_tt = copyString(att);
 
-	m_sample = sequencer->getPhone()->createTouchtones(att);
+	m_sample = sequencer->getMedia()->createTouchtones(att);
 }
 
 int SilenceAtom::start(Sequencer* sequencer, void* aUserData)
@@ -135,7 +135,7 @@ int SilenceAtom::stop(Sequencer* sequencer)
 
 		// if we have to use completed() or addCompleted() depends on the thread context
 		// here we are in the sequencers context, so we use addCompleted
-		sequencer->addCompleted(sequencer->getPhone(), (Molecule*)m_timer.m_data, 0, m_pos);
+		sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_timer.m_data, 0, m_pos);
 
 		m_timer.invalidate();
 
@@ -152,7 +152,7 @@ void SilenceAtom::on_timer(const Timer::TimerID &id)
 
 	Molecule * m = (Molecule*)id.m_data;
 
-	m_seq->completed(m_seq->getPhone(), m, 1, m_length);
+	m_seq->completed(m_seq->getMedia(), m, 1, m_length);
 	m_timer.invalidate();
 	m_pos = 0;
 }

@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.12 2001/07/03 23:13:02 lars Exp $
+	$Id: acuphone.cpp,v 1.13 2001/09/11 22:11:27 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -235,7 +235,7 @@ tSMEventId ProsodyChannel::set_event(tSM_INT type)
 	return event.event;
 }
 
-unsigned ProsodyChannel::Beep::start(Telephone *phone)
+unsigned ProsodyChannel::Beep::start(Media *phone)
 {
 	struct sm_replay_parms start;
 
@@ -268,7 +268,7 @@ unsigned ProsodyChannel::Beep::start(Telephone *phone)
 	return m_position;
 }
 
-unsigned ProsodyChannel::Beep::submit(Telephone *phone)
+unsigned ProsodyChannel::Beep::submit(Media *phone)
 {	
 	struct sm_ts_data_parms data;
 	data.channel = m_prosody->m_channel;
@@ -285,7 +285,7 @@ unsigned ProsodyChannel::Beep::submit(Telephone *phone)
 	return m_position;
 }
 
-bool ProsodyChannel::Beep::stop(Telephone *phone)
+bool ProsodyChannel::Beep::stop(Media *phone)
 {
 	struct sm_replay_abort_parms p;
 
@@ -317,7 +317,7 @@ bool ProsodyChannel::Beep::stop(Telephone *phone)
 }
 
 // fills prosody buffers if space available, notifies about completion if done
-int ProsodyChannel::Beep::process(Telephone *phone)
+int ProsodyChannel::Beep::process(Media *phone)
 {
 	struct sm_replay_status_parms replay;
 	// we need a local copy because the client might delete us
@@ -373,7 +373,7 @@ int ProsodyChannel::Beep::process(Telephone *phone)
 	return replay.status;
 }
 
-unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
+unsigned ProsodyChannel::Touchtones::start(Media *phone)
 {
 	struct sm_play_digits_parms digits;
 
@@ -416,7 +416,7 @@ unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
 	return 0;
 }
 
-bool ProsodyChannel::Touchtones::stop(Telephone *phone)
+bool ProsodyChannel::Touchtones::stop(Media *phone)
 {
 	omni_mutex_lock l(m_prosody->m_mutex);
 
@@ -443,7 +443,7 @@ bool ProsodyChannel::Touchtones::stop(Telephone *phone)
 	return true;
 }
 
-int ProsodyChannel::Touchtones::process(Telephone *phone)
+int ProsodyChannel::Touchtones::process(Media *phone)
 {
 	struct sm_play_tone_status_parms tone;
 	// we need a local copy because the client might delete us
@@ -499,7 +499,7 @@ Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isR
 	Storage* storage;
 
 	if (!dot)
-		throw FileFormatError(__FILE__, __LINE__, "AculabPhone::allocateStorage", "unknown format");
+		throw FileFormatError(__FILE__, __LINE__, "AculabMedia::allocateStorage", "unknown format");
 
 	dot++;
 
@@ -517,7 +517,7 @@ Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isR
 	}
 	else
 	{
-		throw FileFormatError(__FILE__, __LINE__, "AculabPhone::allocateBuffers", "unknown format");
+		throw FileFormatError(__FILE__, __LINE__, "AculabMedia::allocateBuffers", "unknown format");
 	}
 
 	return storage;
@@ -530,7 +530,7 @@ unsigned ProsodyChannel::FileSample::getLength()
 		: 0; 
 }
 
-unsigned ProsodyChannel::FileSample::start(Telephone *phone)
+unsigned ProsodyChannel::FileSample::start(Media *phone)
 {
 	struct sm_replay_parms start;
 
@@ -567,7 +567,7 @@ unsigned ProsodyChannel::FileSample::start(Telephone *phone)
 	return m_position;
 }
 
-unsigned ProsodyChannel::FileSample::submit(Telephone *phone)
+unsigned ProsodyChannel::FileSample::submit(Media *phone)
 {	
 	char buffer[kSMMaxReplayDataBufferSize];
 
@@ -586,7 +586,7 @@ unsigned ProsodyChannel::FileSample::submit(Telephone *phone)
 	return m_position;
 }
 
-bool ProsodyChannel::FileSample::stop(Telephone *phone)
+bool ProsodyChannel::FileSample::stop(Media *phone)
 {
 	struct sm_replay_abort_parms p;
 
@@ -618,7 +618,7 @@ bool ProsodyChannel::FileSample::stop(Telephone *phone)
 }
 
 // fills prosody buffers if space available, notifies about completion if done
-int ProsodyChannel::FileSample::process(Telephone *phone)
+int ProsodyChannel::FileSample::process(Media *phone)
 {
 	struct sm_replay_status_parms replay;
 	// we need a local copy because the client might delete us
@@ -663,7 +663,7 @@ int ProsodyChannel::FileSample::process(Telephone *phone)
 	return replay.status;
 }
 
-unsigned ProsodyChannel::RecordFileSample::start(Telephone *phone)
+unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 {
 	struct sm_record_parms record;
 
@@ -695,7 +695,7 @@ unsigned ProsodyChannel::RecordFileSample::start(Telephone *phone)
 	return m_position;
 }
 
-bool ProsodyChannel::RecordFileSample::stop(Telephone *phone)
+bool ProsodyChannel::RecordFileSample::stop(Media *phone)
 {
 	struct sm_record_abort_parms abort;
 
@@ -722,7 +722,7 @@ bool ProsodyChannel::RecordFileSample::stop(Telephone *phone)
 	return false;
 }
 
-unsigned ProsodyChannel::RecordFileSample::receive(Telephone *phone)
+unsigned ProsodyChannel::RecordFileSample::receive(Media *phone)
 {	
 	char buffer[kSMMaxRecordDataBufferSize];
 
@@ -742,7 +742,7 @@ unsigned ProsodyChannel::RecordFileSample::receive(Telephone *phone)
 	return m_position;
 }
 
-int ProsodyChannel::RecordFileSample::process(Telephone *phone)
+int ProsodyChannel::RecordFileSample::process(Media *phone)
 {
 	struct sm_record_status_parms record;
 	// we need a local copy because the client might delete us
@@ -786,7 +786,7 @@ int ProsodyChannel::RecordFileSample::process(Telephone *phone)
 	return record.status;
 }
 
-void AculabPhone::connected(Trunk* aTrunk)
+void AculabMedia::connected(Trunk* aTrunk)
 {
 	if (m_receive.st == -1 || m_transmit.st == -1)
 		log(log_error, "phone", getName()) 
@@ -830,19 +830,15 @@ void AculabPhone::connected(Trunk* aTrunk)
 	{
 		log(log_error, "phone") << e << logend();
 	}
-
-	m_client->connected(this);
 }
 
-void AculabPhone::disconnected(Trunk *trunk, int cause)
+void AculabMedia::disconnected(Trunk *trunk)
 {
 	m_sw.disable(m_receive);
 	m_sw.disable(m_transmit);
-
-	m_client->disconnected(this);
 }
 
-void AculabPhone::onRead(tSMEventId id)
+void AculabMedia::onRead(tSMEventId id)
 {
 	omni_mutex_lock l(m_mutex);
 
@@ -866,7 +862,7 @@ void AculabPhone::onRead(tSMEventId id)
 	}
 }
 
-void AculabPhone::onWrite(tSMEventId id)
+void AculabMedia::onWrite(tSMEventId id)
 {
 	omni_mutex_lock l(m_mutex);
 
@@ -898,7 +894,7 @@ void AculabPhone::onWrite(tSMEventId id)
 	}
 }
 
-void AculabPhone::onRecog(tSMEventId id)
+void AculabMedia::onRecog(tSMEventId id)
 {
 	struct sm_recognised_parms recog;
 

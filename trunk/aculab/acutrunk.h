@@ -1,7 +1,7 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.5 2001/07/03 23:13:02 lars Exp $
+	$Id: acutrunk.h,v 1.6 2001/09/11 22:11:27 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -49,8 +49,8 @@ class AculabTrunk : public Trunk
 {
 public:
 
-	AculabTrunk(TrunkClient* aClient, int aPort, Telephone* aTelephone = 0) 
-		: Trunk(aClient, aTelephone), m_handle(-1), m_port(aPort), 
+	AculabTrunk(TrunkClient* aClient, int aPort) 
+		: Trunk(aClient), m_handle(-1), m_port(aPort), 
 		m_stopped(false) {}
     virtual ~AculabTrunk() {}
 

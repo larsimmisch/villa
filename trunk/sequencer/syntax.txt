@@ -1,20 +1,23 @@
 identifier is an arbitrary string not containing whitespace.
 
-tid := identifier
+tid := identifier // '-1' is the special unsolicited event tid
 channel := identifier
 integer := [0-9]+
 
 // response sent to client
 
-event := 'alerting' | 'touchtone' | 'disconnect' |
-	     'disconnect-done' | 'accept-done' 
-	     'play-done' | 'record-done'
+completion := 'listen-done' | 'disconnect-done' | 'accept-done' 
+	     'molecule-done'
 
-data := identifier
+event := 'touchtone' | 'disconnect'
+
+data := identifier*
 
 result := '0' | '1'
 
-response := tid result device event data
+response := tid result device completion data
+
+unsolicited_event := '-1' device event data
 
 // listen for incoming call
 

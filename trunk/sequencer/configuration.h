@@ -136,6 +136,7 @@ public:
 	virtual Timeslot preferredSlot()	{ return Timeslot(-1,-1); }
 
 	virtual Trunk* getTrunk(TrunkClient *client = 0) = 0;
+	virtual unsigned getSwitch() = 0;
 	virtual unsigned numLines() = 0;
 
 	virtual int readFromKey(RegistryKey& key);
@@ -187,8 +188,11 @@ public:
 
 	virtual Trunk* getTrunk(TrunkClient *client = 0)	
 	{ 
-		return new AculabTrunk(client, device, 0); 
+		return new AculabTrunk(client, device); 
 	}
+	
+	virtual unsigned getSwitch() { return swdevice; }
+
 	virtual unsigned numLines()	{ return lines; }
 
 	virtual int readFromKey(RegistryKey& key);

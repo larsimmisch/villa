@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.14 2001/08/08 14:26:45 lars Exp $
+	$Id: acutrunk.cpp,v 1.15 2001/09/11 22:11:27 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -608,9 +608,6 @@ void AculabTrunk::onCallConnected()
 	{
 		m_client->connectDone(this, r_ok);
 	}
-
-	if (m_phone)
-		m_phone->connected(this);
 }
 
 void AculabTrunk::onWaitForOutgoing()

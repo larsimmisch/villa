@@ -42,15 +42,17 @@ Timer Sequencer::timer;
 
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
   :	activity(this), configuration(aConfiguration), connectComplete(0),
-	clientSpec(0), outOfService(0)
+	clientSpec(0), outOfService(0), m_interface(0)
 {
 	Timeslot receive = gBus->allocate();
 	Timeslot transmit = gBus->allocate();
 
-	phone = new AculabPhone(this, aConfiguration->getTrunk(this), 0, 
+	m_media = new AculabMedia(this, aConfiguration->getSwitch(), 
 		receive, transmit);
 
-	phone->listen();
+	m_trunk = aConfiguration->getTrunk(this);
+	
+	m_trunk->listen();
 }
 
 #pragma warning(default : 4355)
@@ -288,24 +290,24 @@ void Sequencer::sendAtomDone(const char *id, unsigned nAtom, unsigned status, un
 
 void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned length)
 {
-	log(log_debug + 2, "sequencer", phone->getName())
+	log(log_debug + 2, "sequencer", m_trunk->getName())
 		<< "send molecule done for: " << id << " status: " << status << " pos: " 
 		<< pos << " length: " << length << logend();
 
 
-	(*m_interface) << id << ' ' << status << " molecule-done " << pos 
-		<< ' ' << length << "\r\n";
+	(*m_interface) << id << ' ' << status << ' ' << m_trunk->getName()
+		<< " molecule-done " << pos << ' ' << length << "\r\n";
 }
 
 int Sequencer::connect(ConnectCompletion* complete)
 {
 	lock();
 
-	if (connectComplete	|| phone->getState() != Trunk::listening)
+	if (connectComplete	|| m_trunk->getState() != Trunk::listening)
 	{
-		log(log_debug, "sequencer", phone->getName())
+		log(log_debug, "sequencer", m_trunk->getName())
 			<< "connect failed - invalid state: " 
-			<< phone->getState() << logend();
+			<< m_trunk->getState() << logend();
 
 		unlock();
 		return _busy;
@@ -319,9 +321,6 @@ int Sequencer::connect(ConnectCompletion* complete)
 	connectComplete = complete;
 
 	unlock();
-
-	// Todo
-	phone->abort();
 
 	return _ok;
 }
@@ -339,7 +338,7 @@ int Sequencer::accept(InterfaceConnection *server, const std::string &id)
 	// completion in acceptDone
 	m_id = id;
 
-	phone->accept();
+	m_trunk->accept();
 
 	return _ok;
 }
@@ -357,7 +356,7 @@ int Sequencer::reject(InterfaceConnection *server, const std::string &id)
 	// completion in acceptDone
 	m_id = id;
 
-	phone->reject();
+	m_trunk->reject();
 
 	return _ok;
 }
@@ -401,7 +400,7 @@ int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
 
 	unlock();
 
-	phone->transfer(remote, timeout);
+	m_trunk->transfer(remote, timeout);
 */
 	return _ok;
 }
@@ -429,9 +428,10 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 
 	m_id = id;
 
-	log(log_debug, "sequencer", phone->getName()) << "disconnecting" << logend();
+	log(log_debug, "sequencer", m_trunk->getName()) << "disconnecting" << logend();
 
-	phone->disconnect(c);
+	m_trunk->disconnect(c);
+	m_media->disconnected(m_trunk);
 
 	checkCompleted();
 
@@ -446,7 +446,7 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 	clientSpec = configuration->dequeue(local);
 	if (clientSpec)
 	{
-		log(log_debug, "sequencer", phone->getName()) 
+		log(log_debug, "sequencer", m_trunk->getName()) 
 			<< "found client matching: " << local 
 			<< " id: " << clientSpec->m_id << logend();
 	}
@@ -462,7 +462,7 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 			clientSpec = gClientQueue.dequeue();
 			if (clientSpec)
 			{
-				log(log_debug, "sequencer", phone->getName()) 
+				log(log_debug, "sequencer", m_trunk->getName()) 
 					<< "found client in global queue, remote: " 
 					<< clientSpec->m_id << logend();
 			}
@@ -473,11 +473,11 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 		lock();
 
 		m_interface = clientSpec->m_interface;
-		m_interface->add(phone->getName(), this);
+		m_interface->add(m_trunk->getName(), this);
 
 		(*m_interface) << clientSpec->m_id.c_str() << ' ' << _ok 
-			<< ' ' << phone->getName()
-			<< " alerting "
+			<< ' ' << m_trunk->getName()
+			<< " listen-done "
 			<< " \"" << remote.getAddress() << "\" \""
 			<< configuration->getNumber() << "\" \""
 			<< local.getService() << "\" "
@@ -489,29 +489,29 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 	{
 		if (!contained)
 		{
-			log(log_debug, "sequencer", phone->getName()) 
+			log(log_debug, "sequencer", m_trunk->getName()) 
 				<< "no client found. rejecting call." << logend(); 
 
-			phone->reject(0);
+			m_trunk->reject(0);
 		}
 		else
 		{
-			log(log_debug, "sequencer", phone->getName()) 
+			log(log_debug, "sequencer", m_trunk->getName()) 
 				<< "received partial local address: " << local 
 				<< logend();
 		}
 	}
 }
 
-// Protocol of Telephone Client. Basically forwards it's information to the remote client
+// Protocol of TrunkClient. Basically forwards it's information to the remote client
 
 void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remote)
 {
 	if (connectComplete)
 	{
-		phone->reject();
+		m_trunk->reject();
 
-		log(log_debug, "sequencer", phone->getName()) 
+		log(log_debug, "sequencer", m_trunk->getName()) 
 			<< "rejecting request because of outstanding outgoing call" << logend();
 	}
 	else
@@ -520,8 +520,8 @@ void Sequencer::connectRequest(Trunk* server, const SAP &local, const SAP &remot
 
 		if (!connectComplete)
 		{
-			log(log_debug, "sequencer", phone->getName()) 
-				<< "telephone connect request from: " 
+			log(log_debug, "sequencer", m_trunk->getName()) 
+				<< "connect request from: " 
 				<< remote << " , " << local	<< " [" << server->getTimeslot() << ']' 
 				<< logend();
 		}
@@ -532,7 +532,7 @@ void Sequencer::connectRequestFailed(Trunk* server, int cause)
 {
 	if (cause == _aborted && connectComplete)
 	{
-		log(log_debug, "sequencer", phone->getName()) << "connecting to " 
+		log(log_debug, "sequencer", m_trunk->getName()) << "connecting to " 
 			<< connectComplete->m_id.c_str() 
 			<< " for dialout" << logend();
 
@@ -543,20 +543,22 @@ void Sequencer::connectRequestFailed(Trunk* server, int cause)
 	}
 	else
 	{
-		log(log_debug, "sequencer", phone->getName()) 
+		log(log_debug, "sequencer", m_trunk->getName()) 
 			<< "connect request failed with " << cause 
 			<< logend();
 
-		phone->listen();
+		m_trunk->listen();
 	}
 }
 
 void Sequencer::connectDone(Trunk* server, int result)
 {
-	log(log_debug, "sequencer", phone->getName()) 
-		<< "telephone connect done: " << result << logend();
+	log(log_debug, "sequencer", m_trunk->getName()) 
+		<< "connect done: " << result << logend();
 
 	// good. we got through
+
+	m_media->connected(server);
 
 	if (connectComplete)
 	{
@@ -576,8 +578,8 @@ void Sequencer::connectDone(Trunk* server, int result)
 
 void Sequencer::transferDone(Trunk *server)
 {
-	log(log_debug, "sequencer", phone->getName()) 
-		<< "telephone transfer succeeded" << logend();
+	log(log_debug, "sequencer", m_trunk->getName()) 
+		<< "transfer succeeded" << logend();
 
 	activity.stop();
 
@@ -599,8 +601,8 @@ void Sequencer::transferDone(Trunk *server)
 
 void Sequencer::transferFailed(Trunk *server, int cause)
 {
-	log(log_warning, "sequencer", phone->getName()) 
-		<< "telephone transfer failed: " << cause << logend();
+	log(log_warning, "sequencer", m_trunk->getName()) 
+		<< "transfer failed: " << cause << logend();
 
 /* Todo
 
@@ -617,9 +619,11 @@ void Sequencer::transferFailed(Trunk *server, int cause)
 
 void Sequencer::disconnectRequest(Trunk *server, int cause)
 {
-	log(log_debug, "sequencer", phone->getName()) 
-		<< "telephone disconnect request" << logend();
+	log(log_debug, "sequencer", m_trunk->getName()) 
+		<< "disconnect request" << logend();
 
+	m_media->disconnected(server);
+	
 	lock();
 
 	if (activity.getState() == Activity::active)
@@ -630,7 +634,7 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 
 		if (activity.getState() == Activity::idle)
 		{
-			(*m_interface) << _event << ' ' << phone->getName() 
+			(*m_interface) << _event << ' ' << m_trunk->getName() 
 				<< " disconnect\r\n";
 		}
 	}
@@ -646,12 +650,12 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 	if (m_id.size())
 	{
 		(*m_interface) << m_id.c_str() << ' ' << result << ' '
-			<< phone->getName() << " disconnect-done\r\n";
+			<< m_trunk->getName() << " disconnect-done\r\n";
 	}
-	else
+	else if (m_interface)
 	{
 		(*m_interface) << "-1 " << _event << ' '
-			<< phone->getName() << " disconnect\r\n";
+			<< m_trunk->getName() << " disconnect\r\n";
 	}
 
 	m_id.erase();
@@ -667,8 +671,10 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 		log(log_debug, "sequencer", server->getName()) << "call accept failed: " 
 		<< result << logend();
 
+	m_media->connected(server);
+
 	(*m_interface) << m_id.c_str() << ' ' << result
-		<< " " << phone->getName() << " accept-done\r\n";
+		<< " " << m_trunk->getName() << " accept-done\r\n";
 
 	m_id.erase();
 }
@@ -687,7 +693,7 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 
 		unlock();
 
-		phone->connect(connectComplete->m_local, connectComplete->m_remote, 
+		m_trunk->connect(connectComplete->m_local, connectComplete->m_remote, 
 			connectComplete->m_timeout);
 
 		log(log_debug, "sequencer", server->getName()) 
@@ -709,14 +715,14 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 		m_id.erase();
 
 		unlock();
-		phone->listen();
+		m_trunk->listen();
 	}
 }
 
 void Sequencer::details(Trunk *server, const SAP& local, const SAP& remote)
 {
 	log(log_debug, "sequencer", server->getName()) 
-		<< "telephone details: " << local << " " << remote << logend();
+		<< "details: " << local << " " << remote << logend();
 
 	onIncoming(server, local, remote);
 }
@@ -724,7 +730,7 @@ void Sequencer::details(Trunk *server, const SAP& local, const SAP& remote)
 void Sequencer::remoteRinging(Trunk *server)
 {
 	log(log_debug, "sequencer", server->getName()) 
-		<< "telephone remote end ringing" << logend();
+		<< "remote end ringing" << logend();
 
 /* Todo
 
@@ -739,7 +745,7 @@ void Sequencer::remoteRinging(Trunk *server)
 */
 }
 
-void Sequencer::started(Telephone *server, Sample *aSample)
+void Sequencer::started(Media *server, Sample *aSample)
 {
 	Molecule* m = (Molecule*)aSample->getUserData();
 
@@ -755,12 +761,12 @@ void Sequencer::started(Telephone *server, Sample *aSample)
 	}
 }
 
-void Sequencer::completed(Telephone *server, Sample *aSample, unsigned msecs)
+void Sequencer::completed(Media *server, Sample *aSample, unsigned msecs)
 {
 	completed(server, (Molecule*)(aSample->getUserData()), msecs, aSample->getStatus());
 }
 
-void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs, unsigned status)
+void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, unsigned status)
 {
 	int done, atEnd, notifyStop;
 	unsigned pos, length, nAtom;
@@ -804,11 +810,11 @@ void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs,
 			<< "done " << *molecule << logend();
 	}
 
-	if (server->getState() == Trunk::disconnecting)
+	if (m_trunk->getState() == Trunk::disconnecting)
 	{
 		sendMoleculeDone(id.c_str(), status, pos, length);
 
-		server->disconnect();
+		m_trunk->disconnect();
 
 		return;
 	}
@@ -822,32 +828,32 @@ void Sequencer::completed(Telephone* server, Molecule* molecule, unsigned msecs,
 	}
 }
 
-void Sequencer::touchtone(Telephone* server, char tt)
+void Sequencer::touchtone(Media* server, char tt)
 {
 	(*m_interface) << "-1 0 " <<
 	server->getName() << " touchtone " << tt 
 	<< "\r\n";
 }
 
-void Sequencer::fatal(Telephone* server, const char* e)
+void Sequencer::fatal(Media* server, const char* e)
 {
 	log(log_error, "sequencer", server->getName()) 
-		<< "fatal Telephone exception: " << e << std::endl
+		<< "fatal Media exception: " << e << std::endl
 		<< "terminating" << logend();
 
 	exit(5);
 }
 
-void Sequencer::fatal(Telephone* server, Exception& e)
+void Sequencer::fatal(Media* server, Exception& e)
 {
 	log(log_error, "sequencer", server->getName()) 
-		<< "fatal Telephone exception: " << e << std::endl
+		<< "fatal Media exception: " << e << std::endl
 		<< "terminating" << logend();
 
 	exit(5);
 }
 
-void Sequencer::addCompleted(Telephone* server, Molecule* molecule, unsigned msecs, unsigned status)
+void Sequencer::addCompleted(Media* server, Molecule* molecule, unsigned msecs, unsigned status)
 {
 	delayedCompletions.enqueue(server, molecule, msecs, status);
 }
@@ -997,7 +1003,7 @@ int main(int argc, char* argv[])
 		}
 
 		AculabTrunk::start();
-		AculabPhone::start();
+		AculabMedia::start();
 		Sequencer::getTimer().start();
 
 		SAP local;
