@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.7 2001/06/19 15:02:51 lars Exp $
+	$Id: acuphone.h,v 1.8 2001/06/23 09:55:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -250,6 +250,8 @@ protected:
 	tSMEventId eventRecog;
 	struct sm_listen_for_parms listenFor;
 	struct sm_channel_info_parms info;
+	omni_mutex mutex;
+	Sample *current;
 
 	static ProsodyEventDispatcher dispatcher;
 };

@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.14 2001/06/21 10:54:23 lars Exp $
+	$Id: phonetest.cpp,v 1.15 2001/06/23 09:55:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -27,7 +27,7 @@ class Application : public TelephoneClient
 {
 public:
 
-	Application() : m_active(false) {}
+	Application() : m_active(0) {}
 
 	// must call server.accept or server.reject
 	virtual void connectRequest(Trunk *server, const SAP& local, const SAP& remote)
@@ -60,7 +60,7 @@ public:
 		{
 			m_mutex.unlock();
 			log(log_debug, "app", server->getName()) << "remote disconnect - aborting DSP activity" << logend();
-			server->getTelephone()->abortSending();
+			m_active->stop(server->getTelephone());
 		}
 		else
 		{
@@ -139,7 +139,7 @@ public:
 			sample->start(server);
 
 			m_mutex.lock();
-			m_active = true;
+			m_active = sample;
 			m_mutex.unlock();
 
 		}
@@ -164,7 +164,7 @@ public:
 		delete sample;
 		
 		m_mutex.lock();
-		m_active = false;
+		m_active = 0;
 		m_mutex.unlock();
 
 		server->disconnect();
@@ -173,7 +173,7 @@ public:
 private:
 
 	omni_mutex m_mutex; 
-	bool m_active;
+	Sample *m_active;
 
 };
 

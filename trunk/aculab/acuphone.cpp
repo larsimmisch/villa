@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.9 2001/06/20 09:33:17 lars Exp $
+	$Id: acuphone.cpp,v 1.10 2001/06/23 09:55:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -246,7 +246,7 @@ unsigned ProsodyChannel::Beep::start(Telephone *phone)
 	start.type = kSMDataFormat8KHzALawPCM;
 	start.data_length = sizeof(beep);
 
-	omni_mutex_lock(phone->getMutex());
+	omni_mutex_lock(prosody->mutex);
 
 	int rc = sm_replay_start(&start);
 	if (rc)
@@ -255,7 +255,7 @@ unsigned ProsodyChannel::Beep::start(Telephone *phone)
 	log(log_debug, "phone", phone->getName()) 
 		<< "beep " << beeps << " started" << logend();
 	
-	phone->started(this);
+	prosody->current = this;
 
 	process(phone);
 
@@ -303,6 +303,9 @@ bool ProsodyChannel::Beep::stop(Telephone *phone)
 int ProsodyChannel::Beep::process(Telephone *phone)
 {
 	struct sm_replay_status_parms replay;
+	// we need a local copy because the client might delete us
+	// in completed
+	ProsodyChannel *p = prosody;
 
 	replay.channel = prosody->channel;
 	
@@ -321,12 +324,17 @@ int ProsodyChannel::Beep::process(Telephone *phone)
 				log(log_debug, "phone", phone->getName()) 
 					<< "beep " << beeps << " done [" << result_name(status) << ',' << position << ']' << logend();
 
+				p->current = 0;
+				p->mutex.unlock();
 				phone->completed(this);
+				p->mutex.lock();
 			}
 			else
 			{
 				offset = 0;
+				prosody->mutex.unlock();
 				start(phone);
+				prosody->mutex.lock();
 			}
 			return replay.status;
 		case kSMReplayStatusUnderrun:
@@ -368,6 +376,8 @@ unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
 			<< logend();
 	}
 
+	omni_mutex_lock(prosody->mutex);
+
 	int rc = sm_play_digits(&digits);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
@@ -375,7 +385,7 @@ unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
 	log(log_debug, "phone", phone->getName()) 
 		<< "touchtones " << tt.c_str() << " started" << logend();
 
-	phone->started(this);
+	prosody->current = this;
 
 	// time played
 	return 0;
@@ -400,6 +410,9 @@ bool ProsodyChannel::Touchtones::stop(Telephone *phone)
 int ProsodyChannel::Touchtones::process(Telephone *phone)
 {
 	struct sm_play_tone_status_parms tone;
+	// we need a local copy because the client might delete us
+	// in completed
+	ProsodyChannel *p = prosody;
 
 	tone.channel = prosody->channel;
 
@@ -412,7 +425,10 @@ int ProsodyChannel::Touchtones::process(Telephone *phone)
 		log(log_debug, "phone", phone->getName()) 
 			<< "touchtones " << tt.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
 
+		p->current = 0;
+		p->mutex.unlock();
 		phone->completed(this);
+		p->mutex.lock();
 	}
 
 	return tone.status;
@@ -492,13 +508,13 @@ unsigned ProsodyChannel::FileSample::start(Telephone *phone)
 
 	storage->setPos(offset);
 
-	omni_mutex_lock(phone->getMutex());
+	omni_mutex_lock(prosody->mutex);
 
 	int rc = sm_replay_start(&start);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
 
-	phone->started(this);
+	prosody->current = this;
 
 	process(phone);
 
@@ -551,6 +567,9 @@ bool ProsodyChannel::FileSample::stop(Telephone *phone)
 int ProsodyChannel::FileSample::process(Telephone *phone)
 {
 	struct sm_replay_status_parms replay;
+	// we need a local copy because the client might delete us
+	// in completed
+	ProsodyChannel *p = prosody;
 
 	replay.channel = prosody->channel;
 	
@@ -565,7 +584,10 @@ int ProsodyChannel::FileSample::process(Telephone *phone)
 		case kSMReplayStatusComplete:
 			log(log_debug, "phone", phone->getName()) 
 				<< "file sample " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
+
+			p->mutex.unlock();
 			phone->completed(this);
+			p->mutex.lock();
 			return replay.status;
 		case kSMReplayStatusUnderrun:
 			log(log_error, "phone", phone->getName()) << "underrun!" << logend();
@@ -596,13 +618,13 @@ unsigned ProsodyChannel::RecordFileSample::start(Telephone *phone)
 	// this shouldn't be hardcoded...
 	record.max_silence = 1000;
 
-	omni_mutex_lock(phone->getMutex());
+	omni_mutex_lock(prosody->mutex);
 
 	int rc = sm_record_start(&record);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_record_start", rc);
 
-	phone->started(this);
+	prosody->current = this;
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "recording " << name.c_str() << " started" << logend();
@@ -650,6 +672,9 @@ unsigned ProsodyChannel::RecordFileSample::receive(Telephone *phone)
 int ProsodyChannel::RecordFileSample::process(Telephone *phone)
 {
 	struct sm_record_status_parms record;
+	// we need a local copy because the client might delete us
+	// in completed
+	ProsodyChannel *p = prosody;
 
 	record.channel = prosody->channel;
 	
@@ -664,7 +689,11 @@ int ProsodyChannel::RecordFileSample::process(Telephone *phone)
 		case kSMRecordStatusComplete:
 			log(log_debug, "phone", phone->getName()) 
 				<< "recording " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
+
+			p->current = 0;
+			p->mutex.unlock();
 			phone->completed(this);
+			p->mutex.lock();
 			return record.status;
 		case kSMRecordStatusOverrun:
 			log(log_error, "phone", phone->getName()) << "overrun!" << logend();
@@ -731,8 +760,6 @@ void AculabPhone::connected(Trunk* aTrunk)
 
 void AculabPhone::disconnected(Trunk *trunk, int cause)
 {
-	abortSending();
-
 	sw.disable(receive);
 	sw.disable(transmit);
 

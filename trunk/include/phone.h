@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.10 2001/06/19 15:02:51 lars Exp $
+	$Id: phone.h,v 1.11 2001/06/23 09:55:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -83,6 +83,8 @@ public:
 	void setName(const char* s) { name = std::string(s); }
 	const char* getName() { return name.c_str(); }
 
+	virtual states getState() { return state; }
+
 protected:
 
 	friend class Telephone;
@@ -131,7 +133,7 @@ public:
 		Timeslot rcv = Timeslot(-1,-1), 
 		Timeslot xmit = Timeslot(-1,-1), void* aClientData = 0) 
 		: client(aClient), trunk(aTrunk), receive(rcv), transmit(xmit), 
-		clientData(aClientData), current(0) {}
+		clientData(aClientData) {}
 
     virtual ~Telephone() {}
 
@@ -199,30 +201,10 @@ public:
 	virtual void startEnergyDetector(unsigned qualTime) = 0;
 	virtual void stopEnergyDetector() = 0;
 
-	virtual Sample* getCurrentSample() { return current; }
-
 	virtual Sample* createFileSample(const char *name) = 0;
 	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime) = 0;
 	virtual Sample* createTouchtones(const char *tt) = 0;
 	virtual Sample* createBeeps(int nBeeps) = 0;
-
-	// must be called with mutex held
-	virtual void completed(Sample *sample)
-	{
-		current = 0;
-
-		client->completed(this, sample, sample->position);
-	}
-
-    virtual bool abortSending()
-	{
-		omni_mutex_lock l(mutex);
-
-		if (current) 
-			return current->stop(this);
-
-		return false;
-	}
 
 	virtual void touchtone(char tt)
 	{
@@ -231,21 +213,15 @@ public:
 
     bool isIdle()    	
 	{ 
-		omni_mutex_lock l(mutex);
-
-		return trunk ? (trunk->state == Trunk::idle) : true; 
+		return trunk ? (trunk->getState() == Trunk::idle) : true; 
 	}
     bool isConnected()	
 	{ 
-		omni_mutex_lock l(mutex);
-
-		return trunk ? (trunk->state == Trunk::connected) : false; 
+		return trunk ? (trunk->getState() == Trunk::connected) : false; 
 	}
 
 	Trunk::states getState()
 	{
-		omni_mutex_lock l(mutex);
-
 		return trunk ? trunk->state : Trunk::idle; 
 	}
 
@@ -254,8 +230,6 @@ public:
 
     void setTrunk(Trunk* aTrunk)
 	{
-		omni_mutex_lock l(mutex);
-
 		trunk = aTrunk; 
 		if (trunk) 
 			trunk->setTelephone(this);
@@ -271,25 +245,17 @@ public:
 	// the trunk timeslot is bidirectional
 	Timeslot getTrunkTimeslot()
 	{
-		omni_mutex_lock l(mutex);
-
 		return trunk ? trunk->getTimeslot() : Timeslot(-1, -1);
 	}
 
     virtual Switch* getSwitch()	{ return 0; }
 
-	virtual TelephoneClient* getClient() { return client; }		
-
-	// must be called whenever a sample subclass has been started with locks held
-    virtual void started(Sample* sample) 
-	{
-		current = sample;
+	virtual void completed(Sample *sample) 
+	{ 
+		client->completed(this, sample, sample->position);
 	}
-
-	void lock() { mutex.lock(); }
-	void unlock() { mutex.unlock(); }
-
-	omni_mutex& getMutex() { return mutex; }
+	// todo delete?
+	virtual TelephoneClient* getClient() { return client; }		
 
 	// debug
 	virtual const char *getName() = 0;
@@ -302,9 +268,7 @@ protected:
 	Timeslot receive;
     Trunk* trunk;
     void* clientData;
-	Sample* current;
 	TelephoneClient* client;
-	omni_mutex mutex;
 };
 
 #endif
