@@ -111,7 +111,6 @@ protected:
 	int m_gmax;
 	// receive buffer
 	char *m_rbuf;
-	int m_rpos;
 	int m_rsize;
 	int m_rmax;
 	omni_mutex m_mutex;

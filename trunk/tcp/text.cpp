@@ -18,7 +18,7 @@ static char get_lost[] = "finger weg!\r\n";
 SocketStream::SocketStream(const Socket &socket) : 
 	Socket(socket.protocol(), socket.fd()),
 	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(GSIZE),
-	m_rbuf(0), m_rpos(0), m_rsize(0), m_rmax(RSIZE),
+	m_rbuf(0), m_rsize(0), m_rmax(RSIZE),
 	std::basic_iostream<char>(this)
 {
 	m_gbuf = new char[m_gmax];
@@ -32,7 +32,7 @@ SocketStream::SocketStream(const Socket &socket) :
 SocketStream::SocketStream(int protocol, int s) : 
 	Socket(protocol, s),
 	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(GSIZE),
-	m_rbuf(0), m_rpos(0), m_rsize(0), m_rmax(RSIZE),
+	m_rbuf(0), m_rsize(0), m_rmax(RSIZE),
 	std::basic_iostream<char>(this)
 {
 	m_gbuf = new char[m_gmax];
@@ -69,18 +69,15 @@ unsigned SocketStream::send()
 
 unsigned SocketStream::fillGBuf()
 {
-	if (m_rpos == m_rsize)
+	if (strlen(m_rbuf) == 0)
 		return 0;
 
-	if (strlen(m_rbuf + m_rpos) == 0)
-		return 0;
-
-	char *e = strstr(m_rbuf + m_rpos, "\r\n");
+	char *e = strstr(m_rbuf, "\r\n");
 
 	if (!e)
 		return 0;
 
-	int p = e - m_rbuf - m_rpos;
+	int p = e - m_rbuf;
 
 	// grow the buffer if necessary - take trailing "\n\0" into account
     if (p + 2 >= m_gmax)
@@ -97,13 +94,16 @@ unsigned SocketStream::fillGBuf()
 		m_gbuf = newbuf;
     }
 
-	memcpy(m_gbuf, m_rbuf + m_rpos, p);
+	memcpy(m_gbuf, m_rbuf, p);
 	m_gbuf[p] = '\n';
 	m_gbuf[p+1] = '\0';
 
 	m_gpos = 0;
 	m_gsize = p + 1;
-	m_rpos += p + 2;
+	
+	m_rsize -= m_gsize + 1;
+	memmove(m_rbuf, m_rbuf + m_gsize + 1, m_rsize);
+	m_rbuf[m_rsize] = '\0';
 
 	std::ostream &o = log(log_info, "text") << m_remote << " received: ";
 	o.write(m_gbuf, p);
@@ -128,11 +128,9 @@ unsigned SocketStream::receive()
 	unsigned len = fillGBuf();
 
 	if (len)
+	{
 		return len;
-
-	m_rsize = 0;
-	m_rpos = 0;
-	m_rbuf[0] = '\0';
+	}
 
 	for(;;)
 	{	
@@ -146,10 +144,6 @@ unsigned SocketStream::receive()
 		
 		m_rsize += rcvd;
 		m_rbuf[m_rsize] = '\0';
-
-		std::ostream &o = log(log_info, "text") << m_remote << " receive_raw: ";
-		o.write(m_rbuf, m_rsize);
-		o << logend();
 
 		len = fillGBuf();
 		if (len)
