@@ -626,6 +626,7 @@ unsigned Sequencer::BGRC(const std::string &id)
 	if (m_id.size())
 	{
 		unlock();
+
 		if (m_interface)
 		{
  			m_interface->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
@@ -854,7 +855,6 @@ void Sequencer::transferDone(Trunk *server, unsigned callref, int result)
 
 void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 {
-
 	omni_mutex_lock lock(m_mutex);
 
 	// if we are active, stop
@@ -1019,9 +1019,9 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	unsigned pos, length, atom, channel;
 	std::string id, jobid;
 
-	lock();
-
 	assert(molecule);
+
+	lock();
 
 	// the molecule will be changed after the done. Grab all necesssary information before done.
 

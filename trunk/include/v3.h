@@ -1,3 +1,13 @@
+/* 
+	v3.h 
+
+	Global definitions for Voice3 
+	
+	(Lars' 3rd version of a 100% vegetable call control/media abstraction)
+
+	$Id$ 
+*/
+
 #ifndef V3_DEFS_H__
 #define V3_DEFS_H__
 

@@ -36,6 +36,8 @@ public:
 	void lock() 	{ m_mutex.lock(); }
 	void unlock()	{ m_mutex.unlock(); }
 
+	unsigned size()	{ return m_parties.size(); }
+
 	unsigned getHandle()	{ return m_handle; }
 
 	void* getUserData() 	{ return m_userData; }
@@ -45,12 +47,13 @@ protected:
 	friend class Conferences;
 
 	Conference(unsigned handle, void* aUserData = 0) : m_handle(handle),
-		m_userData(0), m_module(0), m_speakers(0), m_listeners(0) {}
+		m_userData(0), m_module(0), m_closed(false), m_speakers(0), m_listeners(0) {}
 
 	typedef std::map<ProsodyChannel*,mode> t_party_set;
 
 	omni_mutex m_mutex;
 	int m_module;
+	bool m_closed;
 	unsigned m_handle;
 	unsigned m_speakers;
 	unsigned m_listeners;

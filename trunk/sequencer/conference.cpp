@@ -76,48 +76,58 @@ void Conference::add(ProsodyChannel *channel, mode m)
 
 void Conference::remove(ProsodyChannel *channel)
 {
-	omni_mutex_lock lock(m_mutex);
+	bool closed;
 
-	t_party_set::iterator p = m_parties.find(channel);
-
-    if (p == m_parties.end())
+	/* block to restrict lock scope */
 	{
-		throw Exception(__FILE__, __LINE__,
-			"Conference::remove", "party not in this conference");
-	}
+		omni_mutex_lock lock(m_mutex);
 
-	mode m = p->second;
+		closed = m_closed;
 
-	m_parties.erase(p);
-    
-	if (m & speak)
-	{
-		--m_speakers;
+		t_party_set::iterator p = m_parties.find(channel);
 
-		/* We now need to do the opposite of joining: delete the
-		 * leaving party from the low-level conferences belonging to
-		 * each of the remaining parties, and delete all parties from
-		 * the low-level conference belonging to the leaving party.
-		 * This second action is automatically performed when we abort
-		 * the low-level conference, so we just have to do the first
-		 * of these.
-		 */
-
-		for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
+		if (p == m_parties.end())
 		{
-			if (i->second & listen)
+			throw Exception(__FILE__, __LINE__,
+				"Conference::remove", "party not in this conference");
+		}
+
+		mode m = p->second;
+
+		m_parties.erase(p);
+    
+		if (m & speak)
+		{
+			--m_speakers;
+
+			/* We now need to do the opposite of joining: delete the
+			 * leaving party from the low-level conferences belonging to
+			 * each of the remaining parties, and delete all parties from
+			 * the low-level conference belonging to the leaving party.
+			 * This second action is automatically performed when we abort
+			 * the low-level conference, so we just have to do the first
+			 * of these.
+			 */
+
+			for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
 			{
-				i->first->conferenceLeave(channel);
+				if (i->second & listen)
+				{
+					i->first->conferenceLeave(channel);
+				}
 			}
+		}
+
+		if (m & listen)
+		{
+			--m_listeners;
+
+			channel->conferenceAbort();
 		}
 	}
 
-	if (m & listen)
-	{
-		--m_listeners;
-
-		channel->conferenceAbort();
-	}
+	if (closed)
+		delete this;
 }
 
 Conference *Conferences::create(void* userData)
@@ -161,16 +171,36 @@ Conference *Conferences::create(void* userData)
 
 bool Conferences::close(unsigned handle)
 {
-	omni_mutex_lock l(m_mutex);
+	Conference *c = 0;
 
-	iterator h = m_conferences.find(handle);
+	/* block to restrict lock scope */
+	{
+		omni_mutex_lock l(m_mutex);
 
-	if (h == m_conferences.end())
-		return false;
+		iterator h = m_conferences.find(handle);
 
-	delete(h->second);
+		if (h == m_conferences.end())
+			return false;
 
-	m_conferences.erase(h);
+		if (h->second->size() == 0)
+		{
+			delete(h->second);
+		}
+		else
+		{
+			c = h->second;
+		}
+
+		m_conferences.erase(h);
+	}
+
+	/* lock the conference after our mutex was unlocked */
+	if (c)
+	{
+		c->lock();
+		c->m_closed = true;
+		c->unlock();
+	}
 
 	return true;
 }
