@@ -91,6 +91,10 @@ SOURCE=..\..\common\getopt.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\common\log.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\phonetest.cpp
 # End Source File
 # End Group

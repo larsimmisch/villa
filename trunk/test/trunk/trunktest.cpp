@@ -1,7 +1,7 @@
 /*
 	trunktest.cpp
 
-	$Id: trunktest.cpp,v 1.3 2000/11/06 13:10:59 lars Exp $
+	$Id: trunktest.cpp,v 1.4 2000/11/06 15:08:57 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -11,15 +11,18 @@
 #include <iostream>
 #include "aculab/acutrunk.h"
 #include "mvip.h"
+#include "log.h"
 
 using namespace std;
+
+Log cout_log(cout);
 
 class Application : public TrunkClient
 {
 	// must call server.accept or server.reject
 	virtual void connectRequest(Trunk* server, const SAP& local, const SAP& remote)
 	{
-		cout << "incoming call - local: " << local << " remote: " << remote << endl;
+		log(log_debug, "app") << "incoming call - local: " << local << " remote: " << remote << logend();
 		server->accept();
 	}
 	
@@ -28,11 +31,11 @@ class Application : public TrunkClient
 	{
 		if (result == r_ok)
 		{
-			cout << "outgoing call connected" << endl;
+			log(log_debug, "app") << "outgoing call connected" << logend();
 		}
 		else
 		{
-			cout << "outgoing call failed" << endl;
+			log(log_debug, "app") << "outgoing call failed" << logend();
 		}
 	}
 	
@@ -41,7 +44,7 @@ class Application : public TrunkClient
 
 	virtual void disconnectRequest(Trunk* server, int cause)
 	{
-		cout << "remote disconnect" << endl;
+		log(log_debug, "app") << "remote disconnect" << logend();
 
 		server->disconnectAccept();
 	}
@@ -49,7 +52,7 @@ class Application : public TrunkClient
 	// disconnect completion
 	virtual void disconnectDone(Trunk* server, unsigned result)
 	{
-		cout << "disconnected" << endl;
+		log(log_debug, "app") << "disconnected" << logend();
 
 		server->listen();
 	}
@@ -59,11 +62,11 @@ class Application : public TrunkClient
 	{
 		if (result == r_ok)
 		{
-			cout << "incoming call connected" << endl;
+			log(log_debug, "app") << "incoming call connected" << logend();
 		}
 		else
 		{
-			cout << "incoming call failed" << endl;
+			log(log_debug, "app") << "incoming call failed" << logend();
 
 			server->listen();
 		}
@@ -72,7 +75,7 @@ class Application : public TrunkClient
 	// reject completion
 	virtual void rejectDone(Trunk* server, unsigned result)
 	{
-		cout << "rejected" << endl;
+		log(log_debug, "app") << "rejected" << logend();
 
 		server->listen();
 	}
@@ -80,18 +83,21 @@ class Application : public TrunkClient
     // called whenever additional dialling information comes in (caller finishes dialling)
     virtual void details(Trunk* server, const SAP& local, const SAP& remote)
 	{
-		cout << "details - local: " << local << " remote: " << remote << endl;
+		log(log_debug, "app") << "details - local: " << local << " remote: " << remote << logend();
 	}
 
 	// called when remote end ringing is detected on an outgoing line
 	virtual void remoteRinging(Trunk* server)
 	{
-		cout << "remote ringing" << endl;
+		log(log_debug, "app") << "remote ringing" << logend();
 	}
 };
 
 int main(int argc, char* argv[])
 {
+	set_log_instance(&cout_log);
+	set_log_level(4);
+
 	Application app;
 
 	AculabTrunk trunk(&app, 0);

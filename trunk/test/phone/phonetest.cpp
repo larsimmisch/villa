@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.3 2000/11/06 13:10:59 lars Exp $
+	$Id: phonetest.cpp,v 1.4 2000/11/06 15:08:57 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -155,14 +155,13 @@ int main(int argc, char* argv[])
 	extern char *optarg;       /* option parameter if any */
 
 	set_log_instance(&cout_log);
+	set_log_level(4);
 
 	SCbus scbus;
 	Application app;
 	int count = 1;
 	int port = 0;
 	int sw = 0;
-
-	set_log_level(4);
 	
 	int c;
 	while( (c = getopt(argc, argv, "c:p:s:l:")) != EOF) 
