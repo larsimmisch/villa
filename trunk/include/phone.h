@@ -158,7 +158,8 @@ public:
 	virtual void stopEnergyDetector() = 0;
 
 	virtual Sample* createFileSample(const char *name) = 0;
-	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime) = 0;
+	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime, 
+		unsigned maxSilence) = 0;
 	virtual Sample* createTouchtones(const char *tt) = 0;
 	virtual Sample* createBeeps(int nBeeps) = 0;
 

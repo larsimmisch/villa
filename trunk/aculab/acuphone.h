@@ -196,7 +196,7 @@ protected:
 	
 		RecordFileSample(ProsodyChannel *channel, const char* name, 
 						 unsigned maxTime, unsigned maxSilence)
-			: FileSample(channel, name, true), m_maxTime(max), 
+			: FileSample(channel, name, true), m_maxTime(maxTime), 
 			m_maxSilence(maxSilence) {}
 		virtual ~RecordFileSample() {}
 

@@ -170,7 +170,7 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 				unsigned maxsilence;
 
 				(*server) >> file;
-				(*server) >> max;
+				(*server) >> maxtime;
 				(*server) >> maxsilence;
 
 				atom = new RecordAtom(channel, this, file.c_str(), maxtime, 

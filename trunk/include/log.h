@@ -29,7 +29,7 @@ protected:
 typedef basic_nullbuf<char> nullbuf;
 typedef basic_nullbuf<wchar_t> wnullbuf;
 
-enum { log_error, log_warning, log_debug };
+enum { log_error, log_warning, log_info, log_debug };
 
 // base class, override if necessary
 class Log

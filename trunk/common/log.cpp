@@ -31,6 +31,9 @@ std::ostream& Log::log(int loglevel, const char *logclass, const char *name)
 		case log_error:
 			log_os << " error ";
 			break;
+		case log_info:
+			log_os << " info ";
+			break;
 		case log_warning:
 			log_os << " warning ";
 			break;
