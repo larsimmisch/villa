@@ -26,10 +26,6 @@ did := identifier | 'any'
 
 listen := tid 'global' 'listen' trunk did
 
-// accept incoming call
-
-accept := tid channel 'accept'
-
 // disconnect call
 disconnect := tid channel 'disconnect'
 

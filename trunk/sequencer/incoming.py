@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call, wait for hangup
 
-$Id: incoming.py,v 1.1 2001/09/27 10:45:05 lars Exp $
+$Id: incoming.py,v 1.2 2001/09/30 09:51:57 lars Exp $
 """
 
 import sys,getopt
@@ -20,13 +20,10 @@ class Call:
 	def listen_done(self, event, data):
 		d = event['device']
 		self.sequencer.devices[d] = self
-		self.send(d + ' accept')
-
-	def accept_done(self, event, data):
 		# queue next listen as early as possible
  		self.send('global listen any any')
-		print 'connected:', event['device']
-		
+		print 'connected:', d
+
 	def disconnect_done(self, event, data):
 		print "disconnected:", event['device']
 

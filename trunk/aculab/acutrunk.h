@@ -1,7 +1,7 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.6 2001/09/11 22:11:27 lars Exp $
+	$Id: acutrunk.h,v 1.7 2001/09/30 09:51:57 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -82,7 +82,6 @@ public:
 protected:
 
 	static const char* eventName(ACU_LONG event);
-	static const char* stateName(states state);
 
 	void setName(int ts);
 

@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.14 2001/09/26 22:41:57 lars Exp $
+	$Id: phone.h,v 1.15 2001/09/30 09:51:57 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -93,6 +93,37 @@ public:
 	const char* getName() { return m_name.c_str(); }
 
 	virtual states getState() { return m_state; }
+
+	static const char* stateName(states state)
+	{
+		switch (state)
+		{
+		case idle:
+			return "idle";
+		case listening:
+			return "listening";
+		case connecting:
+			return "connecting";
+		case connected:
+			return "connected";
+		case disconnecting:
+			return "disconnecting";
+		case remote_disconnect:
+			return "remote_disconnect";
+		case transferring:
+			return "transferring";
+		case waiting:
+			return "waiting";
+		case collecting_details:
+			return "collecting_details";
+		case accepting:
+			return "accepting";
+		case rejecting:
+			return "rejecting";
+		default:
+			return "illegal state";
+		}
+	}
 
 protected:
 

@@ -44,12 +44,24 @@ public:
 	struct Item : public DList::DLink
 	{
 		Item(const std::string &id, const SAP &aDetail, 
-			InterfaceConnection *iface)
-			: m_id(id), m_details(aDetail), m_interface(iface) {}
+			InterfaceConnection *iface, ClientQueue *container)
+			: m_id(id), m_details(aDetail), m_interface(iface),
+			  m_container(container) {}
+		
+
+		void requeue()
+		{
+			m_container->lock();
+			m_container->addFirst(this);
+			m_container->unlock();
+		}
 		
 		std::string m_id;
 		SAP m_details;
 		InterfaceConnection *m_interface;
+
+		// needed for requeuing
+		ClientQueue *m_container;
 	};
 	
 	ClientQueue() : DList() {}
@@ -60,7 +72,7 @@ public:
 	{ 
 		omni_mutex_lock lock(m_mutex);
 
-		addLast(new Item(id, details, iface)); 
+		addLast(new Item(id, details, iface, this)); 
 	}
 
 	Item* dequeue();
@@ -69,6 +81,9 @@ public:
 	void remove(InterfaceConnection *iface, const std::string &id);
 
 	virtual void freeLink(List::Link* item)	{ delete (Item*)item; }
+
+	void lock() { m_mutex.lock(); }
+	void unlock() { m_mutex.unlock(); }
 
 protected:
 

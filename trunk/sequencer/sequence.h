@@ -132,6 +132,8 @@ protected:
 	omni_mutex m_mutex;
 	ConnectCompletion *m_connectComplete;
 	bool m_disconnecting;
+	SAP m_local;
+	SAP m_remote;
 	InterfaceConnection *m_interface;
 
 	// the transaction id for trunk operations

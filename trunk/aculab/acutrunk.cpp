@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.16 2001/09/26 22:41:57 lars Exp $
+	$Id: acutrunk.cpp,v 1.17 2001/09/30 09:51:57 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -70,37 +70,6 @@ void* CallEventDispatcher::run_undetached(void* arg)
 				}
 			}
 		}
-	}
-}
-
-const char* AculabTrunk::stateName(states state)
-{
-	switch (state)
-	{
-	case idle:
-		return "idle";
-	case listening:
-		return "listening";
-	case connecting:
-		return "connecting";
-	case connected:
-		return "connected";
-	case disconnecting:
-		return "disconnecting";
-	case remote_disconnect:
-		return "remote_disconnect";
-	case transferring:
-		return "transferring";
-	case waiting:
-		return "waiting";
-	case collecting_details:
-		return "collecting_details";
-	case accepting:
-		return "accepting";
-	case rejecting:
-		return "rejecting";
-	default:
-		return "illegal state";
 	}
 }
 
@@ -173,7 +142,13 @@ int AculabTrunk::listen()
 
 	memset(&incoming, 0, sizeof(incoming));
 
+	lock();
+	m_stopped = false;
+	m_state = waiting;
+
 	incoming.net = m_port;
+	unlock();
+
     incoming.ts = -1;
 	incoming.cnf = CNF_REM_DISC | CNF_CALL_CHARGE;
 
@@ -185,18 +160,19 @@ int AculabTrunk::listen()
     int rc = call_openin(&incoming);
     if (rc != 0)
 	{
+		s_dispatcher.unlock();
+
 		log(log_error, "trunk") << "call_openin failed: " << rc << logend();
+
+		return r_failed;
 	}
-
-
-	lock();
-	m_handle = incoming.handle;
-	m_stopped = false;
-	m_state = waiting;
-	unlock();
 
 	s_dispatcher.add(incoming.handle, this);
 	s_dispatcher.unlock();
+
+	lock();
+	m_handle = incoming.handle;
+	unlock();
 
 	return r_ok;
 }
@@ -278,6 +254,10 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 		throw Exception(__FILE__, __LINE__, "AculabTrunk::connect()", "invalid signalling system");
 	}
 
+	lock();
+	m_state = connecting;
+	unlock();
+
 	// we must lock the global dispatcher before we enter call_openout
 	// to avoid that the the dispatcher dispatches an event for this channel
 	// before it was added to it's map
@@ -293,13 +273,12 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
         return r_failed;
     }
 
-	lock();
-    m_handle = outdetail.handle;
-	m_state = connecting;
-	unlock();
-
 	s_dispatcher.add(m_handle, this);
 	s_dispatcher.unlock();
+
+	lock();
+    m_handle = outdetail.handle;
+	unlock();
 
 	return r_ok;
 }
@@ -315,6 +294,7 @@ int AculabTrunk::accept()
 		return r_bad_state;
 	}
 
+	m_state = accepting;
 	unlock();
 
 	int rc = call_accept(m_handle);
@@ -329,10 +309,6 @@ int AculabTrunk::accept()
 		return r_failed;
 	}
 
-	lock();
-	m_state = accepting;
-	unlock();
-
 	return r_ok;
 }
 
@@ -345,6 +321,10 @@ int AculabTrunk::reject(int cause)
 	xcause.handle = m_handle;
 	xcause.cause = cause;
 
+	lock();
+	m_state = rejecting;
+	unlock();
+
 	int rc = call_disconnect(&xcause);
 	if (rc)
 	{
@@ -353,10 +333,6 @@ int AculabTrunk::reject(int cause)
 
 		return r_failed;
 	}
-
-	lock();
-	m_state = rejecting;
-	unlock();
 
 	return r_ok;
 }
@@ -370,6 +346,18 @@ int AculabTrunk::disconnect(int cause)
 	xcause.handle = m_handle;
 	xcause.cause = cause;
 
+	lock();
+	if (m_state == idle)
+	{
+		unlock();
+		m_client->disconnectDone(this, r_ok);
+
+		return r_ok;
+	}
+
+	m_state = disconnecting;
+	unlock();
+
 	int rc = call_disconnect(&xcause);
 	if (rc)
 	{
@@ -378,10 +366,6 @@ int AculabTrunk::disconnect(int cause)
 
 		return r_failed;
 	}
-
-	lock();
-	m_state = disconnecting;
-	unlock();
 
 	return r_ok;
 }
@@ -401,6 +385,10 @@ void AculabTrunk::release()
 
 	xcause.handle = m_handle;
 
+	lock();
+	m_state = idle;
+	unlock();
+
 	int rc = call_release(&xcause);
 	if (rc)
 	{
@@ -412,9 +400,6 @@ void AculabTrunk::release()
 	s_dispatcher.remove(m_handle);
 	s_dispatcher.unlock();
 
-	lock();
-	m_state = idle;
-	unlock();
 }
 	
 void AculabTrunk::abort()
@@ -539,20 +524,6 @@ void AculabTrunk::onIdle()
 
 	switch (m_state)
 	{
-	case collecting_details:
-	case waiting:
-	case remote_disconnect:
-		log(log_warning, "trunk", getName()) 
-			<< "incoming call went idle in state " << stateName(m_state) << logend();
-
-		// restart automatically
-		release();
-		lock();
-		setName(-1);
-		unlock();
-		listen();
-
-		break;
 	case connecting:
 		// outgoing failed or stopped
 		release();
@@ -565,7 +536,7 @@ void AculabTrunk::onIdle()
 		break;
 	case connected:
 		lock();
-		m_state = remote_disconnect;
+		m_state = idle;
 		unlock();
 		m_client->disconnectRequest(this, cause);
 		break;
@@ -594,6 +565,10 @@ void AculabTrunk::onIdle()
 		listen();
 		break;
 	default:
+		log(log_warning, "trunk", getName()) 
+			<< "call went idle in state " << stateName(m_state) << logend();
+
+		// restart automatically
 		release();
 		lock();
 		setName(-1);
@@ -630,17 +605,18 @@ void AculabTrunk::onIncomingCallDetected()
 		return;
 	}
 
-	setName(details.ts);
-
-	m_timeslot.st = details.stream;
-	m_timeslot.ts = details.ts;
 
 	remote.setAddress(details.originating_addr);
 	local.setAddress(details.destination_addr);
 	local.setService(details.stream);
 	local.setSelector(details.ts);
 
+	lock();
+	setName(details.ts);
+	m_timeslot.st = details.stream;
+	m_timeslot.ts = details.ts;
 	m_state = collecting_details;
+	unlock();
 
 	m_client->connectRequest(this, local, remote);
 }
@@ -683,24 +659,21 @@ void AculabTrunk::onOutgoingRinging()
 
 void AculabTrunk::onRemoteDisconnect()
 {
-	int cause;
-
 	switch (m_state)
 	{
 	case disconnecting:
 		break;
 	case connected:
-		cause = getCause();
 		m_state = remote_disconnect;
-		m_client->disconnectRequest(this, cause);
+		m_client->disconnectRequest(this, getCause());
 		break;
 	case accepting:
 		m_state = idle;
 		m_client->acceptDone(this, getCause());
 		disconnect();
 		break;
-	case waiting:
-		disconnect();
+	case collecting_details:
+		m_client->disconnectRequest(this, getCause());
 		break;
 	default:
 		log(log_error, "trunk", getName()) << "unhandled state " 
@@ -711,7 +684,6 @@ void AculabTrunk::onRemoteDisconnect()
 
 void AculabTrunk::onWaitForAccept()
 {
-	m_state = accepting;
 }
 
 void AculabTrunk::onOutgoingProceeding()

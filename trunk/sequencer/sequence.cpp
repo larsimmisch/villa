@@ -322,7 +322,7 @@ int Sequencer::connect(ConnectCompletion* complete)
 {
 	omni_mutex_lock lock(m_mutex);
 
-	if (m_connectComplete	|| m_trunk->getState() != Trunk::listening)
+	if (m_connectComplete || m_trunk->getState() != Trunk::listening)
 	{
 		log(log_debug, "sequencer", m_trunk->getName())
 			<< "connect failed - invalid state: " 
@@ -332,44 +332,6 @@ int Sequencer::connect(ConnectCompletion* complete)
 	}
 
 	m_connectComplete = complete;
-
-	return _ok;
-}
-
-int Sequencer::accept(InterfaceConnection *server, const std::string &id)
-{
-	omni_mutex_lock lock(m_mutex);
-
-	if (m_id.size())
-	{
- 		server->begin() << _protocol_violation << ' ' << id.c_str() 
-			<< " protocol violation" << end();
-
-		return _protocol_violation;
-	}
-
-	// completion in acceptDone
-	m_id = id;
-
-	m_trunk->accept();
-
-	return _ok;
-}
-
-int Sequencer::reject(InterfaceConnection *server, const std::string &id)
-{
-	if (m_id.size())
-	{
- 		server->begin() << _protocol_violation << ' ' << id.c_str() 
-			<< " protocol violation" << end();
-
-		return _protocol_violation;
-	}
-
-	// completion in acceptDone
-	m_id = id;
-
-	m_trunk->reject();
 
 	return _ok;
 }
@@ -469,6 +431,15 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 {
 	int contained; 
 
+	if (server->getState() != Trunk::collecting_details)
+	{
+		log(log_warning, "sequencer", m_trunk->getName()) 
+			<< " got details in state: " 
+			<< Trunk::stateName(server->getState()) << logend();
+
+		return;
+	}
+
 	omni_mutex_lock lock(m_mutex);
 
 	// do we have an exact match?
@@ -502,20 +473,16 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 		m_interface = m_clientSpec->m_interface;
 		m_interface->add(m_trunk->getName(), this);
 
-		m_interface->begin() << m_clientSpec->m_id.c_str() << ' ' << _ok 
-			<< ' ' << m_trunk->getName()
-			<< " listen-done "
-			<< " \"" << remote.getAddress() << "\" \""
-			<< m_configuration->getNumber() << "\" \""
-			<< local.getService() << "\" "
-			<< server->getTimeslot().ts << end();
+		m_local = local;
+		m_remote = remote;
 
+		server->accept();
 	}
 	else 
 	{
 		if (!contained)
 		{
-			log(log_debug, "sequencer", m_trunk->getName()) 
+			log(log_warning, "sequencer", m_trunk->getName()) 
 				<< "no client found. rejecting call." << logend(); 
 
 			m_trunk->reject(0);
@@ -703,18 +670,27 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 		log(log_debug, "sequencer", server->getName()) << "call accepted" << logend();
 
 		m_media->connected(server);
+
+		m_interface->begin() << m_clientSpec->m_id.c_str() << ' ' << _ok 
+			<< ' ' << m_trunk->getName()
+			<< " listen-done "
+			<< " \"" << m_remote.getAddress() << "\" \""
+			<< m_configuration->getNumber() << "\" \""
+			<< m_local.getService() << "\" "
+			<< server->getTimeslot().ts << end();
+
+		lock();
+		delete m_clientSpec;
+		m_clientSpec = 0;
+		unlock();
 	}
 	else
-		log(log_debug, "sequencer", server->getName()) << "call accept failed: " 
+	{
+		log(log_error, "sequencer", server->getName()) << "call accept failed: " 
 		<< result << logend();
 
-
-	m_interface->begin() << m_id.c_str() << ' ' << result
-		<< " " << m_trunk->getName() << " accept-done" << end();
-
-	omni_mutex_lock lock(m_mutex);
-
-	m_id.erase();
+		m_clientSpec->requeue();
+	}	
 }
 
 void Sequencer::rejectDone(Trunk *server, unsigned result)
@@ -929,10 +905,6 @@ void Sequencer::data(InterfaceConnection* server, const std::string &id)
 		discardMolecule(server, id);
 	else if (command == "discard-by-priority")
 		discardByPriority(server, id);
-	else if (command == "accept")
-		accept(server, id);
-	else if (command == "reject")
-		reject(server, id);
 	else if (command == "disconnect")
 		disconnect(server, id);
 	else if (command == "transfer")
