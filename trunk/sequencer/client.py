@@ -2,9 +2,9 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.3 2001/09/11 22:10:11 lars Exp $
+$Id: client.py,v 1.4 2001/09/19 12:36:56 lars Exp $
 """
-import socket,re,sys,time,getopt, string
+import socket,re,sys,time,getopt,string
 
 class Transactions:
 
@@ -46,10 +46,16 @@ class Interface:
 		self.devices = {}
 		# read and ignore initial 'sequence protocol...'
 		self.stdin.readline()
+		# open one conference
+		self.send(self, "global open-conference")
 
-	def send(self, call, command, data = None):
+	def open_conference_done(self, event, data):
+		self.conference = event['data'][0]
+		print "conference:", self.conference
+
+	def send(self, sender, command, data = None):
 		# perform next transaction/command
-		tid = self.transactions.create(call, data)
+		tid = self.transactions.create(sender, data)
 		cmd = str(tid) + ' ' + command
 
 		print "command sent to sequencer: " + cmd
@@ -62,38 +68,50 @@ class Interface:
 		the transaction-id, the result of the operation, the action that
 		was just performed and additional data.
 		"""
-		m = re.match(r"(?P<tid>\w*) (?P<result>\d) (?P<device>\w*\[\d,\d\])"+
-                   r" (?P<action>[\w\-_]*)(?P<data>.*)", line)
-		
-		if  m == None:
-			print "parse error:", line
-			return None
+
+		# check if unsolicited event
+
+		tr = string.split(line, ' ')
+		print tr
+		if tr[0] == '-1':
+			if len(tr) < 3:
+				print "parse error:", line
+				return
+			
+			event = { 'device': tr[1], 'action': tr[2] }
+
+			if len(tr) >= 3:
+				event['data'] = tr[3:]
 		else:
-			return m.groupdict()
+			if len(tr) < 4:
+				print "parse error:", line
+				return
+			
+			event = { 'result': tr[1], 'device': tr[2],
+					  'action': tr[3] }
+		
+			if len(tr) >= 4:
+				event['data'] = tr[4:]
+				
+		action = event['action']
+
+		# the sequencer protocol uses dashes '-'
+		# - we need to translate them
+		# to underscores because dashes are illegal in Python identifiers
+		action = string.replace(action, '-', '_')
+		
+		if tr[0] == '-1':
+			device = self.devices[event['device']]
+			device.__class__.__dict__[action](device, event)
+			return
+
+		sender, data = self.transactions.remove(long(tr[0]))
+		sender.__class__.__dict__[action](sender, event, data)
 			
 	def process(self):
 		event = self.stdin.readline()[:-2]
 		print "event from sequencer: " + event
-		event = self.parse(event)
-
-		if not event:
-			return
-
-		tid = event['tid']
-		action = event['action']
-
-		# the sequencer protocol uses dashes '-'  - we need to translate them
-		# to underscores because dashes are illegal in Python identifiers
-		action = string.replace(action, '-', '_')
-		
-		if tid == '-1':
-			device = self.devices[event['device']]
-			device.__class__.__dict__[action](device, event['data'])
-			return
-
-		device, data = self.transactions.remove(long(tid))
-		device.__class__.__dict__[action](device, event, data)
-		return
+		self.parse(event)
 
 	def run(self):
 		while 1:
@@ -117,30 +135,53 @@ class Call:
 		interface.send(self, self.device + ' add 2 1 play sitrtoot.al none')
 
 	def molecule_done(self, event, data):
-		interface.send(self, 'global listen any any') 
-		interface.send(self, self.device + ' disconnect')
+ 		# interface.send(self, 'global listen any any') 
+ 		# interface.send(self, self.device + ' disconnect')
+		pass
 
 	def disconnect_done(self, event, data):
 		del interface.devices[self.device]
 		self.device = None
 
+	def disconnect(self, event):
+		interface.send(self, 'global listen any any')
+ 		interface.send(self, self.device + ' disconnect')
+
+	def touchtone(self, event):
+		tt = event['data'][0]
+		print "touchtone:", tt
+
+		if tt == '#':
+	 		interface.send(self, 'global listen any any') 
+			interface.send(self, self.device + ' disconnect')
+		elif tt == '0':
+			interface.send(self, self.device + ' add 2 1 conference '
+						   + interface.conference + ' none')
+
+
 if __name__ == '__main__':
 
 	# check commandline arguments
-	optlist, args = getopt.getopt(sys.argv[1:], 'n', ['name='])
+	optlist, args = getopt.getopt(sys.argv[1:], 's:c:', ['server=','calls='])
 
+	ncalls = 1
 	hostname = None
 
 	for opt in optlist:
-		if opt[0] == '-n' or opt[0] == '--name':
-			hostname = args[optlist.index(opt)]
+		if opt[0] == '-s' or opt[0] == '--server':
+			hostname = opt[1]
+		elif opt[0] == '-c' or opt[0] == '--calls':
+			print opt
+			ncalls = long(opt[1])
 
 	if hostname == None:
 		hostname = socket.gethostname()
 
 	interface = Interface(hostname, 2104)
 
-	# start one call
-	call = Call(interface)
+	calls = []
+	# start calls
+	for i in range(ncalls):
+		calls.append(Call(interface))
 
 	interface.run()

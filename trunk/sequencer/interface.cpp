@@ -16,10 +16,9 @@
 #include "interface.h"
 
 extern int debug;
-
 extern ClientQueue gClientQueue;
-
 extern ConfiguredTrunks gConfiguration;
+extern Conferences gConferences;
 
 InterfaceConnection::InterfaceConnection(TextTransportClient& aClient, SAP& local) 
 : AsyncText(aClient)
@@ -89,7 +88,7 @@ void Interface::connectRequest(TextTransport *server, SAP& remote)
 */
 	server->accept();
 
-	(*server) << "sequence protocol 0.1\r\n";
+	(*server) << "sequence protocol 0.2\r\n";
 }
 
 void Interface::connectRequestTimeout(TextTransport *server)
@@ -203,13 +202,61 @@ void Interface::data(TextTransport *server)
 		}
 		else if (command == "open-conference")
 		{
-			(*server) << id.c_str() << ' ' << _not_implemented 
-				<< " not implemented" << "\r\n";
+			Conference *conf = gConferences.create(server);
+
+			if (conf)
+			{
+				char name[32];
+
+				sprintf(name, "Conf[%d]", conf->getHandle());
+
+				(*server) << id.c_str() << ' ' << _ok 
+					<< " global open-conference-done " << name << "\r\n";
+			}
+			else
+			{
+				(*server) << id.c_str() << _failed 
+					<< " global open-conference-done\r\n";
+			}
 		}
 		else if (command == "close-conference")
 		{
-			(*server) << id.c_str() << ' ' << _not_implemented 
-				<< " not implemented" << "\r\n";
+			std::string conf;
+
+			(*server) >> conf;
+
+			if (!server->good() || conf.size() <= 4 
+				|| conf.substr(0, 5) != "Conf[")
+			{
+				server->clear();
+
+				(*server) << id.c_str() << ' ' << _syntax_error << 
+					" global close-conference-done\r\n";
+				return;
+			}
+
+			unsigned handle(0);
+
+			sscanf(conf.c_str(), "Conf[%d]", &handle);
+
+			if (!handle)
+			{
+				(*server) << _syntax_error << 
+					" global close-conference-done\r\n";
+
+				return;
+			}
+
+			if (gConferences.close(handle))
+			{
+				(*server) << id.c_str() << ' ' << _ok 
+					<< " global close-conference-done\r\n";
+			}
+			else
+			{
+				(*server) << id.c_str() << ' ' << _failed 
+					<< " global close-conference-done\r\n";
+			}
 		}
 		else if (command == "listen")
 		{

@@ -127,6 +127,19 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 				atom = new SilenceAtom(len);
 			}
+			else if (type == "conference")
+			{
+				std::string conf;
+
+				(*server) >> conf;
+
+				unsigned handle(0);
+
+				sscanf(conf.c_str(), "Conf[%d]", &handle);
+
+				atom = new ConferenceAtom(handle, 
+					Conference::listen | Conference::speak);
+			}
 
 			std::string notifications;
 
@@ -636,6 +649,11 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 				<< " disconnect\r\n";
 		}
 	}
+	else
+	{
+		(*m_interface) << _event << ' ' << m_trunk->getName() 
+			<< " disconnect\r\n";
+	}
 
 	unlock();
 }
@@ -652,7 +670,7 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 	}
 	else if (m_interface)
 	{
-		(*m_interface) << "-1 " << _event << ' '
+		(*m_interface) << _event << ' '
 			<< m_trunk->getName() << " disconnect\r\n";
 	}
 
@@ -828,9 +846,11 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 void Sequencer::touchtone(Media* server, char tt)
 {
-	(*m_interface) << "-1 0 " <<
-	server->getName() << " touchtone " << tt 
-	<< "\r\n";
+	log(log_debug, "sequencer", server->getName())
+		<< "touchtone: " << tt << logend();
+
+	(*m_interface) << _event << ' ' << server->getName() 
+		<< " touchtone " << tt << "\r\n";
 }
 
 void Sequencer::fatal(Media* server, const char* e)

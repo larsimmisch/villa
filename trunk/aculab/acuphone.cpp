@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.14 2001/09/14 16:02:28 lars Exp $
+	$Id: acuphone.cpp,v 1.15 2001/09/19 12:36:56 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -902,6 +902,8 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 
 void AculabMedia::connected(Trunk* aTrunk)
 {
+	m_trunk = aTrunk;
+
 	if (m_receive.st == -1 || m_transmit.st == -1)
 		log(log_error, "phone", getName()) 
 			<< "no transmit or receive timeslot" << logend();
@@ -948,6 +950,8 @@ void AculabMedia::connected(Trunk* aTrunk)
 
 void AculabMedia::disconnected(Trunk *trunk)
 {
+	m_trunk = 0;
+
 	m_sw.disable(m_receive);
 	m_sw.disable(m_transmit);
 }
