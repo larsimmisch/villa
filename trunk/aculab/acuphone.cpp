@@ -365,7 +365,7 @@ unsigned ProsodyChannel::Beep::start(Media *phone)
 	start.data_length = sizeof(beep);
 
 	{
-		omni_mutex_lock(m_prosody->m_mutex);
+		omni_mutex_lock lock(m_prosody->m_mutex);
 
 		int rc = sm_replay_start(&start);
 		if (rc)
@@ -427,11 +427,7 @@ bool ProsodyChannel::Beep::stop(Media *phone, unsigned status)
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
 
-	{
-		omni_mutex_lock l(m_prosody->m_mutex);
-
-		m_position = (m_count * sizeof(beep) + p.offset) / 8;
-    }
+	m_position = (m_count * sizeof(beep) + p.offset) / 8;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping beep " << m_beeps << logend();
@@ -522,7 +518,7 @@ unsigned ProsodyChannel::Touchtones::start(Media *phone)
 	}
 
 	{
-		omni_mutex_lock(m_prosody->m_mutex);
+		omni_mutex_lock lock(m_prosody->m_mutex);
 
 		int rc = sm_play_digits(&digits);
 		if (rc)
@@ -543,18 +539,20 @@ unsigned ProsodyChannel::Touchtones::start(Media *phone)
 
 bool ProsodyChannel::Touchtones::stop(Media *phone, unsigned status)
 {
-	omni_mutex_lock l(m_prosody->m_mutex);
+    {
+	    omni_mutex_lock l(m_prosody->m_mutex);
 
-	if (m_state != active)
-	{
-		log(log_debug+1, "phone", phone->getName()) 
-			<< "stopping touchtones " << m_tt.c_str() << " - not active" << logend();
+	    if (m_state != active)
+	    {
+		    log(log_debug+1, "phone", phone->getName()) 
+			    << "stopping touchtones " << m_tt.c_str() << " - not active" << logend();
 
-		return false;
-	}
+		    return false;
+	    }
 
-	m_state = stopping;
-	m_status = status;
+	    m_state = stopping;
+	    m_status = status;
+    }
 
 	int rc = sm_play_tone_abort(m_prosody->m_channel);
 	if (rc)
@@ -695,7 +693,7 @@ unsigned ProsodyChannel::FileSample::start(Media *phone)
 	m_storage->setPos(offset);
 
 	{
-		omni_mutex_lock(m_prosody->m_mutex);
+		omni_mutex_lock lock(m_prosody->m_mutex);
 
 		int rc = sm_replay_start(&start);
 		if (rc)
@@ -759,12 +757,8 @@ bool ProsodyChannel::FileSample::stop(Media *phone, unsigned status)
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
 
-    {
-	    omni_mutex_lock lock(m_prosody->m_mutex);
     
-        m_position = p.offset * 1000 / m_storage->m_bytesPerSecond;
-    }
-
+    m_position = p.offset * 1000 / m_storage->m_bytesPerSecond;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping file sample " << m_name.c_str() << logend();
@@ -842,7 +836,7 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 	record.max_silence = m_maxSilence;
 
 	{
-		omni_mutex_lock(m_prosody->m_mutex);
+		omni_mutex_lock lock(m_prosody->m_mutex);
 
 		int rc = sm_record_start(&record);
 		if (rc)
@@ -868,7 +862,7 @@ bool ProsodyChannel::RecordFileSample::stop(Media *phone, unsigned status)
 	abort.discard = 0;
 
     {
-	    omni_mutex_lock(m_prosody->m_mutex);
+	    omni_mutex_lock lock(m_prosody->m_mutex);
 
 	    if (m_state != active)
 	    {
@@ -1075,7 +1069,7 @@ void AculabMedia::disconnected(Trunk *trunk)
 
 void AculabMedia::onRead(tSMEventId id)
 {
-	omni_mutex_lock l(m_mutex);
+	omni_mutex_lock lock(m_mutex);
 
 	if (!m_receiving)
 	{
