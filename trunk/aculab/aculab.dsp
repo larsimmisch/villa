@@ -107,6 +107,10 @@ SOURCE=.\common.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\common\names.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\smbesp.c
 # End Source File
 # Begin Source File
@@ -148,10 +152,6 @@ SOURCE=.\acuphone.h
 # Begin Source File
 
 SOURCE=.\acutrunk.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\include\buffers.h
 # End Source File
 # Begin Source File
 
@@ -215,6 +215,10 @@ SOURCE=.\smosintf.h
 # Begin Source File
 
 SOURCE=.\smwavlib.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\storage.h
 # End Source File
 # Begin Source File
 

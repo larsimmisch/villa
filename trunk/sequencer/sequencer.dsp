@@ -129,6 +129,10 @@ SOURCE=.\activ.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\include\bitset.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\include\conference.h
 # End Source File
 # Begin Source File
