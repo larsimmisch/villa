@@ -41,7 +41,7 @@ public:
 	unsigned getHandle()	{ return m_handle; }
 
 	void* getUserData() 	{ return m_userData; }
-	
+
 protected:
 
 	friend class Conferences;

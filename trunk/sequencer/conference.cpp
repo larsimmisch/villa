@@ -96,10 +96,6 @@ void Conference::remove(ProsodyChannel *channel)
 
 		mode m = p->second;
 
-		m_parties.erase(p);
-    
-		parties = m_parties.size();
-
 		if (m & speak)
 		{
 			--m_speakers;
@@ -128,6 +124,9 @@ void Conference::remove(ProsodyChannel *channel)
 
 			channel->conferenceAbort();
 		}
+
+		m_parties.erase(p);
+		parties = m_parties.size();
 	}
 
 	if (closed && parties == 0)
@@ -145,7 +144,7 @@ Conference *Conferences::create(void* userData)
 	std::pair<iterator, bool> p = 
 		m_conferences.insert(std::make_pair(m_handle, (Conference*)0));
 
-	if (p.second == false)
+	if (p.second == false) // insert failed - duplicate handle
 	{
 		unsigned i = m_handle; // cache the wraparound value
 
@@ -176,7 +175,6 @@ Conference *Conferences::create(void* userData)
 bool Conferences::close(unsigned handle)
 {
 	Conference *c = 0;
-	int count = 0;
 
 	/* block to restrict lock scope */
 	{
@@ -197,12 +195,16 @@ bool Conferences::close(unsigned handle)
 	if (c)
 	{
 		c->lock();
-		count = c->size();
+		int count = c->size();
 		c->m_closed = true;
 		c->unlock();
 
+		/* Commented out - suspected double free through race condition. 
+		   Will leak memory.
+
 		if (count == 0)
 			delete c;
+		*/
 	}
 
 	return true;
