@@ -125,6 +125,10 @@ protected:
 	friend std::ostream& text_end(std::ostream& s);
 
 	// helper methods
+
+	// fills the streambuf get area from the receive buffer
+	unsigned fillGBuf();
+	
 	virtual void assertState(states aState);
 
 	virtual void aborted();
@@ -142,11 +146,18 @@ protected:
 	SAP m_remote;
 	void* m_userData;
 	Socket m_socket;
+	// streambuf put area
 	std::string m_pbuf;
+	// streambuf get area
 	char *m_gbuf;
 	int m_gpos;
 	int m_gsize;
 	int m_gmax;
+	// receive buffer
+	char *m_rbuf;
+	int m_rpos;
+	int m_rsize;
+	int m_rmax;
 	TextTransportClient& m_client; 
 	omni_mutex m_mutex;
 	omni_condition m_event;

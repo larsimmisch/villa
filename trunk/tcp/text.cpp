@@ -6,19 +6,22 @@
 #include <stdio.h>
 #include <new.h>
 #include <assert.h>
-#include "Text.h"
+#include "log.h"
+#include "text.h"
 
 static char get_lost[] = "finger weg!\r\n";
 
 TextTransport::TextTransport(TextTransportClient& client, void* userData) : 
 	m_socket(), m_client(client), m_userData(userData), m_state(idle), 
-	m_gbuf(0), m_gpos(0), 
-	m_gsize(0), m_gmax(256),
+	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(512),
+	m_rbuf(0), m_rpos(0), m_rsize(0), m_rmax(512),
 	std::basic_iostream<char>(this),
 	m_event(&m_mutex)
 {
-	m_gbuf = new char[256];
-	m_pbuf.reserve(256);
+	m_gbuf = new char[m_gmax];
+	m_rbuf = new char[m_rmax];
+	m_rbuf[0] = '\0';
+	m_pbuf.reserve(512);
 
 	setbuf(0, 0);
 }
@@ -127,10 +130,11 @@ void TextTransport::abort()
 
 unsigned TextTransport::send()
 {
-	//assert(m_pbuf.size());
+	assert(m_pbuf.size());
 
-	if (!m_pbuf.size())
-		return 0;
+	std::ostream &o = log(log_debug, "text") << "sent: ";
+	o.write(m_pbuf.c_str(), m_pbuf.size() - 2);
+	o << logend();
 
 	int rc = m_socket.send((void*)m_pbuf.c_str(), m_pbuf.size());
 	if (rc == 0)
@@ -146,28 +150,55 @@ unsigned TextTransport::send()
     return rc;
 }
 
+unsigned TextTransport::fillGBuf()
+{
+	if (strlen(m_rbuf) == 0)
+		return 0;
+
+	char *e = strstr(m_rbuf + m_rpos, "\r\n");
+
+	if (!e)
+		return 0;
+
+	int p = e - m_rbuf - m_rpos;
+
+	// grow the buffer if necessary - take trailing "\n\0" into account
+    if (p + 2 >= m_gmax)
+    {
+		m_gmax *= 2;
+		char *newbuf = new char[m_gmax];
+
+		assert(newbuf);
+
+		delete m_gbuf;
+		m_gbuf = newbuf;
+    }
+
+	memcpy(m_gbuf, m_rbuf + m_rpos, p);
+	m_gbuf[p] = '\n';
+	m_gbuf[p+1] = '\0';
+
+	m_gpos = 0;
+	m_gsize = p + 1;
+	m_rpos += p + 2;
+
+	return m_gsize;
+}
+
 unsigned TextTransport::receive()
 {
-	unsigned rcvd;
+	unsigned len = fillGBuf();
 
-	for (;m_gpos < m_gsize-1; ++m_gpos)
-	{
-		if (m_gbuf[m_gpos] == '\r' && m_gbuf[m_gpos+1] == '\n')
-		{
-			m_gpos += 2;
-			break;
-        }
-	}
+	if (len)
+		return len;
 
-	if (m_gpos < m_gsize - 2)
-		return m_gsize - m_gpos;
+	m_rsize = 0;
+	m_rpos = 0;
+	m_rbuf[0] = '\0';
 
-	m_gsize = 0;
-	m_gpos = 0;
-
-	while (true)
+	for(;;)
 	{	
-		rcvd = m_socket.receive(&m_gbuf[m_gsize], m_gmax - m_gsize);
+		unsigned rcvd = m_socket.receive(&m_rbuf[m_rsize], m_rmax - m_rsize - 1);
 		if (rcvd == 0)
 		{
 			if (m_state == connected)
@@ -176,29 +207,27 @@ unsigned TextTransport::receive()
 			return 0;
 		}
 		
-		m_gsize += rcvd;
-		
-        if (m_gsize >= 2) for (unsigned i = 0; i < m_gsize-1; ++i)
-        {
-            if (m_gbuf[i] == '\r' && m_gbuf[i+1] == '\n')
-            {
-                return i;
-            }
-        }
+		m_rsize += rcvd;
+		m_rbuf[m_rsize] = '\0';
+
+		len = fillGBuf();
+
+		if (len)
+			return len;
 
 		// grow the buffer if necessary
-        if (m_gsize == m_gmax)
+        if (m_rsize >= m_rmax)
         {
-			char *newbuf = new char[m_gmax*2];
-			memcpy(newbuf, m_gbuf, m_gmax);
-			m_gmax *= 2;
-			delete m_gbuf;
-			m_gbuf = newbuf;
+			char *newbuf = new char[m_rmax*2];
+			memcpy(newbuf, m_rbuf, m_rmax);
+			m_rmax *= 2;
+			delete m_rbuf;
+			m_rbuf = newbuf;
         }
 	}
 
     // unreached statement
-	return m_gsize;
+	return m_rsize;
 }
 
 void TextTransport::aborted()
@@ -273,11 +302,20 @@ void TextTransport::run()
     			break;
     		case disconnecting:
     		case connected:
+				{
     			result = receive();
                 if (result == 0)    
 					break;
 
+				// don't print trailing newline
+				std::ostream o = log(log_debug, "text") << "received: ";
+				o.write(m_gbuf, m_gsize - 1) ;
+				o << logend();
+
+				clear();
+
             	getClient().data(this);
+				}
     			break;
     		case dying:
     			return;
