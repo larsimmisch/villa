@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.8 2001/09/27 10:45:05 lars Exp $
+$Id: client.py,v 1.9 2001/10/01 10:06:34 lars Exp $
 """
 
 import sys,getopt
@@ -29,14 +29,11 @@ class Call:
 	def listen_done(self, event, data):
 		self.device = event['device']
 		self.sequencer.devices[self.device] = self
-		self.send(self.device + ' accept')
-
-	def accept_done(self, event, data):
 		# queue next listen as early as possible
  		self.send('global listen any any')
 		print 'connected:', self.device
 		self.send(self.device + ' add 2 1 play sitrtoot.al none')
-
+		
 	def molecule_done(self, event, data):
 		self.restart()
 		
@@ -45,6 +42,7 @@ class Call:
 
 	def disconnect(self, event):
 		print "remote disconnect:", event['device']
+		self.restart()
 	
 	def touchtone(self, event):
 		tt = event['data'][0]
