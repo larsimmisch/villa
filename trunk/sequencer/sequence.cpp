@@ -1495,12 +1495,6 @@ int main(int argc, char* argv[])
 
 		return 2;
 	}
-	catch(...)
-	{
-		log(log_error, "sequencer") << "unknown exception. terminating." << logend();
-
-		return 2;
-	}
 
 	return 0;
 }

@@ -83,6 +83,9 @@ unsigned SocketStream::fillGBuf()
     if (p + 2 >= m_gmax)
     {
 		m_gmax *= 2;
+
+		log(log_info, "text") << m_remote << " growing get buffer to " << m_gmax << logend();
+
 		char *newbuf = new char[m_gmax];
 
 		assert(newbuf);
@@ -113,6 +116,8 @@ void SocketStream::grow_rbuf()
 	m_rmax *= 2;
 	delete m_rbuf;
 	m_rbuf = newbuf;
+
+	log(log_info, "text") << m_remote << " growing read buffer to " << m_rmax << logend();
  }
 
 unsigned SocketStream::receive()
