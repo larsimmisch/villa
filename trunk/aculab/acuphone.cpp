@@ -808,7 +808,7 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 	record.channel = m_prosody->m_channel;
 	record.alt_data_source = kSMNullChannelId;
 	record.type = m_storage->m_encoding;
-	record.elimination = 0;
+	record.elimination = kSMDRecordToneElimination;
 	record.max_octets = 0;
 	record.max_elapsed_time = m_maxTime;
 	// this shouldn't be hardcoded...
@@ -1072,28 +1072,35 @@ void AculabMedia::onRecog(tSMEventId id)
 {
 	struct sm_recognised_parms recog;
 
-	recog.channel = m_channel;
+	memset(&recog, 0, sizeof(recog));
 
-	int rc = sm_get_recognised(&recog);
-	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_abort", rc);
-
-	switch(recog.type)
+	for(;;)
 	{
-	case kSMRecognisedDigit:
-		if (m_client)
-			m_client->touchtone(this, recog.param0);
-		else
-			log(log_error, "phone", getName()) << "no client for touchtone"<< logend();
-		break;
-	case kSMRecognisedGruntStart:
-		// todo
-		break;
-	case kSMRecognisedGruntEnd:
-		// todo
-		break;
-	default:
-		break;
+		recog.channel = m_channel;
+
+		int rc = sm_get_recognised(&recog);
+		if (rc)
+			throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_abort", rc);
+
+		switch(recog.type)
+		{
+		case kSMRecognisedDigit:
+			if (m_client)
+				m_client->touchtone(this, recog.param0);
+			else
+				log(log_error, "phone", getName()) << "no client for touchtone"<< logend();
+			break;
+		case kSMRecognisedGruntStart:
+			// todo
+			break;
+		case kSMRecognisedGruntEnd:
+			// todo
+			break;
+		case kSMRecognisedNothing:
+			return;
+		default:
+			break;
+		}
 	}
 }
 

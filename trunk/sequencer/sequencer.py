@@ -77,6 +77,8 @@ class Sequencer:
         self.stdout.write(cmd + '\r\n')
         self.stdout.flush()
 
+        return tid
+
     def parse(self, line):
         """parse the event. `line' is supposed to be built from
         the transaction-id, the result of the operation, the action that
@@ -132,6 +134,7 @@ class Sequencer:
             receiver.__class__.__dict__[action](receiver, event)
         else:
             receiver, user_data = self.transactions.remove(long(tr[1]))
+            event['tid'] = long(tr[1])
             receiver.__class__.__dict__[action](receiver, event, user_data)
             
     def process(self):

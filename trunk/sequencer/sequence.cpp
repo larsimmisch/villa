@@ -377,12 +377,6 @@ unsigned Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
 			{
 				Molecule *molecule = ai.current();
 
-				if (molecule->getMode() & Molecule::dont_interrupt)  
-				{
-					done = false;
-					continue;
-				}
-
 				if (molecule->getPriority() >= fromPriority && molecule->getPriority() <= toPriority)
 				// if active, stop and send ack when stopped, else remove and send ack immediately
 				if (molecule->isActive() && immediately)
@@ -1225,7 +1219,7 @@ int main(int argc, char* argv[])
 	WSADATA wsa;
 
 	set_log_instance(&cout_log);
-	set_log_level(2);
+	set_log_level(log_debug);
 
 	rc = WSAStartup(MAKEWORD(2,0), &wsa);
 

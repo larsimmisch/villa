@@ -12,12 +12,13 @@ class Call:
 
     def __init__(self, sequencer):
         self.device = None
+        self.wait = None
         self.sequencer = sequencer
 
         self.sequencer.send(self, 'LSTN any any') 
 
     def send(self, cmd):
-        self.sequencer.send(self, cmd)
+        return self.sequencer.send(self, cmd)
 
     def restart(self):
         d = self.device
@@ -37,11 +38,13 @@ class Call:
 ##                  % self.device)
 ##         self.send('MLCA %s 0 2 1 beep 2'
 ##                   % self.device)
-        self.send('MLCA %s 0 2 1 beep 1 none rec foo 10000 none'
-                  % self.device)
+        self.send('MLCA %s 0 16 4 beep 1 none ' % self.device)
+        self.wait = self.send('MLCA %s 0 16 4 rec foo 10000 none'
+                              % self.device)
 
     def MLCA(self, event, user_data):
-        self.send('DISC %s 0' % self.device)
+        if event['tid'] == self.wait:
+            self.send('DISC %s 0' % self.device)
     
     def DISC(self, event, user_data):
         print "disconnected:", event['device']
