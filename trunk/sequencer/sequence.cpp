@@ -189,8 +189,12 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 		return _empty;
 	}
 
+	lock();
+
 	m_activity.add(*molecule);
 	checkCompleted();
+
+	unlock();
 
 	return _ok;
 }
@@ -381,16 +385,17 @@ int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
 
 int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 {
-	int c = 0;
-	std::string cause;
+	int cause;
 
 	(*server) >> cause;
 
 	// cause is optional
 	if (!server->good())
-		server->clear();
-	else
-		c = atoi(cause.c_str());
+	{
+		server->syntax_error(id);
+
+		return _syntax_error;
+	}
 
 	omni_mutex_lock l(m_mutex);
 
@@ -420,7 +425,7 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
 
 		m_media->disconnected(m_trunk);
-		m_trunk->disconnect(c);
+		m_trunk->disconnect(cause);
 	}
 	else
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - stopping activity" << logend();
