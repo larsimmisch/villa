@@ -35,14 +35,14 @@ std::ostream& Log::log(int loglevel, const char *logclass, const char *name)
 			log_os << " warning ";
 			break;
 		default:
-			log_os << " debug-" << loglevel - log_debug << ' ';
+			log_os << " d" << loglevel - log_debug << ' ';
 			break;
 		}
 
 		log_os << logclass;
 
-		if (name)
-			log_os << name;
+		if (name && strlen(name) > 0)
+			log_os << ' ' << name;
 
 		log_os << ": ";
 

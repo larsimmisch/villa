@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.10 2001/06/17 20:38:08 lars Exp $
+	$Id: phonetest.cpp,v 1.11 2001/06/19 15:02:51 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -32,7 +32,7 @@ public:
 	// must call server.accept or server.reject
 	virtual void connectRequest(Trunk *server, const SAP& local, const SAP& remote)
 	{
-		log(log_debug, "app") << "incoming call - local: " << local << " remote: " << remote << logend();
+		log(log_debug, "app", server->getName()) << "incoming call - local: " << local << " remote: " << remote << logend();
 		server->accept();
 	}
 	
@@ -41,11 +41,11 @@ public:
 	{
 		if (result == r_ok)
 		{
-			log(log_debug, "app") << "outgoing call connected" << logend();
+			log(log_debug, "app", server->getName()) << "outgoing call connected" << logend();
 		}
 		else
 		{
-			log(log_debug, "app") << "outgoing call failed" << logend();
+			log(log_debug, "app", server->getName()) << "outgoing call failed" << logend();
 		}
 	}
 	
@@ -54,7 +54,7 @@ public:
 
 	virtual void disconnectRequest(Trunk* server, int cause)
 	{
-		log(log_debug, "app") << "remote disconnect" << logend();
+		log(log_debug, "app", server->getName()) << "remote disconnect" << logend();
 
 		m_mutex.lock();
 
@@ -73,7 +73,7 @@ public:
 	// disconnect completion
 	virtual void disconnectDone(Trunk *server, unsigned result)
 	{
-		log(log_debug, "app") << "disconnected" << logend();
+		log(log_debug, "app", server->getName()) << "disconnected" << logend();
 
 		server->listen();
 	}
@@ -83,11 +83,11 @@ public:
 	{
 		if (result == r_ok)
 		{
-			log(log_debug, "app") << "incoming call connected" << logend();
+			log(log_debug, "app", server->getName()) << "incoming call connected" << logend();
 		}
 		else
 		{
-			log(log_debug, "app") << "incoming call failed" << logend();
+			log(log_debug, "app", server->getName()) << "incoming call failed" << logend();
 
 			server->listen();
 		}
@@ -96,7 +96,7 @@ public:
 	// reject completion
 	virtual void rejectDone(Trunk *server, unsigned result)
 	{
-		log(log_debug, "app") << "rejected" << logend();
+		log(log_debug, "app", server->getName()) << "rejected" << logend();
 
 		server->listen();
 	}
@@ -104,18 +104,18 @@ public:
     // called whenever additional dialling information comes in (caller finishes dialling)
     virtual void details(Trunk *server, const SAP &local, const SAP &remote)
 	{
-		log(log_debug, "app") << "details - local: " << local << " remote: " << remote << logend();
+		log(log_debug, "app", server->getName()) << "details - local: " << local << " remote: " << remote << logend();
 	}
 
 	// called when remote end ringing is detected on an outgoing line
 	virtual void remoteRinging(Trunk *server)
 	{
-		log(log_debug, "app") << "remote ringing" << logend();
+		log(log_debug, "app", server->getName()) << "remote ringing" << logend();
 	}
 
 	virtual void touchtone(Telephone* server, char tt)
 	{
-		log(log_debug, "app") << "received touchtone: " << tt << logend();
+		log(log_debug, "app", server->getName()) << "received touchtone: " << tt << logend();
 
 		char s[2];
 		s[0] = tt;
@@ -146,7 +146,7 @@ public:
 		}
 		catch(const Exception &e)
 		{
-			log(log_error, "app") << "caught exception starting sample: " 
+			log(log_error, "app", server->getName()) << "caught exception starting sample: " 
 				<< e << logend();
 
 			server->disconnect();

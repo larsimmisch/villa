@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.7 2001/06/16 22:31:33 lars Exp $
+	$Id: acuphone.cpp,v 1.8 2001/06/19 15:02:51 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -22,7 +22,7 @@
 
 ProsodyEventDispatcher ProsodyChannel::dispatcher;
 
-void AculabSwitch::listen(const Timeslot &a, const Timeslot &b)
+void AculabSwitch::listen(const Timeslot &a, const Timeslot &b, const char *name)
 {
 	OUTPUT_PARMS args;
 
@@ -32,7 +32,7 @@ void AculabSwitch::listen(const Timeslot &a, const Timeslot &b)
     args.ist = b.st;
     args.its = b.ts;
 
-	log(log_debug, "switch") << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << logend();
+	log(log_debug, "switch", name) << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << logend();
 
     int rc = sw_set_output(device, &args);
     if (rc != 0)    
@@ -40,7 +40,7 @@ void AculabSwitch::listen(const Timeslot &a, const Timeslot &b)
 
 }
 
-void AculabSwitch::listen(const Timeslot &a, char pattern)
+void AculabSwitch::listen(const Timeslot &a, char pattern, const char *name)
 {
 	OUTPUT_PARMS args;
 
@@ -49,14 +49,15 @@ void AculabSwitch::listen(const Timeslot &a, char pattern)
     args.mode = PATTERN_MODE;
     args.pattern = pattern;
 
-	log(log_debug, "switch") << a.st << ':' << a.ts << " := 0x" << std::setbase(16) << pattern << std::setbase(10) << logend();
+	log(log_debug, "switch", name) << a.st << ':' << a.ts << " := 0x" 
+		<< std::setbase(16) << pattern << std::setbase(10) << logend();
 
     int rc = sw_set_output(device, &args);
     if (rc != 0)    
 		throw SwitchError(__FILE__,__LINE__,"AculabSwitch::listen(Timeslot,char)", "set_output(PATTERN_MODE)", rc);
 }
 
-void AculabSwitch::disable(const Timeslot &a)
+void AculabSwitch::disable(const Timeslot &a, const char *name)
 {
 	OUTPUT_PARMS args;
 
@@ -69,9 +70,12 @@ void AculabSwitch::disable(const Timeslot &a)
     int rc = sw_set_output(device, &args);
     if (rc != 0)    
 		throw SwitchError(__FILE__,__LINE__,"AculabSwitch::disable(Timeslot)", "sw_set_output(DISABLE_MODE)", rc);
+
+	log(log_debug, "switch", name) << a.st << ':' << a.ts << " disabled"
+		<< logend();
 }
 
-char AculabSwitch::sample(const Timeslot &a)
+char AculabSwitch::sample(const Timeslot &a, const char *name)
 {
 	SAMPLE_PARMS args;
 
@@ -85,7 +89,7 @@ char AculabSwitch::sample(const Timeslot &a)
 	return args.sample;
 }
 	
-Timeslot AculabSwitch::query(const Timeslot &a)
+Timeslot AculabSwitch::query(const Timeslot &a, const char *name)
 {
 	OUTPUT_PARMS args;
 
@@ -248,7 +252,8 @@ unsigned ProsodyChannel::Beep::start(Telephone *phone)
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
 
-	log(log_debug, "phone") << "beep " << beeps << " started" << logend();
+	log(log_debug, "phone", phone->getName()) 
+		<< "beep " << beeps << " started" << logend();
 	
 	phone->started(this);
 
@@ -288,7 +293,8 @@ bool ProsodyChannel::Beep::stop(Telephone *phone)
 
 	status = r_aborted;
 
-	log(log_debug+1, "phone") << "stopping beep " << beeps << logend();
+	log(log_debug+1, "phone", phone->getName()) 
+		<< "stopping beep " << beeps << logend();
 
 	return false;
 }
@@ -312,7 +318,8 @@ int ProsodyChannel::Beep::process(Telephone *phone)
 			++count;
 			if (count == beeps)
 			{
-				log(log_debug, "phone") << "beep " << beeps << " done [" << result_name(status) << ',' << position << ']' << logend();
+				log(log_debug, "phone", phone->getName()) 
+					<< "beep " << beeps << " done [" << result_name(status) << ',' << position << ']' << logend();
 
 				phone->completed(this);
 			}
@@ -323,7 +330,7 @@ int ProsodyChannel::Beep::process(Telephone *phone)
 			}
 			return replay.status;
 		case kSMReplayStatusUnderrun:
-			log(log_error, "phone") << "underrun!" << logend();
+			log(log_error, "phone", phone->getName()) << "underrun!" << logend();
 		case kSMReplayStatusHasCapacity:
 			submit(phone);
 			break;
@@ -355,14 +362,18 @@ unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
 	// warn if digits too long
 	if (tt.length() > kSMMaxDigits)
 	{
-		log(log_warning, "phone") << "warning: digits string " << tt.c_str() << " too long. truncated to: " << digits.digits.digit_string << logend();
+		log(log_warning, "phone", phone->getName()) 
+			<< "warning: digits string " << tt.c_str() 
+			<< " too long. truncated to: " << digits.digits.digit_string 
+			<< logend();
 	}
 
 	int rc = sm_play_digits(&digits);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
 
-	log(log_debug, "phone") << "touchtones " << tt.c_str() << " started" << logend();
+	log(log_debug, "phone", phone->getName()) 
+		<< "touchtones " << tt.c_str() << " started" << logend();
 
 	phone->started(this);
 
@@ -378,7 +389,8 @@ bool ProsodyChannel::Touchtones::stop(Telephone *phone)
 
 	status = r_aborted;
 
-	log(log_debug, "phone") << "touchtones " << tt.c_str() << " stopped" << logend();
+	log(log_debug, "phone", phone->getName()) 
+		<< "touchtones " << tt.c_str() << " stopped" << logend();
 
 	phone->completed(this);
 
@@ -397,7 +409,9 @@ int ProsodyChannel::Touchtones::process(Telephone *phone)
 
 	if (tone.status == kSMPlayToneStatusComplete)
 	{
-		log(log_debug, "phone") << "touchtones " << tt.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
+		log(log_debug, "phone", phone->getName()) 
+			<< "touchtones " << tt.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
+
 		phone->completed(this);
 	}
 
@@ -484,7 +498,8 @@ unsigned ProsodyChannel::FileSample::start(Telephone *phone)
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
 
-	log(log_debug, "phone") << "file sample " << name.c_str() << " started" << logend();
+	log(log_debug, "phone", phone->getName()) 
+		<< "file sample " << name.c_str() << " started" << logend();
 
 	phone->started(this);
 
@@ -526,7 +541,8 @@ bool ProsodyChannel::FileSample::stop(Telephone *phone)
 
 	status = r_aborted;
 
-	log(log_debug+1, "phone") << "stopping file sample " << name.c_str() << logend();
+	log(log_debug+1, "phone", phone->getName()) 
+		<< "stopping file sample " << name.c_str() << logend();
 
 	return false;
 }
@@ -547,11 +563,12 @@ int ProsodyChannel::FileSample::process(Telephone *phone)
 		switch (replay.status)
 		{
 		case kSMReplayStatusComplete:
-			log(log_debug, "phone") << "file sample " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
+			log(log_debug, "phone", phone->getName()) 
+				<< "file sample " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
 			phone->completed(this);
 			return replay.status;
 		case kSMReplayStatusUnderrun:
-			log(log_error, "phone") << "underrun!" << logend();
+			log(log_error, "phone", phone->getName()) << "underrun!" << logend();
 		case kSMReplayStatusHasCapacity:
 			submit(phone);
 			break;
@@ -587,7 +604,8 @@ unsigned ProsodyChannel::RecordFileSample::start(Telephone *phone)
 
 	phone->started(this);
 
-	log(log_debug, "phone") << "recording " << name.c_str() << " started" << logend();
+	log(log_debug, "phone", phone->getName()) 
+		<< "recording " << name.c_str() << " started" << logend();
 
 	return position;
 }
@@ -603,7 +621,8 @@ bool ProsodyChannel::RecordFileSample::stop(Telephone *phone)
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_record_abort", rc);
 
-	log(log_debug, "phone") << "stopping recording " << name.c_str() << logend();
+	log(log_debug, "phone", phone->getName()) 
+		<< "stopping recording " << name.c_str() << logend();
 
 	return false;
 }
@@ -643,11 +662,12 @@ int ProsodyChannel::RecordFileSample::process(Telephone *phone)
 		switch (record.status)
 		{
 		case kSMRecordStatusComplete:
-			log(log_debug, "phone") << "recording " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
+			log(log_debug, "phone", phone->getName()) 
+				<< "recording " << name.c_str() << " done [" << result_name(status) << ',' << position << ']' << logend();
 			phone->completed(this);
 			return record.status;
 		case kSMRecordStatusOverrun:
-			log(log_error, "phone") << "overrun!" << logend();
+			log(log_error, "phone", phone->getName()) << "overrun!" << logend();
 		case kSMRecordStatusData:
 		case kSMRecordStatusCompleteData:
 			receive(phone);
@@ -664,12 +684,13 @@ int ProsodyChannel::RecordFileSample::process(Telephone *phone)
 void AculabPhone::connected(Trunk* aTrunk)
 {
 	if (receive.st == -1 || transmit.st == -1)
-		log(log_error, "phone") << "no transmit or receive timeslot" << logend();
+		log(log_error, "phone", getName()) 
+			<< "no transmit or receive timeslot" << logend();
 
 	try
 	{
-		sw.listen(aTrunk->getTimeslot(), transmit);
-		sw.listen(receive, aTrunk->getTimeslot());
+		sw.listen(aTrunk->getTimeslot(), transmit, getName());
+		sw.listen(receive, aTrunk->getTimeslot(), getName());
 
 		if (info.card == -1)
 		{
@@ -696,8 +717,8 @@ void AculabPhone::connected(Trunk* aTrunk)
 			Timeslot in(info.ist, info.its);
 			Timeslot out(info.ost, info.ots);
 
-			sw.listen(transmit, out);
-			sw.listen(in, receive);
+			sw.listen(transmit, out, getName());
+			sw.listen(in, receive, getName());
 		}
 	}
 	catch (const Exception &e)
@@ -724,7 +745,8 @@ void AculabPhone::onRead(tSMEventId id)
 
 	if (!current)
 	{
-		log(log_error, "phone") << "got onRead() event while no output active" << logend();
+		log(log_error, "phone", getName()) 
+			<< "got onRead() event while no output active" << logend();
 		return;
 	}
 
@@ -737,7 +759,7 @@ void AculabPhone::onRead(tSMEventId id)
 	}
 	catch (const Exception& e)
 	{
-		log(log_error, "phone") << e << logend();
+		log(log_error, "phone", getName()) << e << logend();
 	}
 }
 
@@ -747,7 +769,8 @@ void AculabPhone::onWrite(tSMEventId id)
 
 	if (!current)
 	{
-		log(log_error, "phone") << "got onWrite() event while no output active" << logend();
+		log(log_error, "phone", getName()) 
+			<< "got onWrite() event while no output active" << logend();
 		return;
 	}
 
@@ -768,7 +791,7 @@ void AculabPhone::onWrite(tSMEventId id)
 	}
 	catch (const Exception& e)
 	{
-		log(log_error, "phone") << e << logend();
+		log(log_error, "phone", getName()) << e << logend();
 	}
 }
 

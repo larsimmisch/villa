@@ -1,7 +1,7 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.3 2001/05/20 20:02:44 lars Exp $
+	$Id: acutrunk.h,v 1.4 2001/06/19 15:02:51 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -50,7 +50,8 @@ class AculabTrunk : public Trunk
 public:
 
 	AculabTrunk(TrunkClient* aClient, int aPort, Telephone* aTelephone = 0) 
-		: Trunk(aClient, aTelephone), handle(-1), port(aPort), stopped(false) {}
+		: Trunk(aClient, aTelephone), handle(-1), port(aPort), 
+		stopped(false) {}
     virtual ~AculabTrunk() {}
 
 	// Connection establishment 
@@ -76,12 +77,14 @@ public:
 	void lock() { mutex.lock(); }
 	void unlock() { mutex.unlock(); }
 
-	static void start() { dispatcher.start(); }
+	static void start();
 
 protected:
 
 	static const char* eventName(ACU_LONG event);
 	static const char* stateName(states state);
+
+	void setName(int ts);
 
 	void release();
 
@@ -109,6 +112,7 @@ protected:
 	int port;
 	bool stopped;
 
+	static siginfo_xparms siginfo[MAXPORT];
 	static CallEventDispatcher dispatcher;
 };
 

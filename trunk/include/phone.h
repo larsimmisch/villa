@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.9 2001/06/17 20:38:08 lars Exp $
+	$Id: phone.h,v 1.10 2001/06/19 15:02:51 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -290,6 +290,9 @@ public:
 	void unlock() { mutex.unlock(); }
 
 	omni_mutex& getMutex() { return mutex; }
+
+	// debug
+	virtual const char *getName() = 0;
 
 protected:
 	

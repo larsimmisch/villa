@@ -3,7 +3,7 @@
 
 	Copyright 1995-2001 Lars Immisch
 
-	$Id: switch.h,v 1.4 2001/06/07 12:58:25 lars Exp $
+	$Id: switch.h,v 1.5 2001/06/19 15:02:51 lars Exp $
 
 	Author: Lars Immisch <lars@ibp.de>
 */
@@ -44,18 +44,18 @@ public:
 	Switch(int aDevice = 0, const char* aName = 0) : device(aDevice), name(aName) {}
 	virtual ~Switch()	{}
 	
-	virtual void listen(const Timeslot &a, const Timeslot &b) = 0;
-	virtual void listen(const Timeslot &a, char pattern) = 0;
-	virtual void connect(const Timeslot &a, const Timeslot &b)
+	virtual void listen(const Timeslot &a, const Timeslot &b, const char *name = 0) = 0;
+	virtual void listen(const Timeslot &a, char pattern, const char *name = 0) = 0;
+	virtual void connect(const Timeslot &a, const Timeslot &b, const char* name = 0)
 	{
-		listen(a, b);
-		listen(b, a);
+		listen(a, b, name);
+		listen(b, a, name);
 	}
 
-	virtual void disable(const Timeslot &a) = 0;
-	virtual char sample(const Timeslot &a) = 0;
+	virtual void disable(const Timeslot &aconst, const char *name = 0) = 0;
+	virtual char sample(const Timeslot &a, const char *name = 0) = 0;
 	
-	virtual Timeslot query(const Timeslot &a) = 0;
+	virtual Timeslot query(const Timeslot &a, const char *name = 0) = 0;
 	
 	virtual const char* getName() const { return name.c_str(); }
 

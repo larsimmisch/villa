@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.7 2001/06/17 20:38:08 lars Exp $
+	$Id: acutrunk.cpp,v 1.8 2001/06/19 15:02:51 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -15,6 +15,7 @@
 #include "acutrunk.h"
 
 CallEventDispatcher AculabTrunk::dispatcher;
+struct siginfo_xparms AculabTrunk::siginfo[MAXPORT];
 
 void CallEventDispatcher::add(ACU_INT handle, AculabTrunk* trunk)
 {
@@ -41,7 +42,7 @@ void* CallEventDispatcher::run_undetached(void* arg)
 		rc = call_event(&event);
 		if (rc)
 		{
-			std::cerr << "call_event failed: " << rc << std::endl;
+			log(log_error, "trunk") << "call_event failed: " << rc << logend();
 		}
 		else
 		{
@@ -55,7 +56,7 @@ void* CallEventDispatcher::run_undetached(void* arg)
 
 				if (i == handle_map.end())
 				{
-					std::cerr << "no device registered for handle : 0x" << std::setbase(16) << event.handle << std::setbase(10) << std::endl;
+					log(log_error, "trunk") << "no device registered for handle : 0x" << std::setbase(16) << event.handle << std::setbase(10) << logend();
 				}
 				else
 				{
@@ -149,6 +150,15 @@ const char* AculabTrunk::eventName(ACU_LONG event)
 	}
 }
 
+void AculabTrunk::start()
+{ 
+	memset(&AculabTrunk::siginfo, 0, sizeof(AculabTrunk::siginfo));
+
+	call_signal_info(AculabTrunk::siginfo);
+
+	dispatcher.start(); 
+}
+
 int AculabTrunk::listen()
 {
 	IN_XPARMS incoming;
@@ -171,7 +181,7 @@ int AculabTrunk::listen()
 	{
 		dispatcher.unlock();
 
-		std::cerr << "call_openin failed: " << rc << std::endl;
+		log(log_error, "trunk") << "call_openin failed: " << rc << logend();
 	}
 
 	handle = incoming.handle;
@@ -266,7 +276,7 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 	int rc = call_openout(&outdetail);
 	if (rc != 0)
 	{
-		std::cerr << "call_openout failed: " << rc << std::endl;
+		log(log_error, "trunk") << "call_openout failed: " << rc << logend();
 
         return r_failed;
     }
@@ -295,7 +305,8 @@ int AculabTrunk::accept()
 	{
 		release();
 
-		std::cerr << "call_accept failed: " << rc << std::endl;
+		log(log_error, "trunk", getName()) 
+			<< "call_accept failed: " << rc << logend();
 
 		return r_failed;
 	}
@@ -326,7 +337,8 @@ int AculabTrunk::disconnect(int cause)
 	{
 		release();
 
-		std::cerr << "call_disconnect failed: " << rc << std::endl;
+		log(log_error, "trunk", getName()) 
+			<< "call_disconnect failed: " << rc << logend();
 
 		return r_failed;
 	}
@@ -354,7 +366,7 @@ void AculabTrunk::release()
 	int rc = call_release(&xcause);
 	if (rc)
 	{
-		std::cerr << "call_release failed: " << rc << std::endl;
+		log(log_error, "trunk", getName()) << "call_release failed: " << rc << logend();
 	}
 
 	dispatcher.lock();
@@ -362,6 +374,7 @@ void AculabTrunk::release()
 	dispatcher.unlock();
 
 	state = idle;
+	setName(-1);
 }
 	
 void AculabTrunk::abort()
@@ -378,7 +391,8 @@ int AculabTrunk::getCause()
 	int rc = call_getcause(&cause);
 	if (rc != 0)
 	{
-		std::cerr << "call_getcause failed: " << rc << std::endl;
+		log(log_error, "trunk", getName()) 
+			<< "call_getcause failed: " << rc << logend();
 
 		return r_failed;
 	}
@@ -418,7 +432,7 @@ void AculabTrunk::onCallEvent(ACU_LONG event)
 {
 	omni_mutex_lock l(mutex);
 
-	log(log_debug+2, "trunk") << eventName(event) << logend();
+	log(log_debug+2, "trunk", getName()) << eventName(event) << logend();
 
 	switch (event)
 	{
@@ -468,7 +482,8 @@ void AculabTrunk::onCallEvent(ACU_LONG event)
 	case EV_TEST_CONNECT:
 	case EV_EXTENDED:
 	default:
-		log(log_warning, "trunk") << "unhandled call event " << eventName(event) << logend();
+		log(log_warning, "trunk", getName()) 
+			<< "unhandled call event " << eventName(event) << logend();
 		break;
 	}
 }
@@ -483,7 +498,8 @@ void AculabTrunk::onIdle()
 	{
 	case collecting_details:
 	case waiting:
-		log(log_warning, "trunk") << "incoming call went idle in state " << stateName(state) << logend();
+		log(log_warning, "trunk", getName()) 
+			<< "incoming call went idle in state " << stateName(state) << logend();
 
 		// restart automatically
 		release();
@@ -531,7 +547,7 @@ void AculabTrunk::onIncomingCallDetected()
 
 	if (rc)
 	{
-		log(log_error, "trunk") << "call_details failed: " << rc << logend();
+		log(log_error, "trunk", getName()) << "call_details failed: " << rc << logend();
 
 		// restart automatically
 
@@ -540,6 +556,8 @@ void AculabTrunk::onIncomingCallDetected()
 
 		return;
 	}
+
+	setName(details.ts);
 
 	timeslot.st = details.stream;
 	timeslot.ts = details.ts;
@@ -565,7 +583,7 @@ void AculabTrunk::onCallConnected()
 
 	if (rc)
 	{
-		log(log_error, "trunk") << "call_details failed: " << rc << logend();
+		log(log_error, "trunk", getName()) << "call_details failed: " << rc << logend();
 
 		return;
 	}
@@ -612,7 +630,7 @@ void AculabTrunk::onRemoteDisconnect()
 		release();
 		break;
 	default:
-		log(log_error, "trunk") << "unhandled state " << stateName(state) << " in onRemoteDisconnect" << logend();
+		log(log_error, "trunk", getName()) << "unhandled state " << stateName(state) << " in onRemoteDisconnect" << logend();
 		break;
 	}
 }
@@ -637,7 +655,7 @@ void AculabTrunk::onDetails()
 
 	if (rc)
 	{
-		log(log_error, "trunk") << "call_details failed: " << rc << logend();
+		log(log_error, "trunk", getName()) << "call_details failed: " << rc << logend();
 
 		return;
 	}	
@@ -649,4 +667,20 @@ void AculabTrunk::onCallCharge()
 
 void AculabTrunk::onChargeInt()
 {
+}
+
+void AculabTrunk::setName(int ts)
+{
+	if (ts == -1)
+	{
+		Trunk::setName("");
+	}
+	else
+	{
+		char buffer[MAXSIGSYS + 16];
+
+		sprintf(buffer, "%s[%d,%d]", siginfo[port].sigsys, port, ts);
+
+		Trunk::setName(buffer);
+	}
 }

@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.6 2001/06/16 22:31:33 lars Exp $
+	$Id: acuphone.h,v 1.7 2001/06/19 15:02:51 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -30,13 +30,13 @@ public:
 	AculabSwitch(int device) : Switch(device, "Aculab") {}
 	virtual ~AculabSwitch() {}
 	
-	virtual void listen(const Timeslot &a, const Timeslot &b);
-	virtual void listen(const Timeslot &a, char pattern);
+	virtual void listen(const Timeslot &a, const Timeslot &b, const char *name = NULL);
+	virtual void listen(const Timeslot &a, char pattern, const char *name = 0);
 
-	virtual void disable(const Timeslot &a);
-	virtual char sample(const Timeslot &a);
+	virtual void disable(const Timeslot &a, const char *name = 0);
+	virtual char sample(const Timeslot &a, const char *name = 0);
 	
-	virtual Timeslot query(const Timeslot &a);
+	virtual Timeslot query(const Timeslot &a, const char *name = 0);
 };
 
 class ProsodyError : public Exception
@@ -278,6 +278,8 @@ public:
 
 	virtual void startEnergyDetector(unsigned qualTime) { ProsodyChannel::startEnergyDetector(qualTime); }
 	virtual void stopEnergyDetector() { ProsodyChannel::stopEnergyDetector(); }
+
+	virtual const char* getName() { return trunk ? trunk->getName() : NULL; }
 
 	static void start() { dispatcher.start(); }
 
