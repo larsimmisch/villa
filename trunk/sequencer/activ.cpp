@@ -56,20 +56,21 @@ BeepAtom::BeepAtom(unsigned channel, Sequencer* sequencer,
 }
 
 ConferenceAtom::ConferenceAtom(unsigned channel, unsigned aConference, Conference::mode m)
- : Atom(channel), m_mode(m), m_conference(0), m_data(0), m_conferenceID(aConference)
+ : Atom(channel), m_mode(m), m_data(0), m_conferenceID(aConference), m_conference(0)
 {
 	
 }
 
 bool ConferenceAtom::start(Sequencer* sequencer)
 {
-    m_conference = gConferences[m_conferenceID];
+    Conference *conference = gConferences[m_conferenceID];
 
-	if (!m_conference)
+	if (!conference)
 		return false;
 
-	m_conference->add(sequencer->getMedia(), m_mode);
+	conference->add(sequencer->getMedia(), m_mode);
 
+	m_conference = conference;
 	m_started.now();
 
 	return true;

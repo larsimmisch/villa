@@ -689,6 +689,10 @@ unsigned Sequencer::BGRC(const std::string &id)
 
 	if (close(id.c_str()))
 	{
+		// disconnect timeslots and DTMF detectors
+		if (m_media)
+			m_media->disconnected(m_trunk);
+
 		if (m_interface)
 		{
 			m_interface->begin() << V3_OK << ' ' << id.c_str() << " BGRC " << getName() 
@@ -727,7 +731,10 @@ bool Sequencer::close(const char *id)
 
 		idle = true;
 		if (m_media)
+		{
+			m_media->disconnected(m_trunk);
 			gMediaPool.release(m_media);
+		}
 		m_media = 0;
 	}
 
@@ -1163,7 +1170,9 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 			log(log_debug, "sequencer", getName()) << "disconnect - all channels idle" 
 				<< logend();
 
-			m_media->disconnected(m_trunk);
+			if (m_media)
+				m_media->disconnected(m_trunk);
+
 			m_trunk->disconnect(m_disconnecting);
 		}
 	}
@@ -1181,6 +1190,10 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 		{
 			omni_mutex_lock l(m_mutex);
 			m_id.erase();
+			
+			if (m_media)
+				m_media->disconnected(m_trunk);
+
 			release();
 		}
 
