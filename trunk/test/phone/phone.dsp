@@ -107,11 +107,11 @@ SOURCE=..\..\timer\timer.cpp
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
-SOURCE=..\..\include\h100.h
+SOURCE=..\..\include\phone.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\include\timer.h
+SOURCE=..\..\include\storage.h
 # End Source File
 # End Group
 # End Target

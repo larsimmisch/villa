@@ -1,15 +1,22 @@
 /*
-	buffers.h
+	fal.h
 
-	$Id: storage.h,v 1.4 2001/06/08 10:09:33 lars Exp $
+	$Id: fal.h,v 1.1 2001/06/16 22:31:33 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
+
+	This file was named storage.h until I discovered no file dependent
+	on storage.h was rebuilt when I changed it.
+
+	Now there is a storage.h coming with MSVC which is being obsoleted,
+	so I guess someone is playing tricks with that special filename.
+
 */
 
-#ifndef _BUFFERS_H_
-#define _BUFFERS_H_ 
+#ifndef _STORAGE_H_
+#define _STORAGE_H_ 
 
 #include <stdio.h>
 #include <iostream>
@@ -125,6 +132,8 @@ public:
 		file = fopen(name, write ? "wb" : "rb");
 		if (!file)
 		{
+			int x = GetLastError();
+
 			throw FileDoesNotExist(__FILE__, __LINE__, 
 				"RawFileStorage::RawFileStorage", name);
 		}

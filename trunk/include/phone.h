@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.7 2001/05/20 20:02:44 lars Exp $
+	$Id: phone.h,v 1.8 2001/06/16 22:31:33 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -16,7 +16,6 @@
 #include "phoneclient.h"
 #include "switch.h"
 #include "exc.h"
-#include "storage.h"
 
 enum { indefinite = -1 };
 

@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.8 2001/06/08 10:09:33 lars Exp $
+	$Id: phonetest.cpp,v 1.9 2001/06/16 22:31:33 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -13,6 +13,7 @@
 #include <iostream>
 #include "getopt.h"
 #include "log.h"
+#include "phone.h"
 #include "aculab/acuphone.h"
 #include "aculab/mvswdrvr.h"
 #include "ctbus.h"

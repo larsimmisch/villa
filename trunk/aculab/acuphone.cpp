@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.6 2001/05/27 21:15:20 lars Exp $
+	$Id: acuphone.cpp,v 1.7 2001/06/16 22:31:33 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -16,6 +16,7 @@
 #include "mvswdrvr.h"
 #include "names.h"
 #include "acuphone.h"
+#include "fal.h"
 #include "prosody_error.i"
 #include "beep.i"
 
@@ -411,6 +412,19 @@ void ProsodyChannel::stopEnergyDetector()
 {
 }
 
+ProsodyChannel::FileSample::FileSample(ProsodyChannel *channel, 
+									   const char* file, 
+									   bool isRecordable)
+ : recordable(isRecordable), storage(0), prosody(channel), name(file)
+{
+	storage = allocateStorage(file, isRecordable);
+}
+
+ProsodyChannel::FileSample::~FileSample()
+{
+	delete storage;
+}
+
 Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isRecording)
 {
 	char* dot = strrchr(aName, '.');
@@ -439,6 +453,13 @@ Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isR
 	}
 
 	return storage;
+}
+
+unsigned ProsodyChannel::FileSample::getLength() 
+{ 
+	return storage ? 
+		storage->getLength() * 1000 / storage->bytesPerSecond
+		: 0; 
 }
 
 unsigned ProsodyChannel::FileSample::start(Telephone *phone)

@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.5 2001/05/27 21:15:20 lars Exp $
+	$Id: acuphone.h,v 1.6 2001/06/16 22:31:33 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -20,6 +20,8 @@
 #include "switch.h"
 
 const char* prosody_error(int);
+
+class Storage;
 
 class AculabSwitch : public Switch
 {
@@ -155,16 +157,10 @@ protected:
 	{
 	public:
 
-		FileSample(ProsodyChannel *channel, const char* file, bool isRecordable = false)
-				: recordable(isRecordable), storage(0), prosody(channel), name(file)
-		{
-			storage = allocateStorage(file, isRecordable);
-		}
+		FileSample(ProsodyChannel *channel, const char* file, 
+			bool isRecordable = false);
 
-		virtual ~FileSample()
-		{
-			delete storage;
-		}
+		virtual ~FileSample();
 
         virtual unsigned start(Telephone *phone);
         virtual bool stop(Telephone *phone);
@@ -174,12 +170,7 @@ protected:
 
 		Storage* allocateStorage(const char *name, bool isRecordable);
 
-		virtual unsigned getLength() 
-		{ 
-			return storage ? 
-				storage->getLength() * 1000 / storage->bytesPerSecond
-				: 0; 
-		}
+		virtual unsigned getLength();
 
 		virtual Storage* getStorage() { return storage; }
 
