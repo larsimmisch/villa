@@ -9,18 +9,17 @@
 #ifndef _CONFIGURATION_H_
 #define _CONFIGURATION_H_
 
-#include <Services/Mutex.h>
-#include <Services/Exc.h>
-#include <Collect/List.h>
-#include <Collect/Set.h>
-#include <Registry/Registry.h>
-#include <Aculab/Trunk/Aculab.h>
-#include <NMS/NMSTrunk.h>
-#include "Interface.h"
+#include <omnithread.h>
+#include "exc.h"
+#include "list.h"
+#include "set.h"
+#include "registry.h"
+#include "aculab/acutrunk.h"
+#include "interface.h"
 
 class InvalidKey : public Exception
 {
-	public:
+public:
 
 	InvalidKey(const char* file, int line, const char* function, const char* aKey, const Exception* previous = 0) 
 		: Exception(file, line, function, "invalid key", previous), key(0) 
@@ -35,7 +34,7 @@ class InvalidKey : public Exception
 
 class ClientQueue : public DList
 {
-	public:
+public:
 
 	struct Item : public DList::DLink
 	{
@@ -62,7 +61,7 @@ class DDIIterator;
 
 class DDIs
 {
-	public:
+public:
 	
 	class Node
 	{
@@ -88,7 +87,7 @@ class DDIs
 	// otherwise returns true if key can be found
 	int isSubKey(const char* key);
 
-	protected:
+protected:
 
 	friend class DDIIterator;
 
@@ -99,7 +98,7 @@ class DDIs
 
 class DDIIterator
 {
-	public:
+public:
 
 	DDIIterator(DDIs& addis);
 	~DDIIterator() {}
@@ -108,7 +107,7 @@ class DDIIterator
 	DDIs::Node* current()	{ return node; }
 	int isDone()	{ return node == 0; }
 
-	protected:
+protected:
 
 	DDIs* ddis;
 	DDIs::Node* node;
@@ -117,12 +116,12 @@ class DDIIterator
 
 class TrunkConfiguration : public List::Link
 {
-	public:
+public:
 
 	virtual ~TrunkConfiguration();
 
 	virtual int isDigital()			{ return 0; }
-	virtual Slot preferredSlot()	{ return Slot(-1,-1); }
+	virtual Timeslot preferredSlot()	{ return Timeslot(-1,-1); }
 
 	virtual Trunk* getTrunk() = 0;
 	virtual unsigned numLines() = 0;
@@ -145,54 +144,23 @@ class TrunkConfiguration : public List::Link
 
 	virtual unsigned connect(ConnectCompletion* complete) = 0;
 
-	protected:
+protected:
 
 	TrunkConfiguration() {}
 
 	char* name;
 	char* number;
 	unsigned free;
-	Mutex mutex;
+	omni_mutex mutex;
 };
 
 class Sequencer;
-
-class NmsAnalogTrunkConfiguration : public TrunkConfiguration
-{
-public:
-
-	NmsAnalogTrunkConfiguration() : protocol(0), sequencer(0) {}
-	virtual ~NmsAnalogTrunkConfiguration();
-
-	virtual Slot preferredSlot()	{ return slot; }
-
-	virtual Trunk* getTrunk()	{ return new NMSTrunk(protocol, "wti8sw", 0); }
-	virtual unsigned numLines()	{ return 1; }
-
-	virtual int readFromKey(RegistryKey& key);
-
-	virtual void start();
-	virtual void removeClient(void* tag);
-	virtual void removeClient(void* tag, SAP& aSAP);
-
-	virtual void enqueue(SAP& details, SAP& client, void* tag);
-	virtual ClientQueue::Item* dequeue(SAP& details);
-
-	virtual unsigned connect(ConnectCompletion* complete);
-
-	protected:
-
-	char* protocol;
-	Slot slot;
-	ClientQueue queue;
-	Sequencer* sequencer;
-};
 
 // the Aculab PRI can be configured to run less than 30 lines
 
 class AculabPRITrunkConfiguration : public TrunkConfiguration
 {
-	public:
+public:
 
 	AculabPRITrunkConfiguration() : lines(30) {}
 	virtual ~AculabPRITrunkConfiguration();
@@ -214,7 +182,7 @@ class AculabPRITrunkConfiguration : public TrunkConfiguration
 
 	virtual unsigned connect(ConnectCompletion* complete);
 
-	protected:
+protected:
 
 	unsigned device;
 	unsigned swdevice;
@@ -247,15 +215,15 @@ class ConfiguredTrunks : public Set
 
 	virtual void freeLink(List::Link* item);
 	
-	protected:
+protected:
 	
-	Mutex mutex;
+	omni_mutex mutex;
 	unsigned lines;
 };
 
 class ConfiguredTrunksIterator : public Set::AssocIter
 {
-	public:
+public:
 
 	ConfiguredTrunksIterator(ConfiguredTrunks& aList) : Set::AssocIter(aList) {}
 

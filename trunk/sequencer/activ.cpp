@@ -17,12 +17,6 @@
 
 extern int debug;
 
-extern Log log;
-
-#ifdef __AG__
-extern Conferences gConferences;
-#endif
-
 char* copyString(const char* aString)
 {
     char* s = new char[strlen(aString) +1];
@@ -31,28 +25,27 @@ char* copyString(const char* aString)
     return s;
 }
 
+int Atom::start(Sequencer *sequencer, void *userData)
+{
+	sample->setUserData(userData);
+
+	sample->start(sequencer->getPhone());
+
+	return true;
+}
+
+int Atom::stop(Sequencer *sequencer)
+{
+	return sample->stop(sequencer->getPhone());
+}
+
 PlayAtom::PlayAtom(Sequencer* sequencer, const char* aFile)
 { 
 	file = copyString(aFile);
-	sample = sequencer->getPhone()->createFileSample(aFile)
+	sample = sequencer->getPhone()->createFileSample(aFile);
 }
-
-int PlayAtom::start(Sequencer* sequencer, void* userData)
-{
-    sample->setUserData(userData);
-
-	sequencer->getPhone()->send(sample);
-
-    return 1;
-}
-
-int PlayAtom::stop(Sequencer* sequencer)
-{
-    return sample.stop(sequencer->getPhone());
-}
-
  
-RecordAtom::RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime, int aMessage)
+RecordAtom::RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime)
 	: time(aTime)
 {
 	file = copyString(aFile); 
@@ -60,70 +53,24 @@ RecordAtom::RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime, 
 	sample = sequencer->getPhone()->createRecordFileSample(aFile, aTime);
 }
 
-int RecordAtom::start(Sequencer* sequencer, void* userData)
-{
-    sample->setUserData(userData);
-
-	sequencer->getPhone()->send(sample);
-
-    return 1;
-}
-
-int RecordAtom::stop(Sequencer* sequencer)
-{
-    return sample->stop(sequencer->getPhone());
-}
-
 BeepAtom::BeepAtom(Sequencer* sequencer, unsigned count) : nBeeps(count) 
 {
-	beep = sequencer->getPhone()->createBeeps(count);
-}
-
-int BeepAtom::start(Sequencer* sequencer, void* userData)
-{
-    beep->setUserData(userData);
-
-	sequencer->getPhone()->send(beep);
-
-    return 1;
-}
-
-int BeepAtom::stop(Sequencer* sequencer)
-{
-    return beep->stop(sequencer->getPhone());
-}
-
-int EnergyDetectorAtom::start(Sequencer* sequencer, void* userData)
-{
-    energy.setUserData(userData);
-
-	sequencer->getPhone()->send(energy);
-
-    return 1;
-}
-
-int EnergyDetectorAtom::stop(Sequencer* sequencer)
-{
-    return energy.stop(sequencer->getPhone());
+	sample = sequencer->getPhone()->createBeeps(count);
 }
 
 ConferenceAtom::ConferenceAtom(unsigned aConference, unsigned aMode)
  : mode(aMode), started(), me(0)
 {
-#ifndef __AG__
-    conf = new Conference(aConference);
-#else
-	conf = gConferences[aConference];
-#endif
+//    conf = new Conference(aConference);
 
-    Terminator::getInstance().addLast(this);
+//    Terminator::getInstance().addLast(this);
 }
 
 ConferenceAtom::~ConferenceAtom()
 {
-    terminate();
+//    terminate();
 
-    Terminator::getInstance().remove(this);
+ //   Terminator::getInstance().remove(this);
 }
 
 void ConferenceAtom::terminate()
@@ -141,23 +88,23 @@ int ConferenceAtom::start(Sequencer* sequencer, void* aUserData)
 
     userData = aUserData;
 
-    me = conf->add(sequencer->getPhone()->getSlot(), sequencer->getPhone()->getSwitch(), mode);
+	// me = conf->add(sequencer->getPhone()->getSlot(), sequencer->getPhone()->getSwitch(), mode);
 
-    started.now();
+	// started.now();
 
     return me ? 1 : 0;
 }
 
 int ConferenceAtom::stop(Sequencer* sequencer)
 {
-    DateTime now;
+    Time now;
 
-    now.now();
+    // now.now();
 
-    conf->remove(me);
+    // conf->remove(me);
     me = 0;
 
-    sequencer->addCompleted(sequencer->getPhone(), (Molecule*)userData, 0, now - started);
+    // sequencer->addCompleted(sequencer->getPhone(), (Molecule*)userData, 0, now - started);
 
     return 1;
 }
@@ -165,26 +112,13 @@ int ConferenceAtom::stop(Sequencer* sequencer)
 TouchtoneAtom::TouchtoneAtom(Sequencer* sequencer, const char* att)
 {
 	tt = copyString(att);
+
 	sample = sequencer->getPhone()->createTouchtones(att);
-}
-
-int TouchtoneAtom::start(Sequencer* sequencer, void* userData)
-{
-    sample.setUserData(userData);
-
-	sequencer->getPhone()->send(sample);
-
-    return 1;
-}
-
-int TouchtoneAtom::stop(Sequencer* sequencer)
-{
-    return sample.stop(sequencer->getPhone());
 }
 
 int SilenceAtom::start(Sequencer* sequencer, void* aUserData)
 {
-	entry = sequencer->getTimer().add(length, this, aUserData);
+	timer = sequencer->getTimer().add(length, this, aUserData);
 
 	seq = sequencer;
 
@@ -193,7 +127,7 @@ int SilenceAtom::start(Sequencer* sequencer, void* aUserData)
 
 int SilenceAtom::stop(Sequencer* sequencer)
 {
-    if (entry)
+    if (timer.is_valid())
 	{
 		pos = length - sequencer->getTimer().remove(entry);
 
@@ -242,7 +176,8 @@ Molecule::Molecule(unsigned aMode, int aPriority, int aSyncMinor) : DList()
 
 Molecule::~Molecule()
 {
-	for (ListIter i(*this); !i.isDone(); i.next())    freeLink(i.current());
+	for (ListIter i(*this); !i.isDone(); i.next())    
+		freeLink(i.current());
 }
 
 void Molecule::freeLink(List::Link* anAtom)

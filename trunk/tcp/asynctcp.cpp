@@ -220,7 +220,7 @@ void AsyncTCPNoThread::run()
 AsyncTCP::AsyncTCP(TransportClient& aClient, void* aPrivateData)
 	: AsyncTCPNoThread(aClient, aPrivateData)
 {
-    run_undetached(NULL);
+    start_undetached();
 }
 
 AsyncTCP::~AsyncTCP()

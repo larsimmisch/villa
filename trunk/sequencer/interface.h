@@ -9,10 +9,10 @@
 #ifndef _INTERFACE_H_
 #define _INTERFACE_H_
 
-#include <Collect/List.h>
-#include <Transport/Packet.h>
-#include <TCP/AsyncTCP.h>
-#include "Configuration.h"
+#include "list.h"
+#include "packet.h"
+#include "asynctcp.h"
+#include "configuration.h"
 
 class InterfaceConnection : public AsyncTCPNoThread, public List::Link
 {
@@ -23,22 +23,23 @@ public:
 
 	void sendConnectDone(unsigned syncMajor, unsigned syncMinor, unsigned result);
 
-	Mutex& getMutex()	{ return mutex; }
+	omni_mutex& getMutex()	{ return mutex; }
 
     Packet* staticPacket(unsigned numArgs) { packet->clear(numArgs); return packet; }
 
 protected:
 
-	Mutex mutex;
+	omni_mutex mutex;
     Packet* packet;
     char buffer[1024];
 };
 
-class InterfaceConnectionThread : public InterfaceConnection, public Thread
+class InterfaceConnectionThread : public InterfaceConnection, public omni_thread
 {
-	public:
+public:
 
-	InterfaceConnectionThread(TransportClient& client, SAP& local) : InterfaceConnection(client, local) { Thread::resume(); }
+	InterfaceConnectionThread(TransportClient& client, SAP& local) 
+		: InterfaceConnection(client, local) {}
 	virtual ~InterfaceConnectionThread()	{}
 
 	virtual void run()	{ AsyncTCPNoThread::run(); }
@@ -46,7 +47,7 @@ class InterfaceConnectionThread : public InterfaceConnection, public Thread
 
 class InterfaceConnections : public List
 {
-	public:
+public:
 
 	InterfaceConnections() {}
 	virtual ~InterfaceConnections() { empty(); }
@@ -56,7 +57,7 @@ class InterfaceConnections : public List
 
 class Interface : public TransportClient
 {
-	public:
+public:
 
 	Interface(SAP& local);
 	virtual ~Interface() {}
@@ -94,10 +95,10 @@ class Interface : public TransportClient
     virtual int asynchronous(Transport* server)  { return 0; }
     virtual void data(Transport* server, Packet* aPacket);
 
-	protected:
+protected:
 
 	unsigned unused;
-	Mutex mutex;
+	omni_mutex mutex;
 	InterfaceConnections connections;
 	SAP local;
 };

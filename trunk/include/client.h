@@ -12,7 +12,7 @@ class Transport;
 
 class TransportClient
 {
-	public:
+public:
 
 	TransportClient() {}
 	virtual ~TransportClient() {}

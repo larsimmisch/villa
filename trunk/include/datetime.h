@@ -21,7 +21,15 @@ class DateTime
 {
 public:
  
-	DateTime();
+	DateTime() : hour((unsigned short)-1), 
+		minute((unsigned short)-1), 
+		second((unsigned short)-1), 
+		millisecond(0), 
+		day((unsigned short)-1), 
+		month((unsigned short)-1),
+		year((unsigned short)-1), 
+		weekday((unsigned short)-1) {}
+
 	DateTime(DateTime& dt)
 	: hour(dt.hour), minute(dt.minute), second(dt.second), millisecond(dt.millisecond),
 	  day(dt.day), month(dt.month), year(dt.year), weekday(dt.weekday)

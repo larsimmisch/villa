@@ -16,7 +16,7 @@
 #include "client.h"
 #include "activ.h"
 #include "queue.h"
-// #include "Configuration.h"
+#include "configuration.h"
 
 class Sequencer : public TelephoneClient, public TransportClient
 #ifdef __RECOGNIZER__
@@ -168,7 +168,7 @@ public:
 
 	void loadSwitch(const char* aName, int is32bit = 1, int aDevice = 0)	{ phone.loadSwitch(aName, aDevice); }
 
-	AsyncTimer& getTimer()				{ return timer; }
+	Timer& getTimer()				{ return timer; }
 	Telephone*	getPhone()				{ return &phone; }
 
 protected:
@@ -179,13 +179,12 @@ protected:
 	Packet* newPacket(unsigned args, unsigned size = 1024);
 
 	TrunkConfiguration* configuration;
-	NMSAsyncPhone phone;
 	AsyncTCP tcp;
 #ifdef __RECOGNIZER__
 	AsyncRecognizer* recognizer;
 #endif
 	ClientQueue::Item* clientSpec;
-	Event done;
+//	Event done;
 	Activity* activity;
 	Activity* nextActivity;
 	ActivityCollection activities;
@@ -196,7 +195,7 @@ protected:
 	ConnectCompletion* connectComplete;
 	int outOfService;
 
-	static AsyncTimer timer;
+	static Timer timer;
 };
 
 #endif

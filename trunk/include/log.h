@@ -41,7 +41,7 @@ public:
 	Log(std::ostream &o) : log_os(o) {}
 	virtual ~Log() {}
 
-	virtual std::ostream& log(int loglevel, const char *logclass, const char *name = NULL);
+	virtual std::ostream& log(int loglevel, const char *logclass, const char *name = 0);
 
 	virtual void lock() { log_mutex.lock(); }
 	virtual void unlock() { log_mutex.unlock(); }
@@ -54,7 +54,7 @@ public:
 extern Log *log_instance;
 extern std::ostream nullstream;
 
-inline std::ostream& log(int loglevel, const char *logclass, const char *name = NULL)
+inline std::ostream& log(int loglevel, const char *logclass, const char *name = 0)
 {
 	if (!log_instance)
 		return nullstream;

@@ -194,6 +194,8 @@ public:
 	static void fillSocketAddress(SAP& aSAP, void* socketAddress);
 	static void fillSAP(void* socketAddress, SAP& aSAP);
 
+	static void init();
+
 protected:
 
 	friend class ListenerQueue;

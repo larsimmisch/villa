@@ -106,6 +106,10 @@ SOURCE=.\interface.cpp
 
 SOURCE=.\sequence.cpp
 # End Source File
+# Begin Source File
+
+SOURCE=..\timer\timer.cpp
+# End Source File
 # End Group
 # Begin Group "Header Files"
 
@@ -113,6 +117,14 @@ SOURCE=.\sequence.cpp
 # Begin Source File
 
 SOURCE=.\activ.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\conference.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\configuration.h
 # End Source File
 # Begin Source File
 
@@ -128,11 +140,19 @@ SOURCE=.\queue.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\registry.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\rphone.h
 # End Source File
 # Begin Source File
 
 SOURCE=.\sequence.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\timer.h
 # End Source File
 # End Group
 # Begin Group "Resource Files"

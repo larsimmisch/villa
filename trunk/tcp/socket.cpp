@@ -322,17 +322,26 @@ int Socket::listen(SAP& remote, unsigned aTimeout)
 
 	if (waiting)
 	{
+		int signalled = 1;
+
 		waiting->mutex.lock();
 
-		unsigned long abs_sec, abs_nsec;
-
-		omni_thread::get_time(&abs_sec, &abs_nsec, 
-			aTimeout / 1000, (aTimeout % 1000) * 1000000);
-
-		if (waiting->event.timedwait(abs_sec, abs_nsec))
+		if (aTimeout == infinite)
+			waiting->event.wait();
+		else
 		{
-			waiting->mutex.unlock();
+			unsigned long abs_sec, abs_nsec;
 
+			omni_thread::get_time(&abs_sec, &abs_nsec, 
+				aTimeout / 1000, (aTimeout % 1000) * 1000000);
+
+			signalled = waiting->event.timedwait(abs_sec, abs_nsec);
+		}
+
+		waiting->mutex.unlock();
+
+		if (signalled)
+		{
 			hsocket = waiting->hsocket;
 			result = waiting->result;
 			delete waiting;
@@ -698,6 +707,16 @@ void Socket::fillSAP(void* socketAddress, SAP& aSAP)
 	
 	if (address->sin_addr.S_un.S_addr != INADDR_ANY) aSAP.setAddress(inet_ntoa(address->sin_addr));
 	aSAP.setService(htons(address->sin_port));
+}
+
+void Socket::init()
+{
+	WSADATA wsa;
+
+	DWORD rc = WSAStartup(MAKEWORD(2,0), &wsa);
+
+	if (rc != 0)
+		throw SocketError(__FILE__, __LINE__, "WSAStartup", rc);
 }
 
 extern HMODULE hWinsock;

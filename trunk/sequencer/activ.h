@@ -10,7 +10,7 @@
 #include "omnithread.h"
 #include "list.h"
 #include "timer.h"
-// #include <Conference/Conference.h>
+#include "conference.h"
 #include "phone.h"
 #include "rphone.h"
 
@@ -24,6 +24,11 @@ struct Time
 {
 	unsigned sec;
 	unsigned nsec;
+
+	unsigned operator-(const Time &b)
+	{
+		return (sec - b.sec) * 1000 - (nsec - b.nsec) * 1000000;
+	}
 };
 
 class Sequencer;
@@ -35,8 +40,10 @@ public:
 	Atom() {}
 	virtual ~Atom() {}
 
-	virtual int start(Sequencer* sequencer, void* userData = 0) = 0;
-	virtual int stop(Sequencer* sequencer) = 0;
+	virtual int start(Sequencer* sequencer, void* userData = 0);
+
+	virtual int stop(Sequencer* sequencer);
+
 	virtual int done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return 1; }
 	virtual int setPos(unsigned aPosition) { return 1; }
 	virtual unsigned getLength()	{ return 0; }
@@ -51,7 +58,9 @@ public:
 
 	virtual void printOn(std::ostream& out)  { out << "abstract atom"; }
 
-	protected:
+protected:
+
+	Sample *sample;
 
 	unsigned notifications;
 };
@@ -253,26 +262,6 @@ protected:
 	Conference::Member* me;
 	Time started;
 	unsigned mode;
-};
-
-class EnergyDetectorAtom : public Atom
-{
-public:
-
-	EnergyDetectorAtom(unsigned qualTime, unsigned maxTime) : energy(qualTime, maxTime) {}
-	virtual ~EnergyDetectorAtom()	{}
-
-	virtual int start(Sequencer* sequencer, void* userData = 0);
-	virtual int stop(Sequencer* sequencer);
-	virtual int setPos(unsigned pos)	{ return 1; }
-	virtual unsigned getLength()		{ return energy.maxTime; }
-	virtual unsigned getStatus()		{ return energy.getStatus(); }
-
-	virtual void printOn(std::ostream& out)	{ out << "EnergyDetectorAtom(" << energy.qualTime << ", " << energy.maxTime << ')'; }
-
-protected:
-	
-	Telephone::EnergyDetector energy;
 };
 
 class Activity : public DList, public DList::DLink

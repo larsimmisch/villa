@@ -47,7 +47,7 @@ public:
 							NULL,
 							error,
 							MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-							(LPTSTR) &aName, 0, NULL);
+							(LPTSTR) &aName, 0, (char**)NULL);
 
 		if (size) return aName;
 
