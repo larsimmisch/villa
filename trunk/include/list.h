@@ -41,7 +41,7 @@ public:
 
 public: //	external protocol
 
-	List();
+	List() : head(0), tail(0), size(0) {}
 	virtual ~List() {}					// it is subclass responsibility to destroy the list
 
 	// assert:
@@ -77,8 +77,6 @@ protected:	//	internal protocol
 	virtual void  addLinkAfter(Link* first, Link* second);
 	virtual Link* removeLink(Link* aLink);
 	virtual Link* removeNextLink(Link* aLink);
-
-	protected:
 
 	Link* head;
 	Link* tail;

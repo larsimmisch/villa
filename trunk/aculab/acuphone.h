@@ -264,7 +264,8 @@ protected:
 	struct sm_listen_for_parms m_listenFor;
 	struct sm_channel_info_parms m_info;
 	omni_mutex m_mutex;
-	Sample *m_current;
+	Sample *m_sending;
+	Sample *m_receiving;
 
 	static ProsodyEventDispatcher s_dispatcher;
 };

@@ -76,12 +76,6 @@ void List::LinkIter::setToEnd()
     for (previousLink = head; previousLink->next && previousLink->next->next ; previousLink = previousLink->next);
 }
 
-List::List()
-{
-	head = tail = 0;
-	size = 0;
-}
-
 void List::addFirst(Link* aNewLink)
 {
     if(!tail) tail = aNewLink;
@@ -145,7 +139,8 @@ List::Link* List::removeFirst()
         size--;
     }
     
-    if( !head ) 	tail = 0;
+    if(!head) 
+		tail = 0;
 
     return r;
 }
@@ -182,9 +177,10 @@ List::Link* List::removeAfter(Link* aLink)
 {
     Link* r = removeNextLink(aLink);
 
-    if( tail == r ) tail = aLink;
+    if(tail == r) tail = aLink;
 
-    size--;
+	if (r)
+		--size;
 
     return r;
 }

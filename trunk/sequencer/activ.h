@@ -46,9 +46,9 @@ public:
 	Atom() : m_sample(0), m_channel(0), m_notifications(0) {}
 	virtual ~Atom() {}
 
-	/* channel is typically 0..1 - it is intended for mixing/parallel jobs */
-	virtual int start(Sequencer* sequencer, unsigned channel = 0);
-	virtual int stop(Sequencer* sequencer);
+	/* channel is the index of the parallel job */
+	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
+	virtual bool stop(Sequencer* sequencer);
 
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return true; }
 	virtual bool setPos(unsigned aPosition) { return true; }
@@ -101,8 +101,8 @@ public:
 	Molecule(unsigned mode, int aPriority, const std::string &id);
 	virtual ~Molecule();	
 
-	virtual int start(Sequencer* sequencer, unsigned channel = 0);
-	virtual int stop(Sequencer* sequencer);
+	virtual bool start(Sequencer* sequencer, unsigned channel = 0);
+	virtual bool stop(Sequencer* sequencer);
 	virtual bool done(Sequencer* sequencer, unsigned msecs, unsigned reason);
 	virtual bool setPos(unsigned aPosition);
 	unsigned getPos() const { return m_pos; }
@@ -238,8 +238,8 @@ public:
 	SilenceAtom(unsigned aLength) : m_length(aLength) {}
 	virtual ~SilenceAtom() {}
 
-	virtual int start(Sequencer* sequencer, void* userData = 0);
-	virtual int stop(Sequencer* sequencer);
+	virtual bool start(Sequencer* sequencer, void* userData = 0);
+	virtual bool stop(Sequencer* sequencer);
 	virtual bool setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
 	virtual unsigned getStatus()	{ return V3_OK; }
@@ -265,8 +265,8 @@ public:
 	ConferenceAtom(unsigned aConf, unsigned aMode);
 	virtual ~ConferenceAtom() {}
 
-	virtual int start(Sequencer* sequencer, void* userData = 0);
-	virtual int stop(Sequencer* sequencer);
+	virtual bool start(Sequencer* sequencer, void* userData = 0);
+	virtual bool stop(Sequencer* sequencer);
 	virtual bool setPos(unsigned pos) { return true; }
 	virtual unsigned getLength()	{ return INDEFINITE; }
 	virtual unsigned getStatus()	{ return V3_OK; }

@@ -519,7 +519,7 @@ bool Sequencer::channelsIdle()
 
 	for (int i = 0; i < MAXCHANNELS; ++i)
 	{
-		idle = m_activity[i].getState() == Activity::idle && idle;
+		idle = (m_activity[i].getState() == Activity::idle) && idle;
 	}
 
 	return idle;
@@ -778,9 +778,7 @@ void Sequencer::transferDone(Trunk *server, unsigned callref, int result)
 
 void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 {
-	log(log_debug, "sequencer", getName()) 
-		<< "disconnect request" << logend();
-	
+
 	omni_mutex_lock lock(m_mutex);
 
 	// if we are active, stop
@@ -789,7 +787,7 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 		if (m_activity[i].getState() == Activity::active)
 		{
 			log(log_debug, "sequencer", getName()) 
-				<< "disconnect request - stopping channel " << i << logend();
+				<< "remote disconnect - stopping channel " << i << logend();
 
 			m_activity[i].abort();
 		}
@@ -798,8 +796,7 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	checkCompleted();
 
 	// notify client unless already disconnecting or still stopping
-	if (m_interface && m_disconnecting != INVALID_CALLREF 
-		&& channelsIdle())
+	if (m_disconnecting == INVALID_CALLREF && channelsIdle() && m_interface)
 	{
 		m_interface->begin() << V3_EVENT << " RDIS " << getName() 
 			<< end();
@@ -948,10 +945,9 @@ void Sequencer::completed(Media *server, Sample *aSample, unsigned msecs)
 
 void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, unsigned status)
 {
-	bool done, atEnd, notifyStop, start(true);
-	unsigned pos, length, nAtom, channel;
-	std::string id;
-	std::string jobid;
+	bool done(false), send_atom_done(false), send_molecule_done(false), start(true);
+	unsigned pos, length, atom, channel;
+	std::string id, jobid;
 
 	lock();
 
@@ -960,23 +956,23 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	// the molecule will be changed after the done. Grab all necesssary information before done.
 
 	channel = molecule->getChannel();
-	nAtom = molecule->currentAtom();
-	atEnd = molecule->atEnd();
-	notifyStop = molecule->notifyStop();
+	atom = molecule->currentAtom();
+	send_molecule_done = molecule->atEnd();
+	send_atom_done = molecule->notifyStop();
 	id = molecule->getId();
 	done = molecule->done(this, msecs, status);
 	pos = molecule->getPos();
 	length = molecule->getLength();
-	atEnd = atEnd && done;
+	send_molecule_done = send_molecule_done && done;
 
-	if (notifyStop)
+	if (send_atom_done)
 	{
 		log(log_debug, "sequencer", server->getName()) 
 			<< "sent atom-done for " 
-			<< ", " << id.c_str() << ", " << nAtom << std::endl 
+			<< ", " << id.c_str() << ", " << atom << std::endl 
 			<< *molecule << logend();
 
-		sendAtomDone(id.c_str(), nAtom, status, msecs);
+		sendAtomDone(id.c_str(), atom, status, msecs);
 	}
 
 	if (m_activity[channel].getState() == Activity::stopping || done)
@@ -994,54 +990,82 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	// handle the various disconnect/close conditions
 
-	// active DISC
-	if (m_disconnecting != INVALID_CALLREF)
+	if ((m_trunk && (m_disconnecting != INVALID_CALLREF || m_trunk->remoteDisconnect()))
+		|| m_closing)
 	{
-		sendMoleculeDone(id.c_str(), V3_ERROR_DISCONNECTED, pos, length);
-
-		log(log_debug, "sequencer", getName()) << "disconnect - activity idle" << logend();
-
-		m_media->disconnected(m_trunk);
-		m_trunk->disconnect(m_disconnecting);
-
 		start = false;
-	}
-	else if (m_trunk && m_trunk->remoteDisconnect())
-	{
-		sendMoleculeDone(id.c_str(), V3_ERROR_DISCONNECTED, pos, length);
-		if (m_interface)
-		{
-			m_interface->begin() << V3_EVENT << " RDIS " << getName() 
-				<< end();
-		}
+		send_molecule_done = true;
 
-		start = false;
+		// special status for disconnect-related moleculeDone(s)
+		if (!m_closing)
+			status = V3_ERROR_DISCONNECTED;
 	}
 
-	if (m_closing)
-	{
-		m_interface->begin() << V3_OK << ' ' << m_id.c_str() << " BGRC " 
-			<< getName() << end();
-
-		gMediaPool.release(m_media);
-		m_media = 0;
-
-		start = false;
-	}
-
-	// start next molecule before sending reply to minimise delay
 	if (start)
+	{
+		// start next molecule before sending reply to minimise delay
 		m_activity[channel].start();
+	}
+	else
+	{
+		// current channel is idle
+		m_activity[channel].setState(Activity::idle);
+	}
 
-	if (atEnd && done)
+	if (send_molecule_done)
 	{
 		sendMoleculeDone(id.c_str(), status, pos, length);
 	}
 
 	unlock();
 
+	if (!channelsIdle())
+	{
+		return;
+	}
+
+	// various disconnect/close conditions continued
+
+	if (m_trunk)
+	{
+		// active DISC
+		if (m_disconnecting != INVALID_CALLREF)
+		{
+			log(log_debug, "sequencer", getName()) << "disconnect - all channels idle" 
+				<< logend();
+
+			m_media->disconnected(m_trunk);
+			m_trunk->disconnect(m_disconnecting);
+		}
+		// remote disconnect
+		else if (m_trunk->remoteDisconnect())
+		{
+			log(log_debug, "sequencer", getName()) << "remote disconnect - all channels idle" 
+				<< logend();
+
+			if (m_interface)
+			{
+				m_interface->begin() << V3_EVENT << " RDIS " << getName() 
+					<< end();
+			}
+		}
+	}
+
 	if (m_closing)
+	{
+		log(log_debug, "sequencer", getName()) << "close - all channels idle" << logend();
+
+		if (m_interface)
+		{
+			m_interface->begin() << V3_OK << ' ' << m_id.c_str() << " BGRC " 
+				<< getName() << end();
+		}
+
+		gMediaPool.release(m_media);
+		m_media = 0;
+
 		delete this;
+	}
 }
 
 void Sequencer::touchtone(Media* server, char tt)
@@ -1269,7 +1293,7 @@ int main(int argc, char* argv[])
 
 		nmodules = sm_get_modules();
 		log(log_debug, "sequencer") 
-			 << nmodules << " modules found" << logend();
+			 << nmodules << " prosody modules found" << logend();
 
 		gMediaPool.add(nmodules * 30);
 

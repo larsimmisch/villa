@@ -20,7 +20,7 @@ char* copyString(const char* aString)
 	return s;
 }
 
-int Atom::start(Sequencer *sequencer, unsigned channel)
+bool Atom::start(Sequencer *sequencer, unsigned channel)
 {
 	m_channel = channel;
 	m_sample->start(sequencer->getMedia());
@@ -28,7 +28,7 @@ int Atom::start(Sequencer *sequencer, unsigned channel)
 	return true;
 }
 
-int Atom::stop(Sequencer *sequencer)
+bool Atom::stop(Sequencer *sequencer)
 {
 	return m_sample->stop(sequencer->getMedia());
 }
@@ -58,10 +58,10 @@ ConferenceAtom::ConferenceAtom(unsigned aConference, unsigned aMode)
 	m_conference = gConferences[aConference];
 }
 
-int ConferenceAtom::start(Sequencer* sequencer, void* aUserData)
+bool ConferenceAtom::start(Sequencer* sequencer, void* aUserData)
 {
 	if (!m_conference)
-		return 0;
+		return false;
 
 	m_userData = aUserData;
 
@@ -69,10 +69,10 @@ int ConferenceAtom::start(Sequencer* sequencer, void* aUserData)
 
 	m_started.now();
 
-	return 1;
+	return true;
 }
 
-int ConferenceAtom::stop(Sequencer* sequencer)
+bool ConferenceAtom::stop(Sequencer* sequencer)
 {
 	Time now;
 
@@ -83,7 +83,7 @@ int ConferenceAtom::stop(Sequencer* sequencer)
 
 	sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_userData, 0, now - m_started);
 
-	return 1;
+	return true;
 }
 
 TouchtoneAtom::TouchtoneAtom(Sequencer* sequencer, const char* att)
@@ -93,16 +93,16 @@ TouchtoneAtom::TouchtoneAtom(Sequencer* sequencer, const char* att)
 	m_sample = sequencer->getMedia()->createTouchtones(att);
 }
 
-int SilenceAtom::start(Sequencer* sequencer, void* aUserData)
+bool SilenceAtom::start(Sequencer* sequencer, void* aUserData)
 {
 	m_timer = sequencer->getTimer().add(m_length, this, aUserData);
 
 	m_seq = sequencer;
 
-	return 1;
+	return true;
 }
 
-int SilenceAtom::stop(Sequencer* sequencer)
+bool SilenceAtom::stop(Sequencer* sequencer)
 {
 	if (m_timer.is_valid())
 	{
@@ -116,10 +116,10 @@ int SilenceAtom::stop(Sequencer* sequencer)
 
 		m_timer.invalidate();
 
-		return 1;
+		return true;
 	}
 	
-	return 0;
+	return false;
 }
 
 void SilenceAtom::on_timer(const Timer::TimerID &id)
@@ -159,9 +159,9 @@ void Molecule::freeLink(List::Link* anAtom)
 	delete (Atom*)anAtom;
 }
 
-int Molecule::start(Sequencer* sequencer, unsigned channel)
+bool Molecule::start(Sequencer* sequencer, unsigned channel)
 {
-	int started(0);
+	bool started(false);
 
 	m_channel = channel;
 
@@ -199,7 +199,7 @@ int Molecule::start(Sequencer* sequencer, unsigned channel)
 			if (!setPos(m_pos + timeInactive)) 
 			{
 				m_flags &= ~stopped;
-				return 0;
+				return false;
 			}
 		}
 		else if (m_mode & pause)
@@ -224,14 +224,14 @@ int Molecule::start(Sequencer* sequencer, unsigned channel)
 	return started;
 }
 
-int Molecule::stop(Sequencer* sequencer)
+bool Molecule::stop(Sequencer* sequencer)
 {
 	if (m_mode & dont_interrupt)
-		return 0;
+		return false;
 
 	m_flags |= stopped;
 
-	return m_current ? m_current->stop(sequencer) : 0;
+	return m_current ? m_current->stop(sequencer) : false;
 }
 
 bool Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
@@ -461,12 +461,15 @@ bool Activity::stop()
 {
 	bool stopped(false);
 
+	setState(stopping);
+
 	if (head)
 	{
 		stopped = ((Molecule*)head)->stop(m_sequencer);
 	}
 
-	setState(stopped ? idle : stopping);
+	if (stopped)
+		setState(idle);
 
 	return stopped;
 }
@@ -475,16 +478,17 @@ bool Activity::abort()
 {
 	bool stopped(false);
 
+	setState(stopping);
+
 	if (head)
 	{
 		stopped = ((Molecule*)head)->stop(m_sequencer);
 		removeAfter(head);
 	}
 
-	setState(stopped ? idle : stopping);
-
 	if (stopped)
 	{
+		setState(idle);
 		empty();
 	}
 

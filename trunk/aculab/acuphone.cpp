@@ -170,7 +170,7 @@ void* ProsodyEventDispatcher::DispatcherThread::run_undetached(void *arg)
 	return NULL;
 }
 
-ProsodyChannel::ProsodyChannel()
+ProsodyChannel::ProsodyChannel() : m_sending(0), m_receiving(0)
 {
 	struct sm_channel_alloc_parms alloc;
 	alloc.type		  = kSMChannelTypeFullDuplex;
@@ -364,16 +364,14 @@ unsigned ProsodyChannel::Beep::start(Media *phone)
 
 	omni_mutex_lock(m_prosody->m_mutex);
 
-	m_state = active;
-	m_prosody->m_current = this;
-
 	int rc = sm_replay_start(&start);
 	if (rc)
 	{
-		m_state = idle;
-		m_prosody->m_current = 0;
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
 	}
+
+	m_state = active;
+	m_prosody->m_sending = this;
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "beep " << m_beeps << " started" << logend();
@@ -413,17 +411,17 @@ bool ProsodyChannel::Beep::stop(Media *phone)
 
 		return false;
 	}
-	
+
 	p.channel = m_prosody->m_channel;
 
+	m_state = stopping;
+	m_status = V3_ABORTED;
+	
 	int rc = sm_replay_abort(&p);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
 
 	m_position = (m_count * sizeof(beep) + p.offset) / 8;
-
-	m_state = stopping;
-	m_status = V3_ABORTED;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping beep " << m_beeps << logend();
@@ -458,7 +456,7 @@ int ProsodyChannel::Beep::process(Media *phone)
 					<< ',' << m_position << ']' << logend();
 
 				m_state = idle;
-				p->m_current = 0;
+				p->m_sending = 0;
 				p->m_mutex.unlock();
 				phone->completed(this);
 				p->m_mutex.lock();
@@ -513,16 +511,14 @@ unsigned ProsodyChannel::Touchtones::start(Media *phone)
 
 	omni_mutex_lock(m_prosody->m_mutex);
 
-	m_state = active;
-	m_prosody->m_current = this;
-
 	int rc = sm_play_digits(&digits);
 	if (rc)
 	{
-		m_state = idle;
-		m_prosody->m_current = 0;
 		throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
 	}
+
+	m_state = active;
+	m_prosody->m_sending = this;
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "touchtones " << m_tt.c_str() << " started" << logend();
@@ -543,12 +539,12 @@ bool ProsodyChannel::Touchtones::stop(Media *phone)
 		return false;
 	}
 
+	m_state = stopping;
+	m_status = V3_ABORTED;
+
 	int rc = sm_play_tone_abort(m_prosody->m_channel);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_abort", rc);
-
-	m_state = stopping;
-	m_status = V3_ABORTED;
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "touchtones " << m_tt.c_str() << " stopped" << logend();
@@ -578,7 +574,7 @@ int ProsodyChannel::Touchtones::process(Media *phone)
 			<< result_name(m_status) << ',' << m_position << ']' << logend();
 
 		m_state = idle;
-		p->m_current = 0;
+		p->m_sending = 0;
 		p->m_mutex.unlock();
 		phone->completed(this);
 		p->m_mutex.lock();
@@ -692,16 +688,14 @@ unsigned ProsodyChannel::FileSample::start(Media *phone)
 
 	omni_mutex_lock(m_prosody->m_mutex);
 
-	m_state = active;
-	m_prosody->m_current = this;
-
 	int rc = sm_replay_start(&start);
 	if (rc)
 	{
-		m_state = idle;
-		m_prosody->m_current = 0;
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
 	}
+
+	m_state = active;
+	m_prosody->m_sending = this;
 
 	process(phone);
 
@@ -746,14 +740,15 @@ bool ProsodyChannel::FileSample::stop(Media *phone)
 		return false;
 	}
 
+	m_state = stopping;
+	m_status = V3_ABORTED;
+
 	int rc = sm_replay_abort(&p);
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
 
 	m_position = p.offset * 1000 / m_storage->bytesPerSecond;
 
-	m_state = stopping;
-	m_status = V3_ABORTED;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping file sample " << m_name.c_str() << logend();
@@ -786,7 +781,7 @@ int ProsodyChannel::FileSample::process(Media *phone)
 				<< logend();
 
 			m_state = idle;
-			p->m_current = 0;
+			p->m_sending = 0;
 			p->m_mutex.unlock();
 			phone->completed(this);
 			p->m_mutex.lock();
@@ -829,16 +824,14 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 
 	omni_mutex_lock(m_prosody->m_mutex);
 
-	m_state = active;
-	m_prosody->m_current = this;
-
 	int rc = sm_record_start(&record);
 	if (rc)
 	{
-		m_state = idle;
-		m_prosody->m_current = 0;
 		throw ProsodyError(__FILE__, __LINE__, "sm_record_start", rc);
 	}
+
+	m_state = active;
+	m_prosody->m_receiving = this;
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "recording " << m_name.c_str() << " started" << logend();
@@ -862,6 +855,9 @@ bool ProsodyChannel::RecordFileSample::stop(Media *phone)
 
 		return false;
 	}
+
+	m_state = stopping;
+	m_status = V3_ABORTED;
 
 	int rc = sm_record_abort(&abort);
 	if (rc)
@@ -923,7 +919,7 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 				<< logend();
 
 			m_state = idle;
-			p->m_current = 0;
+			p->m_receiving = 0;
 			p->m_mutex.unlock();
 			
 			if (m_status != V3_ABORTED)
@@ -1028,18 +1024,18 @@ void AculabMedia::onRead(tSMEventId id)
 {
 	omni_mutex_lock l(m_mutex);
 
-	if (!m_current)
+	if (!m_receiving)
 	{
 		log(log_error, "phone", getName()) 
-			<< "got onRead() event while no output active" << logend();
+			<< "got onRead() event while no input active" << logend();
 		return;
 	}
 
 	try
 	{
-		if (typeid(*m_current) == typeid(ProsodyChannel::RecordFileSample))
+		if (typeid(*m_receiving) == typeid(ProsodyChannel::RecordFileSample))
 		{
-			dynamic_cast<FileSample*>(m_current)->process(this);
+			dynamic_cast<RecordFileSample*>(m_receiving)->process(this);
 		}
 	}
 	catch (const Exception& e)
@@ -1052,7 +1048,7 @@ void AculabMedia::onWrite(tSMEventId id)
 {
 	omni_mutex_lock l(m_mutex);
 
-	if (!m_current)
+	if (!m_sending)
 	{
 		log(log_error, "phone", getName()) 
 			<< "got onWrite() event while no output active" << logend();
@@ -1061,17 +1057,17 @@ void AculabMedia::onWrite(tSMEventId id)
 
 	try
 	{
-		if (typeid(*m_current) == typeid(ProsodyChannel::Touchtones))
+		if (typeid(*m_sending) == typeid(ProsodyChannel::Touchtones))
 		{
-			dynamic_cast<Touchtones*>(m_current)->process(this);
+			dynamic_cast<Touchtones*>(m_sending)->process(this);
 		}
-		else if (typeid(*m_current) == typeid(ProsodyChannel::FileSample))
+		else if (typeid(*m_sending) == typeid(ProsodyChannel::FileSample))
 		{
-			dynamic_cast<FileSample*>(m_current)->process(this);
+			dynamic_cast<FileSample*>(m_sending)->process(this);
 		}
-		else if (typeid(*m_current) == typeid(ProsodyChannel::Beep))
+		else if (typeid(*m_sending) == typeid(ProsodyChannel::Beep))
 		{
-			dynamic_cast<Beep*>(m_current)->process(this);
+			dynamic_cast<Beep*>(m_sending)->process(this);
 		}
 	}
 	catch (const Exception& e)
