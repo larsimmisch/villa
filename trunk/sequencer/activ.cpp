@@ -227,7 +227,7 @@ bool Molecule::start(Sequencer* sequencer)
 
 bool Molecule::stop(Sequencer* sequencer, unsigned status)
 {
-	if (m_mode & dont_interrupt)
+	if ((m_mode & dont_interrupt) && !((m_mode & dtmf_stop) && status == V3_STOPPED_DTMF))
 		return false;
 
 	return abort(sequencer, status);
