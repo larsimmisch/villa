@@ -7,17 +7,15 @@
 #include "asynctcp.h"
 
 AsyncTCPNoThread::AsyncTCPNoThread(TransportClient& aClient, void* aPrivateData)
-	: TCP(aPrivateData), client(aClient), incoming(), event()
+	: TCP(aPrivateData), client(aClient), incoming(), event(&mutex)
 {
 }
 
 AsyncTCPNoThread::~AsyncTCPNoThread()
 {
-	setState(dying);
-
 	socket.close();
 
-	event.post();
+	event.signal();
 }
 
 void AsyncTCPNoThread::send(Packet& aPacket, int expedited)
@@ -122,7 +120,9 @@ void AsyncTCPNoThread::run()
     		switch (getState())
     		{
     		case idle:
+				mutex.lock();
     			event.wait();
+				mutex.unlock();
     			break;
     		case listening:
     			packet = TCP::doListen();
@@ -220,7 +220,7 @@ void AsyncTCPNoThread::run()
 AsyncTCP::AsyncTCP(TransportClient& aClient, void* aPrivateData)
 	: AsyncTCPNoThread(aClient, aPrivateData)
 {
-    resume();
+    run_undetached(NULL);
 }
 
 AsyncTCP::~AsyncTCP()
@@ -229,13 +229,12 @@ AsyncTCP::~AsyncTCP()
 
 	socket.close();
 
-	event.post();
-
-	// if I'm not the signalling thread, wait for it to exit
-	if (!isSelf()) Thread::wait();
+	event.signal();
 }
 
-void AsyncTCP::run()
+void *AsyncTCP::run_undetached(void *arg)
 { 
-	AsyncTCPNoThread::run(); 
+	AsyncTCPNoThread::run();
+
+	return NULL;
 }

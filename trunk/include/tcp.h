@@ -5,15 +5,11 @@
 #ifndef _TCP_H_
 #define _TCP_H_
 
-#include <Transport/Transport.h>
-#include <Transport/Packet.h>
-#include <Socket/Socket.h>
+#include "transport.h"
+#include "packet.h"
+#include "socket.h"
 
-#ifndef _export
-#define _export	__declspec( dllexport )
-#endif
-
-class _export TCP : public Transport
+class TCP : public Transport
 {
 	public:
 

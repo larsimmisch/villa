@@ -9,7 +9,7 @@
 #include "tcp.h"
 #include "packet.h"
 #include "socket.h"
-#include "queue.h"
+#include "packetqueue.h"
 #include "client.h"
 
 class AsyncTCPNoThread : public TCP
@@ -36,8 +36,8 @@ protected:
 	virtual void aborted();
 	virtual void setState(states aState);
 	
-	virtual Packet* doListen()  { event.post(); return 0; }
-	virtual Packet* doConnect() { event.post(); return 0; }
+	virtual Packet* doListen()  { event.signal(); return 0; }
+	virtual Packet* doConnect() { event.signal(); return 0; }
 	
 	TransportClient& getClient()	{ return client; }
 	
@@ -47,14 +47,14 @@ protected:
 	omni_condition event;
 };
 
-class AsyncTCP : public AsyncTCPNoThread, public Thread
+class AsyncTCP : public AsyncTCPNoThread, public omni_thread
 {
 public:
 		
 	AsyncTCP(TransportClient& aClient, void* aPrivateData = 0);
 	virtual ~AsyncTCP();
 
-	virtual void run();
+	virtual void *run_undetached(void *arg);
 };
 
 #endif /* _ASYNCTCP_H_ */

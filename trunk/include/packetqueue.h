@@ -1,18 +1,11 @@
-/*
-	Queue.h
-	
-	Copyright 1995 Immisch, Becker & Partner, Hamburg
+// packetqueue.h
 
-	Author: Lars Immisch <lars@ibp.de>
-*/
+#ifndef PACKETQUEUE_H_
+#define PACKETQUEUE_H_
 
-#include <Collect/List.h>
+#include "list.h"
 
-#ifndef _export
-#define _export	__declspec( dllexport )
-#endif
-
-class _export PacketQueue : public List
+class PacketQueue : public List
 {
 	public:
 
@@ -36,3 +29,5 @@ class _export PacketQueue : public List
 	}
 	virtual void freeLink(List::Link* item)	{ delete (Item*)item; }
 };
+
+#endif

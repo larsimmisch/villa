@@ -5,16 +5,12 @@
 #ifndef _TRANSPORT_H_
 #define _TRANSPORT_H_
 
-#include "Transport\Packet.h"
-#include "Transport\SAP.h"
+#include "packet.h"
+#include "sap.h"
 
-#ifndef _export
-#define _export	__declspec( dllexport )
-#endif
-
-class _export Transport
+class Transport
 {
-	public:
+public:
 	
 	enum states  { idle, calling, listening, connecting, connected, disconnecting, dying };
 	enum packets { t_connect_request, t_connect_confirm, t_connect_reject, t_disconnect_request, 
@@ -56,7 +52,7 @@ class _export Transport
     SAP& getLocalSAP()  { return local; }
     SAP& getRemoteSAP() { return remote; }
 	
-	protected:
+protected:
 	
 	virtual void setState(states aState) { state = aState; }
 	

@@ -12,8 +12,8 @@
 #include <fstream.h>
 #include "phone.h"
 #include "phoneclient.h"
-// #include <TCP/AsyncTCP.h>
-// #include <TCP/Client.h>
+#include "asynctcp.h"
+#include "client.h"
 #include "activ.h"
 #include "queue.h"
 // #include "Configuration.h"

@@ -64,8 +64,8 @@ LIB32=link.exe -lib
 # PROP Output_Dir "Debug"
 # PROP Intermediate_Dir "Debug"
 # PROP Target_Dir ""
-# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ  /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "../include" /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FD /GZ  /c
+# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ /c
+# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "../include" /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FD /GZ /c
 # SUBTRACT CPP /YX
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
@@ -103,23 +103,27 @@ SOURCE=.\tcp.cpp
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
-SOURCE=.\asynctcp.h
+SOURCE=..\include\asynctcp.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\client.h
+SOURCE=..\include\client.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\services.h
+SOURCE=..\include\packet.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\socket.h
+SOURCE=..\include\socket.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\tcp.h
+SOURCE=..\include\tcp.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\transport.h
 # End Source File
 # End Group
 # End Target

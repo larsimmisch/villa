@@ -1,20 +1,16 @@
 /* Client.h */
 
-#if !defined(_TRANSPORT_CLIENT_H_)
+#ifndef _TRANSPORT_CLIENT_H_
 #define _TRANSPORT_CLIENT_H_
 
-#include <iostream.h>
-#include <Services/Exc.h>
-#include <Transport/SAP.h>
-
-#ifndef _export
-#define _export	__declspec( dllexport )
-#endif
+#include <iostream>
+#include "exc.h"
+#include "sap.h"
 
 class Packet;
 class Transport;
 
-class _export TransportClient
+class TransportClient
 {
 	public:
 
@@ -54,7 +50,7 @@ class _export TransportClient
 	virtual int asynchronous(Transport* server)	{ return 1; }
 	virtual void data(Transport* server, Packet* aPacket) {}
 
-    virtual void fatal(const char* e) { cerr << e << endl; }
-    virtual void fatal(Exception& e)  { cerr << e; }
+    virtual void fatal(const char* e) { std::cerr << e << endl; }
+    virtual void fatal(Exception& e)  { std::cerr << e; }
 };
 #endif
