@@ -476,8 +476,9 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 		m_interface->add(phone->getName(), this);
 
 		(*m_interface) << clientSpec->m_id.c_str() << ' ' << _ok 
+			<< ' ' << phone->getName()
 			<< " alerting "
-			<< phone->getName() << " \"" << remote.getAddress() << "\" \""
+			<< " \"" << remote.getAddress() << "\" \""
 			<< configuration->getNumber() << "\" \""
 			<< local.getService() << "\" "
 			<< server->getTimeslot().ts << "\r\n";
@@ -666,7 +667,8 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 		log(log_debug, "sequencer", server->getName()) << "call accept failed: " 
 		<< result << logend();
 
-	(*m_interface) << m_id.c_str() << ' ' << result << " accept-done\r\n";
+	(*m_interface) << m_id.c_str() << ' ' << result
+		<< " " << phone->getName() << " accept-done\r\n";
 
 	m_id.erase();
 }
