@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.18 2003/11/22 23:44:46 lars Exp $
+	$Id: acuphone.cpp,v 1.19 2003/12/07 23:35:44 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -626,6 +626,12 @@ Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isR
 	else if (_stricmp(dot, "al") == 0)
 	{
 		storage = new RawFileStorage(aName, isRecording);
+		storage->encoding = kSMDataFormat8KHzALawPCM;
+		storage->bytesPerSecond = 8000;
+	}
+	else if (_stricmp(dot, "wav") == 0)
+	{
+		storage = new WavFileStorage(aName, isRecording);
 		storage->encoding = kSMDataFormat8KHzALawPCM;
 		storage->bytesPerSecond = 8000;
 	}

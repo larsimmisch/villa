@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.14 2003/12/04 01:01:38 lars Exp $
+$Id: client.py,v 1.15 2003/12/07 23:35:44 lars Exp $
 """
 
 import sys,getopt
@@ -36,7 +36,7 @@ class Call:
         print 'connected:', self.device
 
     def ACPT(self, event, data):
-        self.send('MLCA %s 2 1 play ../test/phone/sitrtoot.al none'
+        self.send('MLCA %s 2 1 play ../test/phone/sitrtoot.wav none'
                   % self.device)
 
     def MLCA(self, event, data):

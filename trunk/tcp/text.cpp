@@ -65,7 +65,7 @@ unsigned SocketStream::send()
 
 unsigned SocketStream::fillGBuf()
 {
-	if (strlen(m_rbuf) == 0)
+	if (strlen(m_rbuf + m_rpos) == 0)
 		return 0;
 
 	char *e = strstr(m_rbuf + m_rpos, "\r\n");

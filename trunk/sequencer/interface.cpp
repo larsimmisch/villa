@@ -84,13 +84,17 @@ void Interface::run()
 
 				if (FD_ISSET(ic->fd(), &read))
 				{
-					rc = ic->receive();
-					ic->clear();
-
-					if (rc)
+					do
 					{
-						exit = !data(ic);			
-					}
+						rc = ic->receive();
+						ic->clear();
+						if (!data(ic))
+						{
+							exit = true;
+							break;
+						}
+					} while (rc);
+
 					if (rc == 0 || exit)
 					{
 						if (rc == 0)
@@ -163,6 +167,12 @@ bool Interface::data(InterfaceConnection *ic)
 	std::string command;
 
 	(*ic) >> id;
+	if (ic->eof())
+	{
+		// incomplete command
+		return true;
+	}
+
 	(*ic) >> command;
 
 	if (ic->eof())
