@@ -69,6 +69,9 @@ unsigned SocketStream::send()
 
 unsigned SocketStream::fillGBuf()
 {
+	if (m_rpos == m_rsize)
+		return 0;
+
 	if (strlen(m_rbuf + m_rpos) == 0)
 		return 0;
 
