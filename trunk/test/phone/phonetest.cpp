@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.11 2001/06/19 15:02:51 lars Exp $
+	$Id: phonetest.cpp,v 1.12 2001/06/20 09:33:17 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -54,18 +54,18 @@ public:
 
 	virtual void disconnectRequest(Trunk* server, int cause)
 	{
-		log(log_debug, "app", server->getName()) << "remote disconnect" << logend();
-
 		m_mutex.lock();
 
 		if (m_active)
 		{
 			m_mutex.unlock();
+			log(log_debug, "app", server->getName()) << "remote disconnect - aborting DSP activity" << logend();
 			server->getTelephone()->abortSending();
 		}
 		else
 		{
 			m_mutex.unlock();
+			log(log_debug, "app", server->getName()) << "remote disconnect - accepting" << logend();
 			server->disconnectAccept();
 		}
 	}
@@ -139,10 +139,9 @@ public:
 			sample->start(server);
 
 			m_mutex.lock();
-
 			m_active = true;
-
 			m_mutex.unlock();
+
 		}
 		catch(const Exception &e)
 		{
@@ -159,6 +158,9 @@ public:
 
 	virtual void completed(Telephone *server, Sample *sample, unsigned msecs)
 	{
+		log(log_debug, "app", server->getName()) << "sample completed" 
+			<< logend();
+
 		delete sample;
 		
 		m_mutex.lock();
@@ -190,7 +192,6 @@ int main(int argc, char* argv[])
 	set_log_level(4);
 
 	CTbus *bus;
-	Application app;
 	int count = 1;
 	int port = 0;
 	int sw = 0;
@@ -255,8 +256,11 @@ int main(int argc, char* argv[])
 		Timeslot receive = bus->allocate();
 		Timeslot transmit = bus->allocate();
 
-		trunks[i] = new AculabTrunk(&app, port);
-		phones[i] = new AculabPhone(&app, trunks[i], sw, receive, transmit);
+		// this will leak memory - we don't care
+		Application *app = new Application;
+
+		trunks[i] = new AculabTrunk(app, port);
+		phones[i] = new AculabPhone(app, trunks[i], sw, receive, transmit);
 	}
 
 	AculabTrunk::start();

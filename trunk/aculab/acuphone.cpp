@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.8 2001/06/19 15:02:51 lars Exp $
+	$Id: acuphone.cpp,v 1.9 2001/06/20 09:33:17 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -482,11 +482,11 @@ unsigned ProsodyChannel::FileSample::start(Telephone *phone)
 
 	long offset = position * storage->bytesPerSecond / 1000;
 
+	memset(&start, 0, sizeof(start));
+
 	start.channel = prosody->channel;
 	start.background = kSMNullChannelId;
 	start.speed = 100;
-	start.agc = 0;
-	start.volume = 0;
 	start.type = storage->encoding;
 	start.data_length = storage->getLength() - offset;
 
@@ -498,12 +498,12 @@ unsigned ProsodyChannel::FileSample::start(Telephone *phone)
 	if (rc)
 		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
 
-	log(log_debug, "phone", phone->getName()) 
-		<< "file sample " << name.c_str() << " started" << logend();
-
 	phone->started(this);
 
 	process(phone);
+
+	log(log_debug, "phone", phone->getName()) 
+		<< "file sample " << name.c_str() << " started" << logend();
 
 	return position;
 }
