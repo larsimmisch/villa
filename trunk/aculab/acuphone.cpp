@@ -173,10 +173,9 @@ void* ProsodyEventDispatcher::DispatcherThread::run_undetached(void *arg)
 ProsodyChannel::ProsodyChannel() : m_sending(0), m_receiving(0)
 {
 	struct sm_channel_alloc_parms alloc;
+	memset(&alloc, 0, sizeof(alloc));
+
 	alloc.type		  = kSMChannelTypeFullDuplex;
-	alloc.firmware_id = 0;
-	alloc.group		  = 0;
-	alloc.caps_mask	  = 0;
 	
 	int rc = sm_channel_alloc(&alloc);
 	if (rc)
@@ -184,6 +183,8 @@ ProsodyChannel::ProsodyChannel() : m_sending(0), m_receiving(0)
 
 	m_channel = alloc.channel;
 	
+	memset(&m_listenFor, 0, sizeof(m_listenFor));
+
 	m_listenFor.channel = m_channel;
 	m_listenFor.enable_pulse_digit_recognition = 0;
 	m_listenFor.tone_detection_mode = kSMToneLenDetectionMinDuration64; // signal event at end of tone, to avoid recording the tone
@@ -1008,6 +1009,14 @@ void AculabMedia::connected(Trunk* aTrunk)
 
 void AculabMedia::disconnected(Trunk *trunk)
 {
+	memset(&m_listenFor, 0, sizeof(m_listenFor));
+
+	m_listenFor.channel = m_channel;
+	
+	int rc = sm_listen_for(&m_listenFor);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_listen_for", rc);
+
 	m_trunk = 0;
 
 	m_sw.disable(m_receive);

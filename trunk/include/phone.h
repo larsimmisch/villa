@@ -184,7 +184,7 @@ public:
 		m_client->completed(this, sample, sample->m_position);
 	}
 	MediaClient* getClient() { return m_client; }
-	void setClient(MediaClient *client) { m_client = client;; }
+	void setClient(MediaClient *client) { m_client = client; }
 
 	// debug
 	virtual const char *getName() = 0;
