@@ -2,9 +2,9 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.1 2001/08/02 12:28:06 goldbach Exp $
+$Id: client.py,v 1.2 2001/08/07 22:16:36 lars Exp $
 """
-import socket,re,sys,time
+import socket,re,sys,time,getopt
 
 class sequencer_client:
     def __init__(self,host,port):
@@ -47,7 +47,7 @@ class sequencer_client:
         was just performed and additional data.
         """
         m=re.match(r"(?P<transaction>\w*) (?P<result>\d) (?P<device>\w*\[\d,\d\])"+
-                   " (?P<action>[\w-_]*)(?P<data>.*)", line)
+                   r" (?P<action>[\w\-_]*)(?P<data>.*)", line)
         if (m==None):
             self.response=None
             print "parsing the server's response failed"
@@ -93,16 +93,27 @@ class sequencer_client:
             x.wait_for_response()
             x.act_on_response()
 
+if __name__ == '__main__':
 
+	# check commandline arguments
+	optlist, args = getopt.getopt(sys.argv[1:], 'n', ['name='])
 
+	hostname = None
 
-x=sequencer_client('zimt', 2104)
+	for opt in optlist:
+		if opt[0] == '-n' or opt[0] == '--name':
+			hostname = args[optlist.index(opt)]
 
-# 'sequence protocol...' lesen und ignorieren
-x.stdin.readline()
+	if hostname == None:
+		hostname = socket.gethostname()
 
-# auf alles hören, was da anruft
-x.listen_to_any()
+	x=sequencer_client(hostname, 2104)
 
-# ab in die event loop
-x.event_loop()
+	# 'sequence protocol...' lesen und ignorieren
+	x.stdin.readline()
+
+	# auf alles hören, was da anruft
+	x.listen_to_any()
+
+	# ab in die event loop
+	x.event_loop()
