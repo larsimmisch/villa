@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.8 2001/06/16 22:31:33 lars Exp $
+	$Id: phone.h,v 1.9 2001/06/17 20:38:08 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -193,13 +193,6 @@ public:
 		if (trunk)
 			trunk->abort();
 	}
-    // called from Trunk
-    virtual void disconnected(Trunk* aTrunk, int aCause)
-	{
-		abortSending();
-	}
-
-	virtual void remoteRinging(Trunk* aTrunk) {}
 
 	virtual void connected(Trunk* aTrunk) {}
 

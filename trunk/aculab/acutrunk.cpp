@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.6 2001/06/07 12:58:25 lars Exp $
+	$Id: acutrunk.cpp,v 1.7 2001/06/17 20:38:08 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -498,8 +498,6 @@ void AculabTrunk::onIdle()
 		break;
 	case connected:
 		client->disconnectRequest(this, cause);
-		if (phone)
-			phone->disconnected(this, cause);
 		state = disconnecting;
 		break;
 	case disconnecting:
@@ -593,8 +591,6 @@ void AculabTrunk::onWaitForOutgoing()
 
 void AculabTrunk::onOutgoingRinging()
 {
-	if (phone)
-		phone->remoteRinging(this);
 }
 
 void AculabTrunk::onRemoteDisconnect()
@@ -604,13 +600,12 @@ void AculabTrunk::onRemoteDisconnect()
 	switch (state)
 	{
 	case connected:
-		state = disconnecting;
 	
 		cause = getCause();
 
 		client->disconnectRequest(this, cause);
-		if (phone)
-			phone->disconnected(this, cause);
+
+		state = disconnecting;
 		break;
 	case accepting:
 		client->acceptDone(this, getCause());

@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.9 2001/06/16 22:31:33 lars Exp $
+	$Id: phonetest.cpp,v 1.10 2001/06/17 20:38:08 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -13,6 +13,7 @@
 #include <iostream>
 #include "getopt.h"
 #include "log.h"
+#include "omnithread.h"
 #include "phone.h"
 #include "aculab/acuphone.h"
 #include "aculab/mvswdrvr.h"
@@ -25,6 +26,8 @@ Log cout_log(cout);
 class Application : public TelephoneClient
 {
 public:
+
+	Application() : m_active(false) {}
 
 	// must call server.accept or server.reject
 	virtual void connectRequest(Trunk *server, const SAP& local, const SAP& remote)
@@ -53,7 +56,18 @@ public:
 	{
 		log(log_debug, "app") << "remote disconnect" << logend();
 
-		server->disconnectAccept();
+		m_mutex.lock();
+
+		if (m_active)
+		{
+			m_mutex.unlock();
+			server->getTelephone()->abortSending();
+		}
+		else
+		{
+			m_mutex.unlock();
+			server->disconnectAccept();
+		}
 	}
 	
 	// disconnect completion
@@ -123,6 +137,12 @@ public:
 			Sample* sample = server->createFileSample("startrek.al");
 
 			sample->start(server);
+
+			m_mutex.lock();
+
+			m_active = true;
+
+			m_mutex.unlock();
 		}
 		catch(const Exception &e)
 		{
@@ -130,8 +150,7 @@ public:
 				<< e << logend();
 
 			server->disconnect();
-		}
-		
+		}		
 	}
 
 	virtual void disconnected(Telephone *server)
@@ -140,8 +159,20 @@ public:
 
 	virtual void completed(Telephone *server, Sample *sample, unsigned msecs)
 	{
+		delete sample;
+		
+		m_mutex.lock();
+		m_active = false;
+		m_mutex.unlock();
+
 		server->disconnect();
 	}
+
+private:
+
+	omni_mutex m_mutex; 
+	bool m_active;
+
 };
 
 void usage()
