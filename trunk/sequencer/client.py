@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.13 2003/12/01 22:26:56 lars Exp $
+$Id: client.py,v 1.14 2003/12/04 01:01:38 lars Exp $
 """
 
 import sys,getopt
@@ -30,9 +30,9 @@ class Call:
         self.device = event['device']
         self.sequencer.devices[self.device] = self
         # queue next listen as early as possible
-        # self.send('LSTN any any')
-        self.send('DISC ' + self.device)
-        # self.send('ACPT ' + self.device)
+        self.send('LSTN any any')
+        # self.send('DISC ' + self.device)
+        self.send('ACPT ' + self.device)
         print 'connected:', self.device
 
     def ACPT(self, event, data):
