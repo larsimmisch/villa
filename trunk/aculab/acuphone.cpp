@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.20 2003/12/08 00:04:02 lars Exp $
+	$Id: acuphone.cpp,v 1.21 2003/12/10 21:54:32 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -396,7 +396,7 @@ unsigned ProsodyChannel::Beep::submit(Media *phone)
 	m_position += data.length / 8;
 	m_offset += data.length;
 
-	return m_position;
+	return data.length;
 }
 
 bool ProsodyChannel::Beep::stop(Media *phone)
@@ -726,7 +726,7 @@ unsigned ProsodyChannel::FileSample::submit(Media *phone)
 
 	m_position += data.length * 1000 / m_storage->bytesPerSecond;
 
-	return m_position;
+	return data.length;
 }
 
 bool ProsodyChannel::FileSample::stop(Media *phone)
@@ -793,7 +793,12 @@ int ProsodyChannel::FileSample::process(Media *phone)
 		case kSMReplayStatusUnderrun:
 			log(log_error, "phone", phone->getName()) << "underrun!" << logend();
 		case kSMReplayStatusHasCapacity:
-			submit(phone);
+			if (!submit(phone))
+			{
+				// Villa test
+				log(log_error, "phone", phone->getName()) << "premature end of data" << logend();
+				stop(phone);
+			}
 			break;
 		case kSMReplayStatusCompleteData:
 			return replay.status;
