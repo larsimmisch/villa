@@ -1286,7 +1286,7 @@ int main(int argc, char* argv[])
 			break;
 		case 'l':
 			std::cout << "logging to: " << optarg << std::endl;
-			logfile.open(optarg);
+			logfile.open(optarg, std::ios_base::out | std::ios_base::app);
 			filelogging = true;
 			// todo
 			break;
