@@ -354,11 +354,11 @@ unsigned ProsodyChannel::Beep::start(Media *phone)
 {
 	struct sm_replay_parms start;
 
+	memset(&start, 0, sizeof(start));
+
 	start.channel = m_prosody->m_channel;
 	start.background = kSMNullChannelId;
 	start.speed = 100;
-	start.agc = 0;
-	start.volume = 0;
 	start.type = kSMDataFormat8KHzALawPCM;
 	start.data_length = sizeof(beep);
 
@@ -701,9 +701,9 @@ unsigned ProsodyChannel::FileSample::submit(Media *phone)
 	char buffer[kSMMaxReplayDataBufferSize];
 
 	struct sm_ts_data_parms data;
+
 	data.channel = m_prosody->m_channel;
 	data.length = m_storage->read(buffer, sizeof(buffer));
-
 	data.data = buffer;
 
 	int rc = sm_put_replay_data(&data);
@@ -785,6 +785,7 @@ int ProsodyChannel::FileSample::process(Media *phone)
 				// Villa test
 				log(log_error, "phone", phone->getName()) << "premature end of data" << logend();
 				stop(phone);
+				return replay.status;
 			}
 			break;
 		case kSMReplayStatusCompleteData:

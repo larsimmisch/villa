@@ -299,7 +299,7 @@ public:
 	{
 		m_position = pos;
 
-		return mmioSeek(m_hmmio, pos, SEEK_SET) != -1;
+		return mmioSeek(m_hmmio, pos + m_dataOffset, SEEK_SET) != -1;
 	}
 
 	virtual unsigned getLength()	{ return m_dataSize; }
