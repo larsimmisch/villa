@@ -303,7 +303,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			ic->remove(device);
 
-			s->close(id);
+			s->BGRC(id);
 		}
 	}
 	else if (command == "LSTN")

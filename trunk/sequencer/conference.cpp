@@ -12,7 +12,7 @@
 
 void Conference::add(ProsodyChannel *channel, mode m)
 {
-	lock();
+	omni_mutex_lock lock(m_mutex);
 
 	if (m_parties.find(channel) != m_parties.end())
 	{
@@ -28,14 +28,29 @@ void Conference::add(ProsodyChannel *channel, mode m)
 
 	if (m & listen)
 	{
-		if (m_parties.begin() != m_parties.end())
+		if (m_listeners)
 		{
 			ProsodyChannel *first = m_parties.begin()->first;
 			channel->conferenceClone(first);
 			channel->conferenceAdd(first);
 		}
 		else
+		{
 			channel->conferenceStart();
+
+			/*
+			 * First listener in the conference: add all speakers
+			 */
+			for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
+			{
+				if (i->second & speak)
+				{
+					channel->conferenceAdd(i->first);
+				}
+			}
+		}
+
+		++m_listeners;
 	}
 
 	if (m & speak)
@@ -50,18 +65,18 @@ void Conference::add(ProsodyChannel *channel, mode m)
 				i->first->conferenceAdd(channel);
 			}
 		}
- 
+
 		channel->conferenceEC();
-	}
+
+		++m_speakers;
+ 	}
 
 	m_parties.insert(t_party_set::value_type(channel, m));
-
-	unlock();
 }
 
 void Conference::remove(ProsodyChannel *channel)
 {
-	lock();
+	omni_mutex_lock lock(m_mutex);
 
 	t_party_set::iterator p = m_parties.find(channel);
 
@@ -77,6 +92,8 @@ void Conference::remove(ProsodyChannel *channel)
     
 	if (m & speak)
 	{
+		--m_speakers;
+
 		/* We now need to do the opposite of joining: delete the
 		 * leaving party from the low-level conferences belonging to
 		 * each of the remaining parties, and delete all parties from
@@ -97,10 +114,10 @@ void Conference::remove(ProsodyChannel *channel)
 
 	if (m & listen)
 	{
+		--m_listeners;
+
 		channel->conferenceAbort();
 	}
-
-	unlock();
 }
 
 Conference *Conferences::create(void* userData)

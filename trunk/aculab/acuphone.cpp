@@ -33,7 +33,7 @@ void AculabSwitch::listen(const Timeslot &a, const Timeslot &b, const char *name
     args.ist = b.st; // source
     args.its = b.ts;
 
-	log(log_debug + 2, "switch", name) << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << logend();
+	log(log_debug , "switch", name) << a.st << ':' << a.ts << " := " << b.st << ':' << b.ts << logend();
 
     int rc = sw_set_output(device, &args);
     if (rc != 0)    
@@ -50,7 +50,7 @@ void AculabSwitch::listen(const Timeslot &a, char pattern, const char *name)
     args.mode = PATTERN_MODE;
     args.pattern = pattern;
 
-	log(log_debug + 2, "switch", name) << a.st << ':' << a.ts << " := 0x" 
+	log(log_debug, "switch", name) << a.st << ':' << a.ts << " := 0x" 
 		<< std::setbase(16) << pattern << std::setbase(10) << logend();
 
     int rc = sw_set_output(device, &args);
@@ -72,7 +72,7 @@ void AculabSwitch::disable(const Timeslot &a, const char *name)
     if (rc != 0)    
 		throw SwitchError(__FILE__,__LINE__,"AculabSwitch::disable(Timeslot)", "sw_set_output(DISABLE_MODE)", rc);
 
-	log(log_debug + 2, "switch", name) << a.st << ':' << a.ts << " disabled"
+	log(log_debug, "switch", name) << a.st << ':' << a.ts << " disabled"
 		<< logend();
 }
 
@@ -1104,6 +1104,6 @@ void AculabMedia::onRecog(tSMEventId id)
 
 void AculabMedia::loopback()
 {
-	m_sw.listen(Timeslot(m_info.ist, m_info.its), 
-				Timeslot(m_info.ost, m_info.ots));
+	m_sw.listen(m_receive, Timeslot(m_info.ost, m_info.ots));
+	m_sw.listen(Timeslot(m_info.ist, m_info.its), m_receive);
 }

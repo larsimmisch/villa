@@ -45,7 +45,7 @@ protected:
 	friend class Conferences;
 
 	Conference(unsigned handle, void* aUserData = 0) : m_handle(handle),
-		m_userData(0), m_module(0), m_speakers(0) {}
+		m_userData(0), m_module(0), m_speakers(0), m_listeners(0) {}
 
 	typedef std::map<ProsodyChannel*,mode> t_party_set;
 
@@ -53,6 +53,7 @@ protected:
 	int m_module;
 	unsigned m_handle;
 	unsigned m_speakers;
+	unsigned m_listeners;
 	void*	 m_userData;
 	t_party_set m_parties;
 };

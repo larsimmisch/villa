@@ -33,24 +33,24 @@ public:
 	Sequencer(InterfaceConnection *server);
 	virtual ~Sequencer() {}
 
-	// external protocol - called by remote client by sending appropriate packets
+	/* Add molecule */
+	int MLCA(InterfaceConnection *server, const std::string &id);
+	/* Delete molecule */
+	int MLCD(InterfaceConnection *server, const std::string &id);
+	/* delete molecules by priority */
+	int MLDP(InterfaceConnection *server, const std::string &id);
 
-	int addMolecule(InterfaceConnection *server, const std::string &id);
+	/* accept */
+	int ACPT(InterfaceConnection *server, const std::string &id);
+	/* transfer */
+	int TRSF(InterfaceConnection *server, const std::string &id);
+	/* disconnect */
+	int DISC(InterfaceConnection *server, const std::string &id);
+	/* close background channel */
+	int BGRC(const std::string &id);
 
-	int discardMolecule(InterfaceConnection *server, const std::string &id);
-	int discardByPriority(InterfaceConnection *server, const std::string &id);
- 
-	int startActivity(InterfaceConnection *server, const std::string &id);
-	int stopActivity(InterfaceConnection *server, const std::string &id);
- 
-	int transfer(InterfaceConnection *server, const std::string &id);
-	int disconnect(InterfaceConnection *server, const std::string &id);
 	int disconnect(int cause);
 
-	/* used for background server - deletes self */
-	int close(const std::string &id);
-
-	int accept(InterfaceConnection *server, const std::string &id);
 	int reject(InterfaceConnection *server, const std::string &id);
 
 	int stopListening(InterfaceConnection *server, const std::string &id);

@@ -51,10 +51,13 @@ class Conftest:
 
     def ACPT(self, event, data):
         self.send('MLCA %s 0 0 1 conf %s duplex'
-                  % (self.background, self.conf))
+                  % (self.device, self.conf))
     
     def BGRC(self, event, data):
         sys.exit(0)
+
+    def RDIS(self, event, data):
+        self.send('DISC ' + self.device)
 
     def MLCA(self, event, data):
         pass

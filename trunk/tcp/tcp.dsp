@@ -103,10 +103,6 @@ SOURCE=..\include\client.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\include\packet.h
-# End Source File
-# Begin Source File
-
 SOURCE=..\include\sap.h
 # End Source File
 # Begin Source File

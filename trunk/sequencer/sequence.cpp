@@ -89,7 +89,7 @@ void Sequencer::lost_connection()
 	}
 	else if (!m_trunk)
 	{
-		close(std::string(""));
+		BGRC(std::string(""));
 	}
 }
 
@@ -110,7 +110,7 @@ void Sequencer::release()
 
 #pragma warning(default : 4355)
 
-int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
+int Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 {
 	unsigned channel;
 	unsigned mode;
@@ -303,9 +303,8 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 }
 
 
-int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &id)
+int Sequencer::MLCD(InterfaceConnection *server, const std::string &id)
 {
-
 	std::string mid;
 
 	(*server) >> mid;
@@ -352,7 +351,7 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 	return V3_OK;
 }
 
-int Sequencer::discardByPriority(InterfaceConnection *server, const std::string &id)
+int Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
 {
 	bool done = true;
 	int fromPriority;
@@ -471,7 +470,7 @@ int Sequencer::connect(ConnectCompletion* complete)
 	return V3_OK;
 }
 
-int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
+int Sequencer::TRSF(InterfaceConnection *server, const std::string &id)
 {
 /* Todo
 
@@ -515,7 +514,7 @@ int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
 	return V3_OK;
 }
 
-int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
+int Sequencer::DISC(InterfaceConnection *server, const std::string &id)
 {
 	int cause(0);
 
@@ -595,7 +594,7 @@ int Sequencer::disconnect(int cause)
 	return rc;
 }
 
-int Sequencer::close(const std::string &id)
+int Sequencer::BGRC(const std::string &id)
 {
 	bool idle(false);
 
@@ -627,7 +626,7 @@ int Sequencer::close(const std::string &id)
 
 	if (channelsIdle())
 	{
-		log(log_debug, "sequencer", getName()) << "close - all channels idle" << logend();
+		log(log_debug, "sequencer", getName()) << "BGRC - all channels idle" << logend();
 
 		idle = true;
 		gMediaPool.release(m_media);
@@ -862,7 +861,7 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 	release();
 }
 
-int Sequencer::accept(InterfaceConnection *server, const std::string &id)
+int Sequencer::ACPT(InterfaceConnection *server, const std::string &id)
 {
 	omni_mutex_lock l(m_mutex);
 
@@ -1153,17 +1152,17 @@ bool Sequencer::data(InterfaceConnection* server, const std::string &command,
 	// the main packet inspection method...
 
 	if (command == "ACPT")
-		accept(server, id);
+		ACPT(server, id);
 	else if (command == "MLCA")
-		addMolecule(server, id);
+		MLCA(server, id);
 	else if (command == "MLCD")
-		discardMolecule(server, id);
+		MLCD(server, id);
 	else if (command == "MLDP")
-		discardByPriority(server, id);
+		MLDP(server, id);
 	else if (command == "DISC")
-		disconnect(server, id);
+		DISC(server, id);
 	else if (command == "TRSF")
-		transfer(server, id);
+		TRSF(server, id);
 	else
 	{
 		server->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str()  
