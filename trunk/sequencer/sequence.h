@@ -29,24 +29,24 @@ public:
 
 	// external protocol - called by remote client by sending appropriate packets
 
-	int addMolecule(Packet* aPacket);
+	int addMolecule(InterfaceConnection *server, const std::string &id);
 
-	int discardMolecule(Packet* aPacket);
-	int discardByPriority(Packet* aPacket);
+	int discardMolecule(InterfaceConnection *server, const std::string &id);
+	int discardByPriority(InterfaceConnection *server, const std::string &id);
  
-	int startActivity(Packet* aPacket);
-	int stopActivity(Packet* aPacket);
+	int startActivity(InterfaceConnection *server, const std::string &id);
+	int stopActivity(InterfaceConnection *server, const std::string &id);
  
-	int transfer(Packet* aPacket);
-	int disconnect(Packet* aPacket);
-	int abort(Packet* aPacket);
+	int transfer(InterfaceConnection *server, const std::string &id);
+	int disconnect(InterfaceConnection *server, const std::string &id);
+	int abort(InterfaceConnection *server, const std::string &id);
 
-	int accept(Packet* aPacket);
-	int reject(Packet* aPacket);
+	int accept(InterfaceConnection *server, const std::string &id);
+	int reject(InterfaceConnection *server, const std::string &id);
 
-	int stopListening(Packet* aPacket);
-	int stopConnecting(Packet* aPacket);
-	int stopTransferring(Packet* aPacket);
+	int stopListening(InterfaceConnection *server, const std::string &id);
+	int stopConnecting(InterfaceConnection *server, const std::string &id);
+	int stopTransferring(InterfaceConnection *server, const std::string &id);
 
 
 	void lock()   { mutex.lock(); }
@@ -55,6 +55,8 @@ public:
 	// helpers for sending packets
 	void sendAtomDone(unsigned syncMinor, unsigned nAtom, unsigned status, unsigned msecs);
 	void sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned pos, unsigned msecs);
+
+	int connect(ConnectCompletion* complete);
 
 	// TrunkClients connectRequest & details are treated here
 	void onIncoming(Trunk *server, const SAP &local, const SAP &remote); 
@@ -126,10 +128,6 @@ public:
 
 protected:
 
-	int addMolecule(Packet* aPacket, unsigned* posInPacket);
- 
-	Packet* newPacket(unsigned args, unsigned size = 1024);
-
 	TrunkConfiguration *configuration;
 	Telephone *phone;
 	ClientQueue::Item *clientSpec;
@@ -139,6 +137,10 @@ protected:
 	ConnectCompletion *connectComplete;
 	int outOfService;
 	InterfaceConnection *m_interface;
+
+	// the transaction id for trunk operations
+	// at any given time, only one may be active
+	std::string m_id;
 
 	static Timer timer;
 };

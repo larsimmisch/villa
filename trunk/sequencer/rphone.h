@@ -8,7 +8,6 @@
 #ifndef _RPHONE_H_
 #define _RPHONE_H_
 
-#define sequencer_port 2103
 #define interface_port 2104
 
 enum { notify_start = 0x01, notify_done = 0x02 };
@@ -79,11 +78,13 @@ enum
 
 enum
 {
+    _event = -1,
     _ok,
     _timeout,
     _aborted,
     _rejected,
 	_disconnected,
+	_protocol_violation,
 	_failed,
 	_not_implemented,
 	_invalid, 

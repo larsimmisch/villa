@@ -153,7 +153,7 @@ void Interface::abort(TextTransport *server)
 
 void Interface::data(TextTransport *server)
 {
-    // that's the main packet inspection method...
+    // this is the main packet inspection method...
 	InterfaceConnection* ico = (InterfaceConnection*)server;
 
 	omni_mutex_lock lock(ico->getMutex());
@@ -164,9 +164,11 @@ void Interface::data(TextTransport *server)
 	(*server) >> id;
 	(*server) >> scope;
 
-	if (!server->good())
+	if (!server->good() || server->eof())
 	{
-		(*server) << _syntax_error << id.c_str() 
+		server->clear();
+
+		(*server) << _syntax_error << ' ' << id.c_str() 
 			<< " syntax error\r\n";
 
 		return;
@@ -219,6 +221,8 @@ void Interface::data(TextTransport *server)
 
 			if (!server->good())
 			{
+				server->clear();
+
 				(*server) << id.c_str() << _syntax_error 
 					<< " syntax error\r\n";
 				return;
@@ -246,7 +250,7 @@ void Interface::data(TextTransport *server)
 					return;
 				}
 	
-				log(log_debug, "sequencer") << "client " << client 
+				log(log_debug, "sequencer") << "id " << id.c_str() 
 					<< " added listen for " << trunk->getName() 
 					<< ' ' << (detail.getService() ? detail.getService() : "any") 
 					<< logend();
@@ -255,7 +259,7 @@ void Interface::data(TextTransport *server)
 			}
 			else
 			{
-				log(log_debug, "sequencer") << "client " << client 
+				log(log_debug, "sequencer") << "id " << id.c_str()
 					<< " added listen for any trunk " << logend();
 
 				gClientQueue.enqueue(id, detail, ico);
@@ -372,7 +376,7 @@ void Interface::data(TextTransport *server)
 	}
 	else
 	{
-		Sequencer *s = ico->find(id);
+		Sequencer *s = ico->find(scope);
 
 		if (!s)
 		{

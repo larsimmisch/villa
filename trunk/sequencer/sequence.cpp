@@ -16,13 +16,12 @@
 #include "phoneclient.h"
 #include "acuphone.h"
 #include "rphone.h"
-#include "bitset.h"
+#include "ctbus.h"
 #include "activ.h"
 #include "sequence.h"
 #include "interface.h"
 #include "getopt.h"
-
-bitset<1024> SCBus;
+#include "mvswdrvr.h"
 
 Log cout_log(std::cout);
 
@@ -33,6 +32,8 @@ Conferences gConferences;
 ConfiguredTrunks gConfiguration;
 ClientQueue gClientQueue;
 
+CTbus *gBus;
+
 Timer Sequencer::timer;
 
 // I use 'this' in the base member initializer list on purpose
@@ -42,11 +43,8 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
   :	activity(this), configuration(aConfiguration), connectComplete(0),
 	clientSpec(0), outOfService(0)
 {
-	Timeslot receive(24, SCBus.lowest_bit());
-	SCBus.set_bit(receive.ts, false);
-
-	Timeslot transmit(24, SCBus.lowest_bit());
-	SCBus.set_bit(transmit.ts, false);
+	Timeslot receive = gBus->allocate();
+	Timeslot transmit = gBus->allocate();
 
 	phone = new AculabPhone(this, aConfiguration->getTrunk(this), 0, 
 		receive, transmit);
@@ -56,7 +54,7 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
 
 #pragma warning(default : 4355)
 
-int Sequencer::addMolecule(Packet* aPacket)
+int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 {
 /* Todo:
 
@@ -86,18 +84,6 @@ int Sequencer::addMolecule(Packet* aPacket)
 	}
 	packet->clear(1);
 
-	packet->setSync(aPacket->getSyncMajor(), syncMinor);
-	packet->setContent(phone_add_molecule_done);
-
-	packet->setUnsignedAt(0, _ok);
-	tcp.send(*packet);
-
-	return _ok;
-*/
-}
-
-int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
-{
 	int index;
 	unsigned pos = *pPos;
 	unsigned pos2;
@@ -255,12 +241,18 @@ int Sequencer::addMolecule(Packet* aPacket, unsigned* pPos)
 	activity.add(*aMolecule);
 	checkCompleted();
 
-	*pPos = pos;
+	packet->setSync(aPacket->getSyncMajor(), syncMinor);
+	packet->setContent(phone_add_molecule_done);
 
+	packet->setUnsignedAt(0, _ok);
+	tcp.send(*packet);
+
+*/
 	return _ok;
 }
 
-int Sequencer::discardMolecule(Packet* aPacket)
+
+int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &id)
 {
 /* Todo
 
@@ -303,7 +295,7 @@ int Sequencer::discardMolecule(Packet* aPacket)
 	return _ok;
 }
 
-int Sequencer::discardByPriority(Packet* aPacket)
+int Sequencer::discardByPriority(InterfaceConnection *server, const std::string &id)
 {
 /* Todo
 
@@ -404,25 +396,72 @@ void Sequencer::sendMoleculeDone(unsigned syncMinor, unsigned status, unsigned p
 */
 }
 
-int Sequencer::accept(Packet* aPacket)
+int Sequencer::connect(ConnectCompletion* complete)
 {
-	// completion and error handling in acceptDone
+	lock();
+
+	if (connectComplete	|| phone->getState() != Trunk::listening)
+	{
+		log(log_debug, "sequencer")
+			<< "connect failed - invalid state: " 
+			<< phone->getState() << logend();
+
+		unlock();
+		return _busy;
+	}
+	else if (outOfService)
+	{
+		unlock();
+		return _out_of_service;
+	}
+
+	connectComplete = complete;
+
+	unlock();
+
+	// Todo
+	phone->abort();
+
+	return _ok;
+}
+
+int Sequencer::accept(InterfaceConnection *server, const std::string &id)
+{
+	if (m_id.size())
+	{
+ 		(*server) << _protocol_violation << ' ' << id.c_str() 
+			<< " protocol violation\r\n";
+
+		return _protocol_violation;
+	}
+
+	// completion in acceptDone
+	m_id = id;
 
 	phone->accept();
 
 	return _ok;
 }
 
-int Sequencer::reject(Packet* aPacket)
+int Sequencer::reject(InterfaceConnection *server, const std::string &id)
 {
-	// completion and error handling in rejectDone
+	if (m_id.size())
+	{
+ 		(*server) << _protocol_violation << ' ' << id.c_str() 
+			<< " protocol violation\r\n";
+
+		return _protocol_violation;
+	}
+
+	// completion in acceptDone
+	m_id = id;
 
 	phone->reject();
 
 	return _ok;
 }
 
-int Sequencer::transfer(Packet* aPacket)
+int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
 {
 /* Todo
 
@@ -466,48 +505,39 @@ int Sequencer::transfer(Packet* aPacket)
 	return _ok;
 }
 
-int Sequencer::disconnect(Packet* aPacket)
+int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 {
-/* Todo
+	int c = 0;
+	std::string cause;
+
+	(*server) >> cause;
+
+	// cause is optional
+	if (!server->good())
+		server->clear();
+	else
+		c = atoi(cause.c_str());
+
+	if (m_id.size())
+	{
+ 		(*server) << _protocol_violation << ' ' << id.c_str() 
+			<< " protocol violation\r\n";
+
+		return _protocol_violation;
+	}
+
+	m_id = id;
 
 	log(log_debug, "sequencer") << "disconnecting" << logend();
 
-	if (!phone->isConnected() || aPacket->typeAt(0) != Packet::type_unsigned)
-	{
-		lock();
-		packet->clear(1);
-		packet->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
-		packet->setContent(phone_disconnect_done);
-
-		packet->setUnsignedAt(0, _invalid);
-
-		tcp.send(*packet);
-		unlock();
-
-		return _invalid;
-	}
-
-	lock();
-
-#ifdef __RECOGNIZER__
-	if (recognizer) delete recognizer;
-	recognizer = 0;
-#endif
-
-	unlock();
-
-	Timer::sleep(200);
-
-	phone->disconnect(aPacket->getUnsignedAt(0));
+	phone->disconnect(c);
 
 	checkCompleted();
 
-	tcp.disconnect();
-*/
 	return _ok;
 }
 
-int Sequencer::abort(Packet* aPacket)
+int Sequencer::abort(InterfaceConnection *server, const std::string &id)
 {
 /* Todo
 
@@ -567,10 +597,10 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 		m_interface->add(phone->getName(), this);
 
 		(*m_interface) << clientSpec->m_id.c_str() << ' ' << _ok 
-			<< " connect-request "
-			<< phone->getName() << ' ' << remote.getAddress() << ' '
-			<< configuration->getNumber() << ' '
-			<< local.getService() << ' '
+			<< " alerting "
+			<< phone->getName() << " \"" << remote.getAddress() << "\" \""
+			<< configuration->getNumber() << "\" \""
+			<< local.getService() << "\" "
 			<< server->getTimeslot().ts << "\r\n";
 
 		unlock();
@@ -724,59 +754,28 @@ void Sequencer::disconnectRequest(Trunk *server, int cause)
 
 void Sequencer::disconnectDone(Trunk *server, unsigned result)
 {
-	// result is always _ok
-/* Todo
+	log(log_debug, "sequencer") << "call disconnected" << logend();
 
-	lock();
-	packet->clear(1);
-	packet->setSync(0, 0);
-	packet->setContent(phone_disconnect_done);
-	packet->setUnsignedAt(0, _ok);
-	
-	tcp.disconnect(indefinite, packet);
+	(*m_interface) << m_id.c_str() << ' ' << result << " disconnect-done\r\n";
 
-	unlock();
-
-	phone->listen();
-*/
+	m_id.erase();
 }
 
 void Sequencer::acceptDone(Trunk *server, unsigned result)
 {
-/* Todo
-	lock();
-	packet->clear(1);
-
-	delete clientSpec;
-	clientSpec = 0;
-
-	packet->setContent(phone_accept_done);
-
-	if(result == r_ok) 
-		packet->setUnsignedAt(0, _ok);
-	else 
-		packet->setUnsignedAt(0, _failed);
-
-	tcp.send(*packet);
-	unlock();
-
 	if (result == r_ok)
-	{
 		log(log_debug, "sequencer") << "call accepted" << logend();
-	}
 	else
-	{
-		tcp.disconnect();
+		log(log_debug, "sequencer") << "call accept failed: " 
+		<< result << logend();
 
-		log(log_debug, "sequencer") << "call accept failed" << logend();
-	}
-*/
+	(*m_interface) << m_id.c_str() << ' ' << result << " accept-done\r\n";
+
+	m_id.erase();
 }
 
 void Sequencer::rejectDone(Trunk *server, unsigned result)
 {
-/* Todo
-
 	// result is always _ok
 
 	lock();
@@ -798,24 +797,18 @@ void Sequencer::rejectDone(Trunk *server, unsigned result)
 	}
 	else
 	{
-		packet->clear(1);
-
 		delete clientSpec;
 		clientSpec = 0;
 
-		packet->setContent(phone_reject_done);
+		log(log_debug, "sequencer") << "call rejected" << logend();
 
-		packet->setUnsignedAt(0, _ok);
+		(*m_interface) << m_id.c_str() << ' ' << result << " accept-done\r\n";
 
-		tcp.send(*packet);
+		m_id.erase();
+
 		unlock();
-
-		if (tcp.isConnected())
-			tcp.disconnect();
-
 		phone->listen();
 	}
-*/
 }
 
 void Sequencer::details(Trunk *server, const SAP& local, const SAP& remote)
@@ -1022,50 +1015,35 @@ void Sequencer::checkCompleted()
 	}
 }
 
-void Sequencer::data(Transport* server, Packet* aPacket)
+void Sequencer::data(InterfaceConnection* server, const std::string &id)
 {
 	// the main packet inspection method...
 
-	switch (aPacket->getContent())
+	std::string command;
+
+	(*server) >> command;
+
+	if (command == "add")
+		addMolecule(server, id);
+	else if (command == "discard")
+		discardMolecule(server, id);
+	else if (command == "discard-by-priority")
+		discardByPriority(server, id);
+	else if (command == "accept")
+		accept(server, id);
+	else if (command == "reject")
+		reject(server, id);
+	else if (command == "disconnect")
+		disconnect(server, id);
+	else if (command == "abort")
+		abort(server, id);
+	else if (command == "transfer")
+		transfer(server, id);
+	else
 	{
-	case phone_add_molecule:
-		addMolecule(aPacket);
-		break;
-	case phone_discard_molecule:
-		discardMolecule(aPacket);
-		break;
-	case phone_discard_molecule_priority:
-		discardByPriority(aPacket);
-		break;
-	case phone_listen:
-		listen(aPacket);
-		break;
-	case phone_accept:
-		accept(aPacket);
-		break;
-	case phone_reject:
-		reject(aPacket);
-		break;
-	case phone_connect:
-		connect(aPacket);
-		break;
-	case phone_disconnect:
-		disconnect(aPacket);
-		break;
-	case phone_abort:
-		abort(aPacket);
-		break;
-	case phone_transfer:
-		transfer(aPacket);
-		break;
-	case phone_stop_listening:
-		break;
-	case phone_start_recognition:
-		startRecognition(aPacket);
-		break;
-	case phone_stop_recognition:
-		stopRecognition(aPacket);
-		break;
+		(*server) << id.c_str() << ' ' << _failed 
+			<< " syntax error - unknown command " << command.c_str()
+			<< "\r\n";
 	}
 }
 
@@ -1080,14 +1058,11 @@ int main(int argc, char* argv[])
 {
 	int c;
 	int analog = 0;
-	char* switchModule = 0;
+	int sw = 0;
 	char szKey[256];
 
 	ULONG rc;
 	WSADATA wsa;
-
-	// free timeslots are marked true
-	SCBus.set_bits(true);
 
 	set_log_instance(&cout_log);
 	set_log_level(4);
@@ -1117,9 +1092,32 @@ int main(int argc, char* argv[])
 
 	try
 	{
-		unsigned index;
+		struct swmode_parms swmode;
 
-		for (index = 0; 1; index++)
+		int rc = sw_mode_switch(sw, &swmode);
+
+		if (rc)
+		{
+			log(log_error, "app") << "sw_mode_switch("<< sw << ") failed: " << rc
+				<< logend();
+
+			return rc;
+		}
+
+		if (swmode.ct_buses & 1 << SWMODE_CTBUS_H100)
+		{
+			gBus = new H100;
+
+			log(log_debug, "app") << "using H.100 for switching" << logend();
+		}
+		else if (swmode.ct_buses & 1 << SWMODE_CTBUS_SCBUS)
+		{
+			gBus = new SCbus;
+
+			log(log_debug, "app") << "using SCbus for switching" << logend();
+		}
+
+		for (unsigned index = 0; 1; index++)
 		{
 			sprintf(szKey, "SOFTWARE\\Immisch, Becker & Partner\\Voice Server\\Aculab PRI\\Trunk%d", index);
 
