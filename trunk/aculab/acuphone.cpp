@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.19 2003/12/07 23:35:44 lars Exp $
+	$Id: acuphone.cpp,v 1.20 2003/12/08 00:04:02 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -609,11 +609,34 @@ ProsodyChannel::FileSample::~FileSample()
 
 Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isRecording)
 {
-	char* dot = strrchr(aName, '.');
+	// find the last '/' or '\' if any
+	const char *start = strrchr(aName, '/');
+	if (!start)
+	{
+		start = strrchr(aName, '\\');
+	}
+
+	// no path delimiter
+	if (!start)
+	{
+		start = aName;
+	}
+	
+	char* dot = strrchr(start, '.');
 	Storage* storage;
 
+	// .wav is default
 	if (!dot)
-		throw FileFormatError(__FILE__, __LINE__, "AculabMedia::allocateStorage", "unknown format");
+	{
+		std::string file(aName);
+		file += ".wav";
+
+		storage = new WavFileStorage(file.c_str(), isRecording);
+		storage->encoding = kSMDataFormat8KHzALawPCM;
+		storage->bytesPerSecond = 8000;
+
+		return storage;
+	}
 
 	dot++;
 
