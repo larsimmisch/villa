@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.3 2000/10/18 16:58:43 lars Exp $
+	$Id: phone.h,v 1.4 2000/10/30 11:38:57 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -11,10 +11,10 @@
 #ifndef _PHONE_H_
 #define _PHONE_H_ 
 
+#include "phoneclient.h"
 #include "switch.h"
-#include "sap.h"
 #include "exc.h"
-#include "buffers.h"
+#include "storage.h"
 
 enum { indefinite = -1 };
 
@@ -86,6 +86,35 @@ protected:
 	Timeslot timeslot;
 	TrunkClient* client;
     Telephone* phone;
+};
+
+class Sample
+{
+public:
+
+    Sample(unsigned aPosition = 0) : position(aPosition), userData(0), status(r_ok) {}
+    virtual ~Sample() {}
+
+    virtual unsigned start(Telephone* aTelephone) = 0;
+
+    virtual bool stop(Telephone* aTelephone) = 0;
+
+    virtual unsigned getLength()	{ return 0; }
+	virtual unsigned getStatus()	{ return status; }
+	virtual bool isOutgoing()		{ return true; }
+
+    bool setPos(unsigned aPosition)	{ position = aPosition; return position <= getLength(); }
+    unsigned getPos()               { return position; }
+
+    void setUserData(void* data)    { userData = data; }
+    void* getUserData()             { return userData; }
+
+    unsigned position;
+	unsigned status;
+
+protected:
+
+    void* userData;
 };
 
 class Telephone
@@ -164,66 +193,24 @@ public:
 
 	virtual void connected(Trunk* aTrunk) {}
 
-	// Caution: do _never_ create Sample subclasses on the stack
-    class Sample
-    {
-	public:
+	virtual void startEnergyDetector(unsigned qualTime) = 0;
+	virtual void stopEnergyDetector() = 0;
 
-        Sample(unsigned aPosition = 0) : position(aPosition), userData(0), active(false), status(r_ok) {}
-        virtual ~Sample() {}
+	virtual Sample* getCurrentSample() { return current; }
 
-        virtual unsigned start(Telephone* aTelephone) = 0;
-        virtual bool stop(Telephone* aTelephone) = 0;
+	virtual Sample* createFileSample(const char *name) = 0;
+	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime) = 0;
+	virtual Sample* createTouchtones(const char *tt) = 0;
+	virtual Sample* createBeeps(int nBeeps) = 0;
 
-        virtual unsigned getLength()	{ return 0; }
-		virtual unsigned getStatus()	{ return status; }
-        virtual bool isActive()         { return active; }
-		virtual bool isOutgoing()		{ return true; }
-
-		// is called with mutex held
-		void started()
-		{
-			active = true;
-		}
-
-		// is called with mutex held
-		void completed(unsigned msecs)
-		{
-			position = msecs;
-			active = false;
-		}
-
-        bool setPos(unsigned aPosition)	{ position = aPosition; return position <= getLength(); }
-        unsigned getPos()               { return position; }
-
-        void setUserData(void* data)    { userData = data; }
-        void* getUserData()             { return userData; }
-
-        unsigned position;
-		unsigned status;
-
-	protected:
-
-        void* userData;
-        bool active;
-    };
-
-    // Data transfer
-    virtual bool start(Sample *aSample)
+	virtual void completed(Sample *sample)
 	{
 		omni_mutex_lock l(mutex);
 
-		if (current)
-			return false;
+		client->completed(this, sample, sample->position);
 
-		current = aSample;
-
-		aSample->start(this);
-
-		return true;
+		current = NULL;
 	}
-
-	virtual Sample* getCurrentSample() { return current; }
 
     virtual bool abortSending()
 	{
@@ -233,6 +220,11 @@ public:
 			return current->stop(this);
 
 		return false;
+	}
+
+	virtual void touchtone(char tt)
+	{
+		client->touchtone(this, tt);
 	}
 
     bool isIdle()    	
@@ -284,195 +276,20 @@ public:
 
     virtual Switch* getSwitch()	{ return 0; }
 
-	virtual TelephoneClient* getClient() { return client; }
+	virtual TelephoneClient* getClient() { return client; }		
 
-	class FileSample : public Sample
+	// must be called whenever a sample subclass has been started
+    virtual void started(Sample* sample) 
 	{
-	public:
-		
-		FileSample(Telephone* aPhone, const char* name, bool isRecordable = false)
-			: recordable(isRecordable), buffers(0)
-		{
-			buffers = aPhone->allocateBuffers(name, 4, isRecordable);
-		}
+		omni_mutex_lock l(mutex);
 
-		virtual ~FileSample()
-		{
-			delete buffers;
-		}
-		
-        virtual unsigned start(Telephone* aTelephone)
-		{
-			buffers->setPos(position);
-
-			// read as many buffers as possible
-			for (int i = 0; i < buffers->getNumBuffers(); ++i)
-			{
-				buffers->read();
-				if (buffers->isLast())
-					break;
-			}
-
-			position = aTelephone->startPlaying();
-
-			Sample::started();
-
-			return position; 
-		}
-
-		virtual unsigned next(Telephone* aTelephone)
-		{
-			position += aTelephone->submitPlaying();
-
-			if (!buffers->isLast())	
-				buffers->read();
-
-			return position;
-		}
-
-        virtual bool stop(Telephone* aTelephone)
-		{
-			return aTelephone->stopPlaying(); 
-		}
-
-		virtual unsigned getLength() { return buffers ? buffers->getLength() : 0; }
-		virtual unsigned getStatus() {	return buffers ? buffers->getStatus() : r_failed; }
-
-		virtual Buffers* getBuffers() { return buffers; }
-
-	protected:
-		
-		bool recordable;
-		Buffers* buffers;
-	};
-
-	class RecordFileSample : public FileSample
-	{
-	public:
-	
-		RecordFileSample(Telephone* aPhone, const char* name, unsigned max)
-			: Telephone::FileSample(aPhone, name, 1), maxTime(max) {}
-		virtual ~RecordFileSample() {}
-		
-        virtual unsigned start(Telephone* aTelephone)
-		{
-			position = aTelephone->startRecording(maxTime);
-
-			Sample::started();
-
-			return position; 
-		}
-
-		virtual unsigned next(Telephone* aTelephone)
-		{
-			position += aTelephone->submitRecording();
-
-			// buffers->write(); ??
-
-			return position;
-		}
-
-        virtual bool stop(Telephone* aTelephone)
-		{
-			return aTelephone->stopRecording(); 
-		}
-
-
-		virtual bool isOutgoing()	{ return false; }
-
-	protected:
-
-		unsigned maxTime;
-	};
-
-	class Beep : public Sample
-	{
-	public:
-		
-		Beep(int numBeeps) : beeps(numBeeps) {}
-		virtual ~Beep();
-				
-        virtual unsigned start(Telephone* aTelephone)
-		{
-			position = aTelephone->startBeeps(beeps);
-
-			Sample::started(); 
-
-			return position; 
-		}
-
-        virtual bool stop(Telephone* aTelephone)	
-		{ 
-			return aTelephone->stopBeeps(); 
-		}
-
-		int beeps;
-	};
-
-	class Touchtones : public Sample
-	{
-	public:
-		
-		Touchtones(const char* att) : tt(att) {}
-		virtual ~Touchtones() {}
-		
-        virtual unsigned start(Telephone* aTelephone) 
-		{ 
-			position = aTelephone->startTouchtones(tt.c_str());
-
-			Sample::started(); 
-
-			return position; 
-		}
-
-        virtual bool stop(Telephone* aTelephone)
-		{ 
-			return aTelephone->stopTouchtones(); 
-		}
-
-		std::string tt;
-	};
+		current = sample;
+	}
 
 protected:
-	
-    friend class Sample;
-    friend class FileSample;
-    friend class RecordFileSample;
-    friend class Beep;
-    friend class Touchtones;
-	friend class Buffers;
 	
 	void lock() { mutex.lock(); }
 	void unlock() { mutex.unlock(); }
-
-	// these will be called with mutex held
-	virtual unsigned startBeeps(int beeps) = 0;
-	virtual bool stopBeeps() = 0;
-
-	virtual unsigned startTouchtones(const char* tt) = 0;
-	virtual bool stopTouchtones() = 0;
-
-	virtual unsigned startEnergyDetector(unsigned qualTime) = 0;
-	virtual bool stopEnergyDetector() = 0;
-
-	// return msecs queued
-	virtual unsigned startPlaying() = 0;
-	virtual unsigned submitPlaying() = 0;
-
-	// returns true if operations was stopped synchronously
-	virtual bool stopPlaying() = 0;
-
-	virtual unsigned startRecording(unsigned maxTime) = 0;
-	virtual unsigned submitRecording() = 0;
-
-	// returns true if operations was stopped synchronously
-	virtual bool stopRecording() = 0;
-
-	virtual Buffers* allocateBuffers(const char* aFile, unsigned numBuffers, bool isRecording = 0) = 0;
-
-    virtual void started(Sample* aSample) {}
-
-protected:
 
 	SAP local;
 	SAP remote;

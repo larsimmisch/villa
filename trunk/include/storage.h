@@ -1,7 +1,7 @@
 /*
 	buffers.h
 
-	$Id: buffers.h,v 1.1 2000/10/18 16:58:43 lars Exp $
+	$Id: storage.h,v 1.1 2000/10/30 11:38:57 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -15,8 +15,6 @@
 #include <iostream>
 #include <string>
 #include "exc.h"
-
-class Telephone;
 
 class FileDoesNotExist : public Exception
 {
@@ -97,12 +95,12 @@ protected:
 	int error;
 };
 
-class BufferStorage
+class Storage
 {
 public:
 
-	BufferStorage() {}
-	virtual ~BufferStorage() {}
+	Storage() {}
+	virtual ~Storage() {}
 
 	virtual unsigned read(void* data, unsigned length)  = 0;
 	virtual unsigned write(void* data, unsigned length) = 0;
@@ -110,98 +108,12 @@ public:
 	// setPos operates with byte offset
 	virtual int setPos(unsigned pos) = 0;
 	virtual unsigned getLength()	 = 0;
-};
-
-class Buffers
-{
-public:
-	
-	Buffers(BufferStorage* aStorage, unsigned numBuffers, unsigned size) 
-		: store(aStorage), encoding(0), current(0), flushed(0), bufferSize(size), 
-		nBuffers(numBuffers), buffer(0) , status(0 /* r_ok */), bytesPerSecond(8000) 
-	{
-		setBufferSize(size);
-	}
-
-	virtual ~Buffers()	{ delete buffer; delete store; }
-
-	Buffers& operator++()	{ current++; current %= nBuffers; return *this; }
-
-	unsigned read()
-	{
-		unsigned bytes = store->read(bufferAt(flushed), bufferSize);
-
-		*sizeAt(flushed) = bytes;
-
-		flushed++;
-		flushed %= nBuffers;
-
-		return bytes;
-	}
-
-	unsigned write()
-	{
-		size_t bytes = store->write(bufferAt(flushed), *sizeAt(flushed));
-
-		flushed++;
-		flushed %= nBuffers;
-
-		return bytes;
-	}
-
-	// setPos operates with millisecond offsets
-	virtual int setPos(unsigned pos)	{ current = flushed = 0; return store->setPos(pos * bytesPerSecond / 1000); }
-
-	// returns size in ms
-	virtual unsigned getLength()		{ return store->getLength() * 1000 / bytesPerSecond; }
-	virtual unsigned getSize()			{ return store->getLength(); }
-
-	virtual unsigned getStatus()		{ return status; }
-
-	int isLast() { return *sizeAt(current) < bufferSize; }
-
-	int getNumBuffers() { return nBuffers; }
-
-	void setBufferSize(unsigned size)
-	{
-		bufferSize = size;
-		
-		delete buffer;
-
-		buffer = new char[(bufferSize + sizeof(unsigned) + 16) * nBuffers];
-	}
-
-	void setEncoding(unsigned anEncoding) { encoding = anEncoding; }
-	unsigned getEncoding()		{ return encoding; }
-
-	void setCurrentSize(unsigned size)
-	{
-		*(unsigned*)&buffer[current * bufferSize] = size;
-	}
-
-	unsigned getCurrentSize()	{ return *sizeAt(current); }
-	void* getCurrent()	{ return bufferAt(current); }
-
-	void setBytesPerSecond(unsigned bytes)	{ bytesPerSecond = bytes; }
-	unsigned getBytesPerSecond()	{ return bytesPerSecond; }
-
-protected:
-	
-	void* bufferAt(unsigned index)		{ return &buffer[index * (bufferSize + sizeof(unsigned)) + sizeof(unsigned)]; }
-	unsigned* sizeAt(unsigned index)	{ return (unsigned*)&buffer[index * (bufferSize + sizeof(unsigned))]; }
 
 	unsigned bytesPerSecond;
 	unsigned encoding;
-	unsigned current;
-	unsigned flushed;
-	unsigned bufferSize;
-	unsigned nBuffers;
-	unsigned status;
-	char* buffer;
-	BufferStorage* store;
 };
 
-class RawFileStorage : public BufferStorage
+class RawFileStorage : public Storage
 {
 public:
 
@@ -265,8 +177,6 @@ public:
 	}
 
 protected:
-
-	friend class Buffers;
 
 	FILE* file;
 };

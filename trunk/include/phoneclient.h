@@ -1,7 +1,7 @@
 /*
 	phoneclient.h
 
-	$Id: phoneclient.h,v 1.3 2000/10/18 16:58:43 lars Exp $
+	$Id: phoneclient.h,v 1.4 2000/10/30 11:38:57 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -11,7 +11,12 @@
 #ifndef _PHONECLIENT_H_
 #define _PHONECLIENT_H_ 
 
-#include "phone.h"
+
+#include "sap.h"
+
+class Trunk;
+class Telephone;
+class Sample;
 
 class TrunkClient
 {
@@ -61,10 +66,10 @@ public:
 	virtual void touchtone(Telephone* server, char tt) = 0;
 
     // sent whenever a Sample is started
-    virtual void started(Telephone* server, Telephone::Sample* sample) = 0;
+    virtual void started(Telephone* server, Sample* sample) = 0;
 
     // sent whenever a Sample is successfully sent
-    virtual void completed(Telephone* server, Telephone::Sample* sample, unsigned msecs) = 0;
+    virtual void completed(Telephone* server, Sample* sample, unsigned msecs) = 0;
 	
 };
 #endif

@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.1 2000/10/18 16:58:42 lars Exp $
+	$Id: acuphone.cpp,v 1.2 2000/10/30 11:38:57 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -231,6 +231,200 @@ tSMEventId ProsodyChannel::set_event(tSM_INT type)
 	return event.event;
 }
 
+unsigned ProsodyChannel::Beep::start(Telephone *phone)
+{
+	return 0;
+}
+
+bool ProsodyChannel::Beep::stop(Telephone *phone)
+{
+	return false;
+}
+
+unsigned ProsodyChannel::Touchtones::start(Telephone *phone)
+{
+	struct sm_play_digits_parms digits;
+
+	digits.channel = prosody->channel;
+	digits.wait_for_completion = 0;
+	digits.digits.type = kSMDTMFDigits;
+	digits.digits.digit_duration = 64;
+	digits.digits.inter_digit_delay = 16;
+
+	strncpy(digits.digits.digit_string, tt.c_str(), kSMMaxDigits);
+	digits.digits.digit_string[kSMMaxDigits] = '\0';
+	digits.digits.qualifier = 0; // unused parameter
+
+	// warn if digits too long
+	if (tt.length() > kSMMaxDigits)
+	{
+		std::cerr << "warning: digits string " << tt.c_str() << " too long. truncated to: " << digits.digits.digit_string << std::endl;
+	}
+
+	int rc = sm_play_digits(&digits);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
+
+	phone->started(this);
+
+	// time played
+	return 0;
+}
+
+bool ProsodyChannel::Touchtones::stop(Telephone *phone)
+{
+	int rc = sm_play_tone_abort(prosody->channel);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_abort", rc);
+
+	status = r_aborted;
+
+	phone->completed(this);
+
+	return true;
+}
+
+void ProsodyChannel::startEnergyDetector(unsigned qualTime)
+{
+}
+
+void ProsodyChannel::stopEnergyDetector()
+{
+}
+
+Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isRecording)
+{
+	char* dot = strrchr(aName, '.');
+	Storage* storage;
+
+	if (!dot)
+		throw FileFormatError(__FILE__, __LINE__, "AculabPhone::allocateStorage", "unknown format");
+
+	dot++;
+
+	if (_stricmp(dot, "ul") == 0)
+	{
+		storage = new RawFileStorage(aName, isRecording);
+		storage->encoding = kSMDataFormat8KHzULawPCM;
+		storage->bytesPerSecond = 8000;
+	}
+	else if (_stricmp(dot, "al") == 0)
+	{
+		storage = new RawFileStorage(aName, isRecording);
+		storage->encoding = kSMDataFormat8KHzALawPCM;
+		storage->bytesPerSecond = 8000;
+	}
+	else
+	{
+		throw FileFormatError(__FILE__, __LINE__, "AculabPhone::allocateBuffers", "unknown format");
+	}
+
+	return storage;
+}
+
+unsigned ProsodyChannel::FileSample::start(Telephone *phone)
+{
+	struct sm_replay_parms start;
+
+	start.channel = prosody->channel;
+	start.background = kSMNullChannelId;
+	start.speed = 100;
+	start.agc = 0;
+	start.volume = 0;
+	start.type = storage->encoding;
+	start.data_length = storage->getLength();
+
+	int rc = sm_replay_start(&start);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
+
+	process(phone);
+
+	phone->started(this);
+
+	return position;
+}
+
+unsigned ProsodyChannel::FileSample::submit(Telephone *phone)
+{	
+	char buffer[kSMMaxReplayDataBufferSize];
+
+	struct sm_ts_data_parms data;
+	data.channel = prosody->channel;
+	data.length = storage->read(buffer, sizeof(buffer));
+
+	data.data = buffer;
+
+	int rc = sm_put_replay_data(&data);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_put_replay_data", rc);
+
+	position += data.length * 1000 / storage->bytesPerSecond;
+
+	return position;
+}
+
+bool ProsodyChannel::FileSample::stop(Telephone *phone)
+{
+	struct sm_replay_abort_parms p;
+
+	p.channel = prosody->channel;
+
+	int rc = sm_replay_abort(&p);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
+
+	position = p.offset * 1000 / storage->bytesPerSecond;
+
+	status = r_aborted;
+
+	return false;
+}
+
+// fills prosody buffers if space available, notifies about completion if done
+int ProsodyChannel::FileSample::process(Telephone *phone)
+{
+	struct sm_replay_status_parms status;
+
+	status.channel = prosody->channel;
+	
+	while (true)
+	{
+		int rc = sm_replay_status(&status);
+		if (rc)
+			throw ProsodyError(__FILE__, __LINE__, "sm_replay_status", rc);
+
+		switch (status.status)
+		{
+		case kSMReplayStatusComplete:
+			phone->completed(this);
+			return status.status;
+		case kSMReplayStatusUnderrun:
+			std::cerr << "underrun!" << std::endl;
+		case kSMReplayStatusHasCapacity:
+			submit(phone);
+			break;
+		case kSMReplayStatusCompleteData:
+			return status.status;
+		case kSMReplayStatusNoCapacity:
+			return status.status;
+		}
+	}
+
+	// unreached statement
+	return status.status;
+}
+
+unsigned ProsodyChannel::RecordFileSample::start(Telephone *phone)
+{
+	return 0;
+}
+
+bool ProsodyChannel::RecordFileSample::stop(Telephone *phone)
+{
+	return false;
+}
+
 void AculabPhone::connected(Trunk* aTrunk)
 {
 	if (receive.st == -1 || transmit.st == -1)
@@ -288,224 +482,6 @@ void AculabPhone::disconnected(Trunk *trunk, int cause)
 	client->disconnected(this);
 }
 
-unsigned AculabPhone::startBeeps(int beeps)
-{
-	return 0;
-}
-
-bool AculabPhone::stopBeeps()
-{
-	return false;
-}
-
-unsigned AculabPhone::startTouchtones(const char* tt)
-{
-	struct sm_play_digits_parms digits;
-
-	digits.channel = channel;
-	digits.wait_for_completion = 0;
-	digits.digits.type = kSMDTMFDigits;
-	digits.digits.digit_duration = 64;
-	digits.digits.inter_digit_delay = 16;
-
-	strncpy(digits.digits.digit_string, tt, kSMMaxDigits);
-	digits.digits.digit_string[kSMMaxDigits] = '\0';
-	digits.digits.qualifier = 0; // unused parameter
-
-	// warn if digits too long
-	if (strlen(tt) > kSMMaxDigits)
-	{
-		std::cerr << "warning: digits string " << tt << " too long. truncated to: " << digits.digits.digit_string << std::endl;
-	}
-
-	int rc = sm_play_digits(&digits);
-	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_play_digits", rc);
-
-	// time played
-	return 0;
-}
-
-bool AculabPhone::stopTouchtones()
-{
-	omni_mutex_lock l(mutex);
-
-	if (current && typeid(current) == typeid(Telephone::Touchtones))
-	{
-		int rc = sm_play_tone_abort(channel);
-		if (rc)
-			throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_abort", rc);
-
-		current->completed(0);
-		client->completed(this, current, 0);
-
-		current = NULL;
-
-		return true;
-	}
-
-	return false;
-}
-
-unsigned AculabPhone::startEnergyDetector(unsigned qualTime)
-{
-	return 0;
-}
-
-bool AculabPhone::stopEnergyDetector()
-{
-	return false;
-}
-
-Buffers* AculabPhone::allocateBuffers(const char* aName, unsigned numBuffers, bool isRecording)
-{
-	char* dot = strrchr(aName, '.');
-	Buffers* buffers;
-
-	if (!dot)
-		throw FileFormatError(__FILE__, __LINE__, "AculabPhone::allocateBuffers", "unknown format");
-
-	dot++;
-
-	if (_stricmp(dot, "ul") == 0)
-	{
-		buffers = new Buffers(new RawFileStorage(aName, isRecording), numBuffers, kSMMaxReplayDataBufferSize);
-		buffers->setEncoding(kSMDataFormat8KHzULawPCM);
-	}
-	else if (_stricmp(dot, "al") == 0)
-	{
-		buffers = new Buffers(new RawFileStorage(aName, isRecording), numBuffers, kSMMaxReplayDataBufferSize);
-		buffers->setEncoding(kSMDataFormat8KHzALawPCM);
-	}
-	else
-	{
-		throw FileFormatError(__FILE__, __LINE__, "AculabPhone::allocateBuffers", "unknown format");
-	}
-
-	return buffers;
-}
-
-unsigned AculabPhone::startPlaying()
-{
-	Telephone::FileSample *sample = dynamic_cast<Telephone::FileSample*>(current);
-	Buffers *buffers = sample->getBuffers();
-
-	struct sm_replay_parms start;
-
-	start.channel = channel;
-	start.background = kSMNullChannelId;
-	start.speed = 100;
-	start.agc = 0;
-	start.volume = 0;
-	start.type = buffers->getEncoding();
-	start.data_length = buffers->getSize();
-
-	int rc = sm_replay_start(&start);
-	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
-
-	int status;
-	for (int i = 0; i < buffers->getNumBuffers(); ++i)
-	{
-		status = checkReplayStatus(sample);
-		if (status == kSMReplayStatusComplete || status == kSMReplayStatusCompleteData)
-			break;
-	}
-
-	return sample->position;
-}
-
-unsigned AculabPhone::submitPlaying()
-{	
-	Telephone::FileSample *sample = dynamic_cast<Telephone::FileSample*>(current);
-	Buffers *buffers = sample->getBuffers();
-
-	struct sm_ts_data_parms data;
-
-	data.channel = channel;
-	data.data = (char*)buffers->getCurrent();
-	data.length = buffers->getCurrentSize();
-
-	int rc = sm_put_replay_data(&data);
-	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_put_replay_data", rc);
-
-	++(*buffers);
-
-	return data.length * 1000 / buffers->getBytesPerSecond();
-}
-
-bool AculabPhone::stopPlaying()
-{
-	Telephone::FileSample *sample = dynamic_cast<Telephone::FileSample*>(current);
-	Buffers *buffers = sample->getBuffers();
-
-	struct sm_replay_abort_parms p;
-
-	p.channel = channel;
-
-	int rc = sm_replay_abort(&p);
-	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
-
-	int t = p.offset * 1000 / buffers->getBytesPerSecond();
-
-	sample->status = r_aborted;
-
-	current = NULL;
-
-	return true;
-}
-
-int AculabPhone::checkReplayStatus(Telephone::FileSample *sample)
-{
-	struct sm_replay_status_parms status;
-
-	status.channel = channel;
-	
-	int rc = sm_replay_status(&status);
-	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_replay_status", rc);
-
-	switch (status.status)
-	{
-	case kSMReplayStatusComplete:
-
-		sample->completed(sample->getPos());
-		client->completed(this, sample, sample->getPos());
-
-		current = NULL;
-		break;
-	case kSMReplayStatusUnderrun:
-		std::cerr << "underrun!" << std::endl;
-	case kSMReplayStatusHasCapacity:
-
-		sample->next(this);
-
-		break;
-	case kSMReplayStatusCompleteData:
-		break;
-	}
-
-	return status.status;
-}
-
-unsigned AculabPhone::startRecording(unsigned maxTime)
-{
-	return 0;
-}
-
-
-unsigned AculabPhone::submitRecording()
-{
-	return 0;
-}
-
-bool AculabPhone::stopRecording()
-{
-	return true;
-}
-
 void AculabPhone::onRead(tSMEventId id)
 {
 	int x = 9;
@@ -521,7 +497,7 @@ void AculabPhone::onWrite(tSMEventId id)
 
 	try
 	{
-		if (typeid(*current) == typeid(Telephone::Touchtones))
+		if (typeid(*current) == typeid(ProsodyChannel::Touchtones))
 		{
 			struct sm_play_tone_status_parms status;
 
@@ -533,15 +509,12 @@ void AculabPhone::onWrite(tSMEventId id)
 
 			if (status.status == kSMPlayToneStatusComplete)
 			{
-				current->completed(0);
-				client->completed(this, current, 0);
-
-				current = NULL;
+				completed(current);
 			}
 		}
-		else if (typeid(*current) == typeid(Telephone::FileSample))
+		else if (typeid(*current) == typeid(ProsodyChannel::FileSample))
 		{
-			checkReplayStatus(dynamic_cast<FileSample*>(current));
+			dynamic_cast<FileSample*>(current)->process(this);
 		}
 	}
 	catch (const Exception& e)

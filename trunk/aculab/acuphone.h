@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.1 2000/10/18 16:58:42 lars Exp $
+	$Id: acuphone.h,v 1.2 2000/10/30 11:38:57 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -146,7 +146,95 @@ public:
 	// cast operator
 	operator tSMChannelId() { return channel; }
 
+	virtual void startEnergyDetector(unsigned qualTime);
+	virtual void stopEnergyDetector();
+
 protected:
+
+	class FileSample : public Sample
+	{
+	public:
+
+		FileSample(ProsodyChannel *channel, const char* name, bool isRecordable = false)
+				: recordable(isRecordable), storage(0), prosody(channel)
+		{
+			storage = allocateStorage(name, isRecordable);
+		}
+
+		virtual ~FileSample()
+		{
+			delete storage;
+		}
+
+        virtual unsigned start(Telephone *phone);
+        virtual bool stop(Telephone *phone);
+		virtual unsigned submit(Telephone *phone);
+		// fills prosody buffers if space available, notifies about completion if done
+		virtual int process(Telephone *phone);
+
+		Storage* allocateStorage(const char *name, bool isRecordable);
+
+		virtual unsigned getLength() { return storage ? storage->getLength() : 0; }
+
+		virtual Storage* getStorage() { return storage; }
+
+	protected:
+		
+		bool recordable;
+		Storage* storage;
+		ProsodyChannel *prosody;
+	};
+
+	class RecordFileSample : public FileSample
+	{
+	public:
+	
+		RecordFileSample(ProsodyChannel *channel, const char* name, unsigned max)
+			: FileSample(channel, name, true), maxTime(max) {}
+		virtual ~RecordFileSample() {}
+
+        virtual unsigned start(Telephone *phone);
+        virtual bool stop(Telephone *phone);
+
+		virtual bool isOutgoing()	{ return false; }
+
+	protected:
+
+		unsigned maxTime;
+	};
+
+	class Beep : public Sample
+	{
+	public:
+		
+		Beep(ProsodyChannel *channel, int numBeeps) : beeps(numBeeps), prosody(channel) {}
+		virtual ~Beep() {}
+
+        virtual unsigned start(Telephone *phone);
+        virtual bool stop(Telephone *phone);
+
+		int beeps;
+		ProsodyChannel *prosody;
+	};
+
+	class Touchtones : public Sample
+	{
+	public:
+		
+		Touchtones(ProsodyChannel *channel, const char* att) : tt(att), prosody(channel) {}
+		virtual ~Touchtones() {}
+
+        virtual unsigned start(Telephone *phone);
+        virtual bool stop(Telephone *phone);
+
+		std::string tt;
+		ProsodyChannel *prosody;
+	};
+
+	friend class FileSample;
+	friend class RecordFileSample;
+	friend class Touchtones;
+	friend class Beep;
 
 	tSMEventId set_event(tSM_INT type);
 
@@ -177,35 +265,17 @@ public:
 
     virtual Switch* getSwitch() { return &sw; }
 
+	virtual Sample* createFileSample(const char *name) { return new FileSample(this, name); }
+	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime) { return new RecordFileSample(this, name, maxTime); }
+	virtual Sample* createTouchtones(const char *tt) { return new Touchtones(this, tt); }
+	virtual Sample* createBeeps(int nBeeps) { return new Beep(this, nBeeps); }
+
+	virtual void startEnergyDetector(unsigned qualTime) { ProsodyChannel::startEnergyDetector(qualTime); }
+	virtual void stopEnergyDetector() { ProsodyChannel::stopEnergyDetector(); }
+
 	static void start() { dispatcher.start(); }
 
 protected:
-
-	virtual unsigned startBeeps(int beeps);
-	virtual bool stopBeeps();
-
-	virtual unsigned startTouchtones(const char* tt);
-	virtual bool stopTouchtones();
-
-	virtual unsigned startEnergyDetector(unsigned qualTime);
-	virtual bool stopEnergyDetector();
-
-	// return msecs queued
-	virtual unsigned startPlaying();
-	virtual unsigned submitPlaying();
-
-	// returns true if operations was stopped synchronously
-	virtual bool stopPlaying();
-
-	virtual unsigned startRecording(unsigned maxTime);
-	virtual unsigned submitRecording();
-
-	// returns true if operations was stopped synchronously
-	virtual bool stopRecording();
-
-	virtual Buffers* allocateBuffers(const char* aFile, unsigned numBuffers, bool isRecording = 0);
-
-	int checkReplayStatus(Telephone::FileSample* sample);
 
 	virtual void onRead(tSMEventId id);
 	virtual void onWrite(tSMEventId id);

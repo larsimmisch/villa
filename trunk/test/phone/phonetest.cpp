@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.1 2000/10/18 16:58:43 lars Exp $
+	$Id: phonetest.cpp,v 1.2 2000/10/30 11:38:57 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -99,33 +99,28 @@ public:
 		s[0] = tt;
 		s[1] = '\0';
 
-		Telephone::Touchtones *touchtones = new Telephone::Touchtones(s);
+		Sample *touchtones = server->createTouchtones(s);;
 
-		server->start(touchtones);
+		touchtones->start(server);
 	}
 
-	virtual void started(Telephone *server, Telephone::Sample *sample)
+	virtual void started(Telephone *server, Sample *sample)
 	{
 	}
 
 	virtual void connected(Telephone *server)
 	{
-		Telephone::FileSample* sample = new Telephone::FileSample(server, "startrek.al");
+		Sample* sample = server->createFileSample("startrek.al");
 
-		server->start(sample);
+		sample->start(server);
 
-		/*
-		Telephone::Touchtones *touchtones = new Telephone::Touchtones("123456789*#");
-
-		server->start(touchtones);
-		*/
 	}
 
 	virtual void disconnected(Telephone *server)
 	{
 	}
 
-	virtual void completed(Telephone *server, Telephone::Sample *sample, unsigned msecs)
+	virtual void completed(Telephone *server, Sample *sample, unsigned msecs)
 	{
 		delete sample;
 	}
