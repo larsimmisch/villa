@@ -1,5 +1,5 @@
-#ifndef V3_ERRORS_H__
-#define V3_ERRORS_H__
+#ifndef V3_DEFS_H__
+#define V3_DEFS_H__
 
 /* events */
 #define V3_EVENT 100
@@ -31,4 +31,17 @@
 /* fatal errors */
 #define V3_FATAL_SYNTAX 600
 
-#endif
+/* Conference definitions */
+#define V3_CONF_LISTEN 0x01
+#define V3_CONF_SPEAK 0x02
+#define V3_CONF_DUPLEX 0x03
+
+/* Molecule modes */
+#define V3_MODE_DISCARD 0x01
+#define V3_MODE_PAUSE 0x02
+#define V3_MODE_MUTE 0x04
+#define V3_MODE_RESTART 0x08
+#define V3_MODE_DONT_INTERRUPT 0x10
+#define V3_MODE_LOOP 0x20
+
+#endif /* V3_DEFS_H__ */
