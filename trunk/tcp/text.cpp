@@ -10,7 +10,8 @@
 static char get_lost[] = "finger weg!\r\n";
 
 TextTransport::TextTransport(void* aPrivateData) : socket(), 
-	privateData(aPrivateData), state(idle), m_gbuf(0), m_gpos(0), m_gmax(256),
+	privateData(aPrivateData), state(idle), m_gbuf(0), m_gpos(0), 
+	m_gsize(0), m_gmax(256),
 	std::basic_iostream<char>(this)
 {
 	m_gbuf = new char[256];
@@ -159,10 +160,22 @@ unsigned TextTransport::receiveRaw(unsigned aTimeout)
 {
 	unsigned rcvd;
 
+	for (;m_gpos < m_gsize-1; ++m_gpos)
+	{
+		if (m_gbuf[m_gpos] == '\r' && m_gbuf[m_gpos+1] == '\n')
+		{
+			m_gpos += 2;
+			break;
+        }
+	}
+
+	if (m_gpos < m_gsize - 2)
+		return m_gsize - m_gpos;
+
 	m_gsize = 0;
 	m_gpos = 0;
 
-	while(1)
+	while (true)
 	{
 		if ((timeout = socket.waitForData(aTimeout)) == 0)	
 		{
@@ -184,7 +197,7 @@ unsigned TextTransport::receiveRaw(unsigned aTimeout)
         {
             if (m_gbuf[i] == '\r' && m_gbuf[i+1] == '\n')
             {
-                return m_gsize;
+                return i;
             }
         }
 

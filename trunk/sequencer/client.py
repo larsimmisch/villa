@@ -2,7 +2,7 @@
 simple sequencer client:
 connect to sequencer, accept incoming call[, play sample] and hangup
 
-$Id: client.py,v 1.4 2001/09/19 12:36:56 lars Exp $
+$Id: client.py,v 1.5 2001/09/24 10:53:48 lars Exp $
 """
 import socket,re,sys,time,getopt,string
 
@@ -135,8 +135,8 @@ class Call:
 		interface.send(self, self.device + ' add 2 1 play sitrtoot.al none')
 
 	def molecule_done(self, event, data):
- 		# interface.send(self, 'global listen any any') 
- 		# interface.send(self, self.device + ' disconnect')
+ 		interface.send(self, 'global listen any any') 
+ 		interface.send(self, self.device + ' disconnect')
 		pass
 
 	def disconnect_done(self, event, data):
