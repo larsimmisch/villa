@@ -6,28 +6,35 @@ integer := [0-9]+
 
 // response sent to client
 
-completion := 'listen-done' | 'disconnect-done' | 'accept-done' 
-	     'molecule-done'
+completion := 'LSTN' | 'DISC' | 'ACPT' 
+	     'MLCL' | 'CNFO' | 'CNFC'
 
-event := 'touchtone' | 'disconnect'
+// LSTN: listen 
+// DISC: disconnect
+// ACPT: accept
+// MLCL: molecule
+// CNFO: conference open
+// CNFC: conference close
+
+event := 'DTMF' | 'DISC'
 
 data := identifier*
 
 result := '0' | '1'
 
-response := tid result device completion data
+response := tid completion result device data
 
-unsolicited_event := '-1' device event data
+unsolicited_event := '-1' event device data
 
 // listen for incoming call
 
 trunk := identifier | 'any'
 did := identifier | 'any'
 
-listen := tid 'global' 'listen' trunk did
+listen := tid 'GLOBAL' 'LSTN' trunk did
 
 // disconnect call
-disconnect := tid channel 'disconnect'
+disconnect := tid channel 'DISC'
 
 // do media stuff
 

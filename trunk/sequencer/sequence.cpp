@@ -158,8 +158,8 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 			log(log_error, "sequencer") << "Exception in addMolecule: " << e << logend();
 			atom = 0;
 
-			m_interface->begin() << id << ' ' << _failed << ' ' 
-				<< m_trunk->getName() << " molecule-done " 
+			m_interface->begin() << id << ' '  << m_trunk->getName() 
+				<< " MLCL " << _failed << ' '
 				<< 0 << ' ' << molecule->getLength() << end();
 
 			return _failed;
@@ -169,8 +169,8 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 			log(log_error, "sequencer") << e << logend();
 			atom = 0;
 
-			m_interface->begin() << id << ' ' << _failed << ' ' 
-				<< m_trunk->getName() << " molecule-done " 
+			m_interface->begin() << id << ' ' << m_trunk->getName() 
+				<< " MLCL " << _failed << ' ' 
 				<< 0 << ' ' << molecule->getLength() << end();
 
 			return _failed;
@@ -313,8 +313,8 @@ void Sequencer::sendAtomDone(const char *id, unsigned nAtom, unsigned status, un
 
 void Sequencer::sendMoleculeDone(const char *id, unsigned status, unsigned pos, unsigned length)
 {
-	m_interface->begin() << id << ' ' << status << ' ' << m_trunk->getName()
-		<< " molecule-done " << pos << ' ' << length << end();
+	m_interface->begin() << id << ' ' << m_trunk->getName()
+		<< " MLCL " << status << ' ' << pos << ' ' << length << end();
 
 	log(log_debug, "sequencer", m_trunk->getName())
 		<< "sent molecule done for: " << id << " status: " << status << " pos: " 
@@ -483,7 +483,13 @@ void Sequencer::onIncoming(Trunk* server, const SAP& local, const SAP& remote)
 		m_local = local;
 		m_remote = remote;
 
-		server->accept();
+		m_interface->begin() << m_clientSpec->m_id.c_str() 
+			<< ' ' << m_trunk->getName()
+			<< " LSTN " << _ok
+			<< " \"" << m_remote.getAddress() << "\" \""
+			<< m_configuration->getNumber() << "\" \""
+			<< m_local.getService() << "\" "
+			<< server->getTimeslot().ts << end();
 	}
 	else 
 	{
@@ -661,8 +667,8 @@ void Sequencer::disconnectDone(Trunk *server, unsigned result)
 
 	assert(m_id.size());
 
-	m_interface->begin() << m_id.c_str() << ' ' << result << ' '
-		<< m_trunk->getName() << " disconnect-done" << end();
+	m_interface->begin() << m_id.c_str()
+		<< m_trunk->getName() << " DISC "  << result << end();
 
 	m_id.erase();
 
@@ -678,13 +684,9 @@ void Sequencer::acceptDone(Trunk *server, unsigned result)
 
 		m_media->connected(server);
 
-		m_interface->begin() << m_clientSpec->m_id.c_str() << ' ' << _ok 
+		m_interface->begin() << m_clientSpec->m_id.c_str() 
 			<< ' ' << m_trunk->getName()
-			<< " listen-done "
-			<< " \"" << m_remote.getAddress() << "\" \""
-			<< m_configuration->getNumber() << "\" \""
-			<< m_local.getService() << "\" "
-			<< server->getTimeslot().ts << end();
+			<< " ACPT " << _ok << end();
 
 		lock();
 		delete m_clientSpec;
@@ -840,8 +842,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	{
 		sendMoleculeDone(id.c_str(), r_disconnected, pos, length);
 
-		m_interface->begin() << _event << ' ' << server->getName() 
-			<< " disconnect" << end();
+		m_interface->begin() << _event << " DISC " << server->getName() << end();
 
 		return;
 	}
@@ -860,8 +861,7 @@ void Sequencer::touchtone(Media* server, char tt)
 	log(log_debug, "sequencer", server->getName())
 		<< "touchtone: " << tt << logend();
 
-	m_interface->begin() << _event << ' ' << server->getName() 
-		<< " touchtone " << tt << end();
+	m_interface->begin() << _event << " DTMF " << server->getName() << ' ' << tt << end();
 }
 
 void Sequencer::fatal(Media* server, const char* e)

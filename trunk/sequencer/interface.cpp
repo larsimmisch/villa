@@ -151,291 +151,272 @@ bool Interface::data(InterfaceConnection *ic)
     // this is the main packet inspection method...
 
 	std::string id;
-	std::string scope;
+	std::string command;
 
 	(*ic) >> id;
-	(*ic) >> scope;
+	(*ic) >> command;
 
 	if (ic->eof())
 	{
 		ic->clear();
 
-		// exit from telnet - does not restrict tid usage
+		// exit from telnet - does not restrict tid usage (irregular syntax)
 		if (id == "exit")
 		{
 			return false;
 		}
 
-		ic->begin() << _syntax_error 
-			<< " syntax error - expecting id and scope" << end();
+		ic->begin() << id.c_str() << " syntax error - expecting id and command" << end();
 
-		return true;
+		return false;
 	}
 
-	if (scope == "global")
+	if (command == "DESC")
 	{
-		std::string command;
+		ic->begin();
 
-		(*ic) >> command;
+		for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
+		{
+			(*ic) << id.c_str() << ' ' << _ok << ' '
+				<< c.current()->getName() << ' ' 
+				<< c.current()->getNumber() << ' '
+				<< (c.current()->isDigital() ? "digital" : "analog")
+				<< "\n";
+		}
 
-		if (!command.size())
+		(*ic) << end();
+	}
+	else if (command == "CNFO")
+	{
+		Conference *conf = gConferences.create(ic);
+
+		if (conf)
+		{
+			char name[32];
+
+			sprintf(name, "Conf[%d]", conf->getHandle());
+
+			ic->begin() << id.c_str() << " CNFO " << _ok << ' ' << name << end();
+		}
+		else
+		{
+			ic->begin() << id.c_str() << " CNFO " << _failed << end();
+		}
+	}
+	else if (command == "CNFC")
+	{
+		std::string conf;
+
+		(*ic) >> conf;
+
+		if (conf.size() <= 4 || conf.substr(0, 5) != "Conf[")
 		{
 			ic->clear();
 
-			ic->begin() << _syntax_error << 
-				" syntax error - expecting command" << end();
+			ic->begin() << id.c_str() << " CNFC " << _failed << end();
 
 			return true;
 		}
 
-		if (command == "describe")
+		unsigned handle(0);
+
+		sscanf(conf.c_str(), "Conf[%d]", &handle);
+
+		if (!handle)
 		{
-			ic->begin();
+			ic->begin() << id.c_str() << " CFNC " << _syntax_error << end();
 
-			for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
-			{
-				(*ic) << id.c_str() << ' ' << _ok << ' '
-					<< c.current()->getName() << ' ' 
-					<< c.current()->getNumber() << ' '
-					<< (c.current()->isDigital() ? "digital" : "analog")
-					<< "\n";
-			}
-
-			(*ic) << end();
+			return true;
 		}
-		else if (command == "open-conference")
+
+		if (gConferences.close(handle))
 		{
-			Conference *conf = gConferences.create(ic);
-
-			if (conf)
-			{
-				char name[32];
-
-				sprintf(name, "Conf[%d]", conf->getHandle());
-
-				ic->begin() << id.c_str() << ' ' << _ok 
-					<< " global open-conference-done " << name << end();
-			}
-			else
-			{
-				ic->begin() << id.c_str() << _failed 
-					<< " global open-conference-done" << end();
-			}
-		}
-		else if (command == "close-conference")
-		{
-			std::string conf;
-
-			(*ic) >> conf;
-
-			if (conf.size() <= 4 || conf.substr(0, 5) != "Conf[")
-			{
-				ic->clear();
-
-				ic->begin() << id.c_str() << ' ' << _syntax_error << 
-					" global close-conference-done" << end();
-
-				return true;
-			}
-
-			unsigned handle(0);
-
-			sscanf(conf.c_str(), "Conf[%d]", &handle);
-
-			if (!handle)
-			{
-				ic->begin() << _syntax_error << 
-					" global close-conference-done" << end();
-
-				return true;
-			}
-
-			if (gConferences.close(handle))
-			{
-				ic->begin() << id.c_str() << ' ' << _ok 
-					<< " global close-conference-done" << end();
-			}
-			else
-			{
-				ic->begin() << id.c_str() << ' ' << _failed 
-					<< " global close-conference-done" << end();
-			}
-		}
-		else if (command == "listen")
-		{
-			std::string trunkname;
-			std::string spec;
-
-			(*ic) >> trunkname;
-			(*ic) >> spec;
-
-			if (!trunkname.size() | !spec.size())
-			{
-				ic->clear();
-
-				ic->begin() << _syntax_error 
-					<< " syntax error - expecting trunk name and DID" 
-					<< end();
-
-				return true;
-			}
-
-			TrunkConfiguration* trunk = 0;
-			SAP client, detail;
-			
-			if (spec != "any")
-				detail.setService(spec.c_str());
-
-			if (trunkname != "any")
-			{
-				trunk = gConfiguration[trunkname.c_str()];
-
-				if (!trunk)
-				{
-					log(log_error, "sequencer")
-						<< "attempted to add listen for invalid trunk " 
-						<< trunkname.c_str() << logend();
-
-					ic->begin() << id.c_str() << ' ' << _invalid 
-						<< " invalid trunk " << trunkname.c_str() << end();
-
-					return true;
-				}
-	
-
-				trunk->enqueue(id, detail, ic);
-
-				log(log_debug, "sequencer") << "id " << id.c_str() 
-					<< " added listen for " << trunk->getName() 
-					<< ' ' << (detail.getService() ? detail.getService() : "any") 
-					<< logend();
-			}
-			else
-			{
-				gClientQueue.enqueue(id, detail, ic);
-
-				log(log_debug, "sequencer") << "id " << id.c_str()
-					<< " added listen for any trunk " << logend();
-
-			}
-		}
-		else if (command == "connect")
-		{
-/*
-			SAP client;
-
-			client.setAddress(aPacket->getStringAt(0));
-			client.setService(aPacket->getStringAt(1));
-
-			// remove any listeners for this client
-			// first in the global queue
-
-			gClientQueue.remove(ic, client);
-
-			// then in all the trunks
-
-			gConfiguration.lock();
-			for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
-			{
-				t.current()->removeClient(ic, client);
-			}
-			gConfiguration.unlock();
-
-			// now start the connect
-
-			TrunkConfiguration* trunk;
-			unsigned result = _failed;
-
-			trunk = gConfiguration[aPacket->getStringAt(2)];
-
-			log(log_debug, "sequencer") << "client " << client 
-				<< " wants outgoing line on " 
-				<< (aPacket->getStringAt(2) ? aPacket->getStringAt(2) : "any trunk") 
-				<< logend();
-
-			ConnectCompletion* complete = 
-				new ConnectCompletion(*ic, aPacket->getSyncMajor(), aPacket->getSyncMinor(), client);
-
-			if (trunk)
-			{
-				result = trunk->connect(complete);
-			}
-			else
-			{
-				gConfiguration.lock();
-				for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
-				{
-					result = t.current()->connect(complete);
-					if (result == _ok)	break;
-				}
-				gConfiguration.unlock();
-			}
-
-			if (result != _ok)
-			{
-				delete complete;
-
-				reply->setUnsignedAt(0, result);
-				ic->send(*reply);
-			}
-*/
-		}
-		else if (command == "stop-listening")
-		{
-/*
-			reply = ((InterfaceConnection*)ic)->staticPacket(1);
-			reply->setContent(if_stop_listening_done);
-			reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
-
-			if (aPacket->typeAt(0) != Packet::type_string
-			 || aPacket->typeAt(1) != Packet::type_string)
-			{
-				reply->setUnsignedAt(0, _invalid);
-				ic->send(*reply);
-
-				break;
-			}
-
-			SAP client;
-
-			client.setAddress(aPacket->getStringAt(0));
-			client.setService(aPacket->getStringAt(1));
-
-			// remove any listeners for this client
-			// first in the global queue
-
-			gClientQueue.remove(ic, client);
-
-			// then in all the trunks
-
-			gConfiguration.lock();
-			for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
-			{
-				t.current()->removeClient(ic, client);
-			}
-			gConfiguration.unlock();
-
-			reply->setUnsignedAt(0, _ok);
-			ic->send(*reply);
-*/
+			ic->begin() << id.c_str() << " CNFC " << _ok << end();
 		}
 		else
 		{
-			// syntax error
-
-			ic->begin() << id.c_str() << ' ' << _failed 
-				<< " syntax error - unknown command " << command.c_str()
-				<< end();
+			ic->begin() << id.c_str() << " CNFC " << _failed  << end();
 		}
+	}
+	else if (command == "LSTN")
+	{
+		std::string trunkname;
+		std::string spec;
+
+		(*ic) >> trunkname;
+		(*ic) >> spec;
+
+		if (!trunkname.size() | !spec.size())
+		{
+			ic->clear();
+
+			ic->begin() << id.c_str() << " LSTN " << _syntax_error 
+				<< " syntax error - expecting trunk name and DID" 
+				<< end();
+
+			return true;
+		}
+
+		TrunkConfiguration* trunk = 0;
+		SAP client, detail;
+		
+		if (spec != "any")
+			detail.setService(spec.c_str());
+
+		if (trunkname != "any")
+		{
+			trunk = gConfiguration[trunkname.c_str()];
+
+			if (!trunk)
+			{
+				log(log_error, "sequencer")
+					<< "attempted to add listen for invalid trunk " 
+					<< trunkname.c_str() << logend();
+
+				ic->begin() << id.c_str() << " LSTN " << _invalid 
+					<< " invalid trunk " << trunkname.c_str() << end();
+
+				return true;
+			}
+
+
+			trunk->enqueue(id, detail, ic);
+
+			log(log_debug, "sequencer") << "id " << id.c_str() 
+				<< " added listen for " << trunk->getName() 
+				<< ' ' << (detail.getService() ? detail.getService() : "any") 
+				<< logend();
+		}
+		else
+		{
+			gClientQueue.enqueue(id, detail, ic);
+
+			log(log_debug, "sequencer") << "id " << id.c_str()
+				<< " added listen for any trunk " << logend();
+
+		}
+	}
+	else if (command == "CONN")
+	{
+/*
+		SAP client;
+
+		client.setAddress(aPacket->getStringAt(0));
+		client.setService(aPacket->getStringAt(1));
+
+		// remove any listeners for this client
+		// first in the global queue
+
+		gClientQueue.remove(ic, client);
+
+		// then in all the trunks
+
+		gConfiguration.lock();
+		for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+		{
+			t.current()->removeClient(ic, client);
+		}
+		gConfiguration.unlock();
+
+		// now start the connect
+
+		TrunkConfiguration* trunk;
+		unsigned result = _failed;
+
+		trunk = gConfiguration[aPacket->getStringAt(2)];
+
+		log(log_debug, "sequencer") << "client " << client 
+			<< " wants outgoing line on " 
+			<< (aPacket->getStringAt(2) ? aPacket->getStringAt(2) : "any trunk") 
+			<< logend();
+
+		ConnectCompletion* complete = 
+			new ConnectCompletion(*ic, aPacket->getSyncMajor(), aPacket->getSyncMinor(), client);
+
+		if (trunk)
+		{
+			result = trunk->connect(complete);
+		}
+		else
+		{
+			gConfiguration.lock();
+			for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+			{
+				result = t.current()->connect(complete);
+				if (result == _ok)	break;
+			}
+			gConfiguration.unlock();
+		}
+
+		if (result != _ok)
+		{
+			delete complete;
+
+			reply->setUnsignedAt(0, result);
+			ic->send(*reply);
+		}
+*/
+	}
+	else if (command == "STOP")
+	{
+/*
+		reply = ((InterfaceConnection*)ic)->staticPacket(1);
+		reply->setContent(if_stop_listening_done);
+		reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
+
+		if (aPacket->typeAt(0) != Packet::type_string
+		 || aPacket->typeAt(1) != Packet::type_string)
+		{
+			reply->setUnsignedAt(0, _invalid);
+			ic->send(*reply);
+
+			break;
+		}
+
+		SAP client;
+
+		client.setAddress(aPacket->getStringAt(0));
+		client.setService(aPacket->getStringAt(1));
+
+		// remove any listeners for this client
+		// first in the global queue
+
+		gClientQueue.remove(ic, client);
+
+		// then in all the trunks
+
+		gConfiguration.lock();
+		for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
+		{
+			t.current()->removeClient(ic, client);
+		}
+		gConfiguration.unlock();
+
+		reply->setUnsignedAt(0, _ok);
+		ic->send(*reply);
+*/
 	}
 	else
 	{
+		std::string scope;
+
+		(*ic) >> scope;
+		if (ic->eof())
+		{
+			ic->clear();
+
+			ic->begin() << id.c_str() << " syntax error - unknown command: " 
+				<< command << end();
+
+			return false;
+		}
+
 		Sequencer *s = ic->find(scope);
 
 		if (!s)
 		{
-			ic->begin() << id.c_str() << ' ' << _failed 
-				<< " syntax error - unknown scope " << scope.c_str()
+			ic->begin() << id.c_str()
+				<< " error - unknown scope: " << scope.c_str()
 				<< end();
 		}
 		else
