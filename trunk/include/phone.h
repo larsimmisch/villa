@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.19 2003/12/17 23:27:21 lars Exp $
+	$Id: phone.h,v 1.20 2004/01/08 21:22:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -30,6 +30,7 @@ public:
 
     enum TrunkCommand  { 
 		t_none, 
+		t_idle,
 		t_connect, 
 		t_disconnect,
 		t_transfer, 
@@ -39,6 +40,8 @@ public:
 	Trunk(TrunkClient* aClient) 
 		: m_client(aClient), m_cmd(t_none), m_remote_disconnect(false) {}
     virtual ~Trunk() {}
+
+	virtual int idle() = 0;
 
 	// Connection establishment 
 	virtual int listen() = 0;
@@ -174,14 +177,14 @@ public:
     void setTransmitTimeslot(Timeslot aTimeslot) { m_transmit = aTimeslot; }
     void setReceiveTimeslot(Timeslot aTimeslot)	{ m_receive = aTimeslot; }
 
-    virtual Switch* getSwitch()	{ return 0; }
+    Switch* getSwitch()	{ return 0; }
 
 	virtual void completed(Sample *sample) 
 	{ 
 		m_client->completed(this, sample, sample->m_position);
 	}
-	// todo delete?
-	virtual MediaClient* getClient() { return m_client; }		
+	MediaClient* getClient() { return m_client; }
+	void setClient(MediaClient *client) { m_client = client;; }
 
 	// debug
 	virtual const char *getName() = 0;

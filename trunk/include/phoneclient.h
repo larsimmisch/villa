@@ -1,7 +1,7 @@
 /*
 	phoneclient.h
 
-	$Id: phoneclient.h,v 1.9 2003/12/01 22:26:56 lars Exp $
+	$Id: phoneclient.h,v 1.10 2004/01/08 21:22:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -25,6 +25,9 @@ public:
 	TrunkClient() {}
 	virtual ~TrunkClient() {}
 	
+	// callref may be INVALID_CALLREF
+	virtual void idleDone(Trunk *server, unsigned callref) = 0;
+
 	// must call server.accept or server.reject
 	virtual void connectRequest(Trunk* server, unsigned callref,
 		const SAP& local, const SAP& remote) = 0;

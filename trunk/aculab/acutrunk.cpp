@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.23 2003/12/17 23:27:21 lars Exp $
+	$Id: acutrunk.cpp,v 1.24 2004/01/08 21:22:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -144,6 +144,40 @@ void AculabTrunk::start()
 	call_signal_info(AculabTrunk::s_siginfo);
 
 	s_dispatcher.start(); 
+}
+
+int AculabTrunk::idle()
+{
+	CAUSE_XPARMS xcause;
+
+	memset(&xcause, 0, sizeof(xcause));
+
+	xcause.handle = m_handle;
+
+	lock();
+
+	if (m_cmd != t_none)
+	{
+		unlock();
+
+		return V3_ERROR_INVALID_STATE;
+	}
+
+	m_stopped = false;
+	m_cmd = t_idle;
+	unlock();
+
+	int rc = call_disconnect(&xcause);
+	if (rc)
+	{
+		log(log_error, "trunk", getName()) 
+			<< "call_disconnect failed: " << rc << logend();
+
+		return V3_ERROR_FAILED;
+	}
+
+	return V3_OK;
+
 }
 
 int AculabTrunk::listen()
@@ -497,6 +531,10 @@ void AculabTrunk::onIdle()
 
 	switch (cmd)
 	{
+	case t_idle:
+		// outgoing failed or stopped
+		m_client->idleDone(this, callref);
+		break;
 	case t_connect:
 		// outgoing failed or stopped
 		m_client->connectDone(this, callref, stopped ? V3_ABORTED : cause);

@@ -30,6 +30,7 @@ Conferences gConferences;
 
 ConfiguredTrunks gConfiguration;
 ClientQueue gClientQueue;
+MediaPool gMediaPool;
 
 CTbus *gBus;
 
@@ -41,17 +42,26 @@ Timer Sequencer::timer;
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
   :	m_activity(this), m_configuration(aConfiguration), m_connectComplete(0),
 	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), m_interface(0),
-	m_callref(INVALID_CALLREF)
+	m_callref(INVALID_CALLREF), m_media(0)
 {
-	Timeslot receive = gBus->allocate();
-	Timeslot transmit = gBus->allocate();
+	m_receive = gBus->allocate();
+	m_transmit = gBus->allocate();
 
-	m_media = new AculabMedia(this, aConfiguration->getSwitch(), 
-		receive, transmit);
+	if (aConfiguration)
+	{
+		m_trunk = aConfiguration->getTrunk(this);
+		
+		m_trunk->listen();
+	}
+	else
+	{
+		m_media = gMediaPool.allocate(this);
+		if (!m_media)
+		{
+			throw Exception(__FILE__, __LINE__, "Sequencer::Sequencer()", "no media resources");
+		}
 
-	m_trunk = aConfiguration->getTrunk(this);
-	
-	m_trunk->listen();
+	}
 }
 
 void Sequencer::lost_connection()
@@ -374,6 +384,15 @@ int Sequencer::connect(ConnectCompletion* complete)
 		return V3_ERROR_BUSY;
 	}
 
+	m_media = gMediaPool.allocate(this);
+	if (!m_media)
+	{
+		log(log_warning, "sequencer", m_trunk->getName()) 
+			<< "connect failed - could no allocate media channel." << logend(); 
+
+		return V3_ERROR_NO_RESOURCE;
+	}
+
 	m_connectComplete = complete;
 
 	return V3_OK;
@@ -493,6 +512,17 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 	int contained; 
 
 	omni_mutex_lock lock(m_mutex);
+
+	m_media = gMediaPool.allocate(this);
+
+	if (!m_media)
+	{
+		log(log_warning, "sequencer", m_trunk->getName()) 
+			<< "could no allocate media channel. rejecting call." << logend(); 
+
+		m_trunk->disconnect(m_callref);
+		return;
+	}
 
 	m_callref = callref;
 
@@ -689,6 +719,8 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 			<< m_trunk->getName() << end();
 	}
 
+	gMediaPool.release(m_media);
+	m_media = 0;
 	m_id.erase();
 
 	m_disconnecting = INVALID_CALLREF;
@@ -747,6 +779,9 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 	{
 		lock();
 		m_callref = INVALID_CALLREF;
+		gMediaPool.release(m_media);
+		m_media = 0;
+
 		if (m_interface)
 		{
 			m_interface->remove(server->getName());
@@ -973,7 +1008,7 @@ void usage()
 int main(int argc, char* argv[])
 {
 	int c;
-	int analog = 0;
+	int nmodules = 0;
 	int sw = 0;
 	char szKey[256];
 
@@ -1054,6 +1089,7 @@ int main(int argc, char* argv[])
 			trunk->start();
 		}
 
+		/* If nothing was configured, start everything with default values */
 		if (gConfiguration.numElements() == 0)
 		{
 			int card = 0;
@@ -1107,6 +1143,12 @@ int main(int argc, char* argv[])
 				}
 			}
 		}
+
+		nmodules = sm_get_modules();
+		log(log_debug, "sequencer") 
+			 << nmodules << " modules found" << logend();
+
+		gMediaPool.add(nmodules * 30);
 
 		if (gConfiguration.numElements() == 0)
 		{

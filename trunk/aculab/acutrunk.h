@@ -1,7 +1,7 @@
 /*
 	acutrunk.h
 
-	$Id: acutrunk.h,v 1.9 2003/12/01 22:26:56 lars Exp $
+	$Id: acutrunk.h,v 1.10 2004/01/08 21:22:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -53,6 +53,8 @@ public:
 		: Trunk(aClient), m_handle(-1), m_port(aPort), 
 		m_stopped(false) {}
     virtual ~AculabTrunk() {}
+
+	virtual int idle();
 
 	// Connection establishment 
 	virtual int listen();

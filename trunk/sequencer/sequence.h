@@ -64,6 +64,8 @@ public:
 
 	// TrunkClient protocol
 
+	virtual void idleDone(Trunk *server, unsigned callref) {}
+
 	// must call server.accept or server.reject
 	virtual void connectRequest(Trunk *server, unsigned callref, 
 		const SAP &local, const SAP &remote);
@@ -121,6 +123,9 @@ public:
 
 	static Timer& getTimer()		{ return timer; }
 	AculabMedia* getMedia()			{ return m_media; }
+
+	Timeslot m_receive;
+	Timeslot m_transmit;
 
 protected:
 

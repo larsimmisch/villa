@@ -457,3 +457,42 @@ void ConfiguredTrunks::freeLink(List::Link* item)
 { 
 	delete (TrunkConfiguration*)item;
 }
+
+void MediaPool::add(int count)
+{
+	omni_mutex_lock lock(m_mutex);
+
+	for (int i = 0; i < count; ++i)
+	{
+		m_media.push_back(new AculabMedia(0));
+	}
+}
+
+AculabMedia *MediaPool::allocate(Sequencer *s)
+{
+	omni_mutex_lock lock(m_mutex);
+
+	for (std::vector<AculabMedia*>::iterator i = m_media.begin(); 
+		i != m_media.end(); ++i)
+	{
+		if (!(*i)->getClient())
+		{
+			(*i)->setClient(s);
+			(*i)->setTransmitTimeslot(s->m_transmit);
+			(*i)->setReceiveTimeslot(s->m_receive);
+
+			return *i;
+		}
+	}
+
+	return 0;
+}
+
+void MediaPool::release(AculabMedia *m)
+{
+	omni_mutex_lock lock(m_mutex);
+
+	m->setClient(0);
+	m->setTransmitTimeslot(Timeslot(-1, -1));
+	m->setReceiveTimeslot(Timeslot(-1, -1));
+}

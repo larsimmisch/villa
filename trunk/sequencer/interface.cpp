@@ -257,6 +257,47 @@ bool Interface::data(InterfaceConnection *ic)
 			ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << end();
 		}
 	}
+	else if (command == "BGRO")
+	{
+		Sequencer *s = new Sequencer(0);
+		std::string name = s->getMedia()->getName();
+
+		ic->add(name, s);
+
+		ic->begin() << V3_OK << ' ' << id.c_str() << " BGRO " << name << end();
+	}
+	else if (command == "BGRC")
+	{
+		std::string device;
+
+		(*ic) >> device;
+
+		if (!device.size())
+		{
+			ic->clear();
+
+			ic->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str() << " BGRC " 
+				<< " syntax error - expecting device" 
+				<< end();
+
+			return false;
+		}
+
+		Sequencer *s = ic->find(device);
+		if (!s)
+		{
+			ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " BGRC device not found" 
+				<< command << end();
+		}
+		else
+		{
+			// Todo: will this work when a command is under way?
+			delete s;
+			ic->remove(device);
+
+			ic->begin() << V3_OK << ' ' << id.c_str() << " BGRC" << end();
+		}
+	}
 	else if (command == "LSTN")
 	{
 		std::string trunkname;

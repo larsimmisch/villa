@@ -18,6 +18,7 @@
 #include "set.h"
 #include "registry.h"
 #include "aculab/acutrunk.h"
+#include "switch.h"
 #include "interface.h"
 
 class InvalidKey : public Exception
@@ -154,7 +155,7 @@ public:
 
 	virtual ~TrunkConfiguration();
 
-	virtual int isDigital()			{ return 0; }
+	virtual int isDigital()			{ return 1; }
 	virtual Timeslot preferredSlot()	{ return Timeslot(-1,-1); }
 
 	virtual Trunk* getTrunk(TrunkClient *client = 0) = 0;
@@ -291,6 +292,26 @@ public:
 	{ return (TrunkConfiguration*)Set::AssocIter::current(); }
 #endif
 
+};
+
+class AculabMedia;
+
+class MediaPool
+{
+public:
+
+	MediaPool() {}
+	virtual ~MediaPool() {}
+
+	void add(int count);
+
+	AculabMedia *allocate(Sequencer *s);
+	void release(AculabMedia *m);
+
+	void start();
+
+	std::vector<AculabMedia*> m_media;
+	omni_mutex m_mutex;
 };
 
 #endif
