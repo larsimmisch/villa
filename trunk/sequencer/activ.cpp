@@ -85,6 +85,8 @@ bool ConferenceAtom::stop(Sequencer* sequencer, unsigned status)
 	if (m_conference)
 		m_conference->remove(sequencer->getMedia());
 
+	m_conference = 0;
+
 	sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_data, 
 		now - m_started, status);
 

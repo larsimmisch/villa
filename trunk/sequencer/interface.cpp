@@ -211,11 +211,8 @@ bool Interface::data(InterfaceConnection *ic)
 
 		if (conf)
 		{
-			char name[32];
-
-			sprintf(name, "conf[%d]", conf->getHandle());
-
-			ic->begin() << V3_OK << ' ' << id.c_str() << " CNFO " << name << end();
+			ic->begin() << V3_OK << ' ' << id.c_str() << " CNFO conf[" << conf->getHandle()
+				<< ']' << end();
 		}
 		else
 		{
