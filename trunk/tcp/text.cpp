@@ -147,6 +147,10 @@ unsigned SocketStream::receive()
 		m_rsize += rcvd;
 		m_rbuf[m_rsize] = '\0';
 
+		std::ostream &o = log(log_info, "text") << m_remote << " receive_raw: ";
+		o.write(m_rbuf, m_rsize);
+		o << logend();
+
 		len = fillGBuf();
 		if (len)
 			return len;

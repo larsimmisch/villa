@@ -222,12 +222,7 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 				if (sscanf(conf.c_str(), "conf[%d]", &handle) != 1)
 				{
-					server->clear();
-
-					server->syntax_error(id) 
-						<< "invalid conference descriptor" << end();
-
-					return V3_FATAL_SYNTAX;
+					error = true;
 				}
 
 				std::string s;
