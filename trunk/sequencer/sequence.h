@@ -130,7 +130,7 @@ public:
 	static Timer& getTimer()		{ return timer; }
 	AculabMedia* getMedia()			{ return m_media; }
 
-	const char *getName() { return m_trunk ? m_trunk->getName() : m_media->getName(); }
+	const char *getName();
 
 	Timeslot m_receive;
 	Timeslot m_transmit;

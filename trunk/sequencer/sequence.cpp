@@ -82,6 +82,17 @@ Sequencer::Sequencer(InterfaceConnection *server)
 	}
 }
 
+const char *Sequencer::getName()   
+{ 
+	if (m_trunk)
+		return m_trunk->getName(); 
+
+	if (m_media)
+		return m_media->getName();
+
+	return "<invalid>";
+}
+
 void Sequencer::lost_connection()
 {
 	lock();
