@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.13 2001/06/20 12:50:18 lars Exp $
+	$Id: phonetest.cpp,v 1.14 2001/06/21 10:54:23 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -179,7 +179,8 @@ private:
 
 void usage()
 {
-	cout << "usage: phonetest -c <count> -p <port> -s <switch> -l <loglevel>" << endl;
+	cout << "usage: phonetest -p <port>[:<count>] -s <switch> -l <loglevel>" << endl;
+	cout << "\t -p may be repeated" << std::endl;
 }
 
 int main(int argc, char* argv[])
@@ -192,20 +193,30 @@ int main(int argc, char* argv[])
 	set_log_level(4);
 
 	CTbus *bus;
-	int count = 1;
-	int port = 0;
+	std::map<int,int> port_counts;
 	int sw = 0;
 	
 	int c;
-	while( (c = getopt(argc, argv, "c:p:s:l:")) != EOF) 
+	while( (c = getopt(argc, argv, "p:s:l:")) != EOF) 
 	{
 		switch(c) 
 		{
-		case 'c':
-			count = atoi(optarg);
-			break;
 		case 'p':
-			port = atoi(optarg);
+			{
+				// syntax is "-p <port>:<count>
+				std::string s(optarg);
+				int colon = s.find(':');
+				if (colon != std::string::npos)
+				{
+					std::string s2(s);
+					s.erase(colon);
+					s2.erase(0, colon+1);
+
+					port_counts[atoi(s.c_str())] = atoi(s2.c_str());
+				}
+				else
+					port_counts[atoi(s.c_str())] = 1;
+			}
 			break;
 		case 's':
 			sw = atoi(optarg);
@@ -219,6 +230,10 @@ int main(int argc, char* argv[])
 			usage();
 		}
 	}
+
+	// initialize defaults
+	if (port_counts.size() == 0)
+		port_counts[0] = 1;
 
 	struct swmode_parms swmode;
 
@@ -248,27 +263,33 @@ int main(int argc, char* argv[])
 	vector<AculabTrunk*> trunks;
 	vector<AculabPhone*> phones;
 
-	trunks.reserve(count);
-	phones.reserve(count);
-
-	for (int i = 0; i < count; ++i)
+	int count = 0;
+	for (std::map<int,int>::iterator i = port_counts.begin(); i != port_counts.end(); ++i)
 	{
-		Timeslot receive = bus->allocate();
-		Timeslot transmit = bus->allocate();
+		log(log_debug, "app") << "starting " << i->second 
+			<< " channels on port " << i->first <<	logend();
 
-		// this will leak memory - we don't care
-		Application *app = new Application;
+		for (int j = 0; j < i->second; ++j)
+		{
+			Timeslot receive = bus->allocate();
+			Timeslot transmit = bus->allocate();
 
-		trunks[i] = new AculabTrunk(app, port);
-		phones[i] = new AculabPhone(app, trunks[i], sw, receive, transmit);
+			// this will leak memory - we don't care
+			Application *app = new Application;
+
+			trunks.push_back(new AculabTrunk(app, i->first));
+			phones.push_back(new AculabPhone(app, trunks[count], sw, 
+				receive, transmit));
+			++count;
+		}
 	}
 
 	AculabTrunk::start();
 	AculabPhone::start();
 
-	for (i = 0; i < count; ++i)
+	for (int j = 0; j < count; ++j)
 	{
-		phones[i]->listen();
+		phones[j]->listen();
 	}
 
 	while(true)
