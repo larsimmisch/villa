@@ -1,0 +1,34 @@
+#ifndef V3_ERRORS_H__
+#define V3_ERRORS_H__
+
+/* events */
+#define V3_EVENT 100
+
+/* completion codes */
+#define V3_OK 200
+#define V3_ABORTED 201
+#define V3_SILENCE 202
+#define V3_TIMEOUT 203
+
+/* warnings */
+#define V3_WARNING_EMPTY 400
+
+/* errors */
+#define V3_ERROR_FAILED 500
+#define V3_ERROR_INVALID_STATE 501
+#define V3_ERROR_PROTOCOL_VIOLATION 502
+#define V3_ERROR_BUSY 503
+#define V3_ERROR_NO_RESOURCE 504
+#define V3_ERROR_NOT_FOUND 505
+#define V3_ERROR_NOT_IMPLEMENTED 506
+#define V3_ERROR_INVALID_ARGUMENT 507
+#define V3_ERROR_TIMEOUT 508
+#define V3_ERROR_NUMBER_CHANGED 509
+#define V3_ERROR_UNREACHABLE 510
+#define V3_ERROR_REJECTED 511
+#define V3_ERROR_DISCONNECTED 512
+
+/* fatal errors */
+#define V3_FATAL_SYNTAX 600
+
+#endif

@@ -1,42 +1,46 @@
-#include "phone.h"
+#include "v3error.h"
 
 const char* result_name(int r)
 {
 	switch (r)
 	{
-	case PHONE_EVENT:
+	case V3_EVENT:
 		return "event";
-	case PHONE_OK:
+	case V3_OK:
 		return "ok";
-	case PHONE_WARNING_EMPTY:
-		return "empty";
-	case PHONE_ERROR_FAILED:
-		return "failed";
-	case PHONE_ERROR_INVALID_STATE: 
-		return "invalid state";
-	case PHONE_ERROR_PROTOCOL_VIOLATION: 
-		return "protocol violation";
-	case PHONE_ERROR_BUSY:
-		return "busy";
-	case PHONE_ERROR_NO_RESOURCE:
-		return "no resource";
-	case PHONE_ERROR_NOT_FOUND: 
-		return "not found";
-	case PHONE_ERROR_ABORTED:
+	case V3_ABORTED:
 		return "aborted";
-	case PHONE_ERROR_NOT_IMPLEMENTED:
-		return "not implemented";
-	case PHONE_ERROR_INVALID_ARGUMENT:
-		return "invalid argument";
-	case PHONE_ERROR_TIMEOUT:
+	case V3_SILENCE:
+		return "silence";
+	case V3_TIMEOUT:
 		return "timeout";
-	case PHONE_ERROR_NUMBER_CHANGED:
+	case V3_WARNING_EMPTY:
+		return "empty";
+	case V3_ERROR_FAILED:
+		return "failed";
+	case V3_ERROR_INVALID_STATE: 
+		return "invalid state";
+	case V3_ERROR_PROTOCOL_VIOLATION: 
+		return "protocol violation";
+	case V3_ERROR_BUSY:
+		return "busy";
+	case V3_ERROR_NO_RESOURCE:
+		return "no resource";
+	case V3_ERROR_NOT_FOUND: 
+		return "not found";
+	case V3_ERROR_NOT_IMPLEMENTED:
+		return "not implemented";
+	case V3_ERROR_INVALID_ARGUMENT:
+		return "invalid argument";
+	case V3_ERROR_TIMEOUT:
+		return "timeout";
+	case V3_ERROR_NUMBER_CHANGED:
 		return "number changed";
-	case PHONE_ERROR_UNREACHABLE:
+	case V3_ERROR_UNREACHABLE:
 		return "unreachable";
-	case PHONE_ERROR_REJECTED:
+	case V3_ERROR_REJECTED:
 		return "rejected";
-	case PHONE_FATAL_SYNTAX:
+	case V3_FATAL_SYNTAX:
 		return "syntax error";
 	default:
 		return "unknown";

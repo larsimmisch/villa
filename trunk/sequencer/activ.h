@@ -12,7 +12,9 @@
 #include "timer.h"
 #include "conference.h"
 #include "phone.h"
-#include "rphone.h"
+
+#define NOTIFY_START 0x01
+#define NOTIFY_STOP 0x02
 
 // the model here is strictly asynchronous. if an atom/molecule is to be stopped, stop is called,
 // but succesful stopping is expected to be signalled by a done with completed 0
@@ -51,14 +53,14 @@ public:
 	virtual int done(Sequencer* sequencer, unsigned msecs, unsigned reason) { return 1; }
 	virtual int setPos(unsigned aPosition) { return 1; }
 	virtual unsigned getLength()	{ return 0; }
-	virtual unsigned getStatus()	{ return PHONE_OK; }
+	virtual unsigned getStatus()	{ return V3_OK; }
 
 	virtual int isGrowing() { return 0; }
 
 	void setNotifications(int notify)	{ m_notifications = notify; }
 
-	int notifyStart() const { return m_notifications & notify_start; }
-	int notifyStop() const { return m_notifications & notify_stop; }
+	int notifyStart() const { return m_notifications & NOTIFY_START; }
+	int notifyStop() const { return m_notifications & NOTIFY_STOP; }
 
 	virtual void printOn(std::ostream& out)  { out << "abstract atom"; }
 
@@ -169,7 +171,7 @@ public:
 
 	virtual int setPos(unsigned pos) { return m_sample->setPos(pos); }
 	virtual unsigned getLength()	{ return m_sample->getLength(); }
-	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? PHONE_WARNING_EMPTY : PHONE_OK; }
+	virtual unsigned getStatus()	{ return m_sample->getLength() == 0 ? V3_WARNING_EMPTY : V3_OK; }
 
 	virtual int isGrowing() { return 1; }
 
@@ -190,7 +192,7 @@ public:
 
 	virtual int setPos(unsigned pos) { return 1; }
 	virtual unsigned getLength()	{ return m_nBeeps * 250; } // todo fix this
-	virtual unsigned getStatus()	{ return PHONE_OK; }
+	virtual unsigned getStatus()	{ return V3_OK; }
 
 	virtual void printOn(std::ostream& out)	{ out << "BeepAtom(" << m_nBeeps << ')'; }
 
@@ -229,7 +231,7 @@ public:
 	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos);
 	virtual unsigned getLength()	{ return m_length; } 
-	virtual unsigned getStatus()	{ return PHONE_OK; }
+	virtual unsigned getStatus()	{ return V3_OK; }
 
 	virtual void printOn(std::ostream& out)	{ out << "SilenceAtom(" << m_length << ')'; }
 
@@ -255,7 +257,7 @@ public:
 	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos) { return 1; }
 	virtual unsigned getLength()	{ return INDEFINITE; }
-	virtual unsigned getStatus()	{ return PHONE_OK; }
+	virtual unsigned getStatus()	{ return V3_OK; }
 
 	virtual void printOn(std::ostream& out)	{ out << "ConferenceAtom()"; }
 

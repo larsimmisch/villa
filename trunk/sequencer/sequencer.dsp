@@ -173,15 +173,15 @@ SOURCE=.\registry.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\rphone.h
-# End Source File
-# Begin Source File
-
 SOURCE=.\sequence.h
 # End Source File
 # Begin Source File
 
 SOURCE=..\include\timer.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\include\v3error.h
 # End Source File
 # End Group
 # Begin Group "Resource Files"

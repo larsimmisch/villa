@@ -1,7 +1,7 @@
 /*
 	fal.h
 
-	$Id: fal.h,v 1.2 2003/12/07 23:35:44 lars Exp $
+	$Id: fal.h,v 1.3 2003/12/17 23:27:21 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -17,6 +17,7 @@
 #include <mmsystem.h>
 #include <mmreg.h>
 #include "exc.h"
+#include "smbesp.h"
 
 class FileDoesNotExist : public Exception
 {
@@ -341,7 +342,7 @@ public:
 			throw FileDoesNotExist(__FILE__, __LINE__, "WaveBuffers::openForReading", file);
 		} 
  
-		// Locate a "RIFF" chunk with a "WAVE" form type to make 
+		// Locate a "RIFF" chunk within a "WAVE" form type to make 
 		// sure the file is a waveform-audio file. 
 		parent.fccType = mmioFOURCC('W', 'A', 'V', 'E'); 
 		if (mmioDescend(hmmio, &parent, NULL, MMIO_FINDRIFF)) 

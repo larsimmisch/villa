@@ -18,6 +18,8 @@
 #include "queue.h"
 #include "configuration.h"
 
+#define SEQUENCER_PORT 2104
+
 class Sequencer : public TrunkClient, public MediaClient
 {
 public:

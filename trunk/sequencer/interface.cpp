@@ -11,7 +11,6 @@
 #include "omnithread.h"
 #include "conference.h"
 #include "socket.h"
-#include "rphone.h"
 #include "sequence.h"
 #include "configuration.h"
 #include "interface.h"
@@ -185,7 +184,7 @@ bool Interface::data(InterfaceConnection *ic)
 			return false;
 		}
 
-		ic->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str()
+		ic->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str()
 			<< " syntax error - expecting id and command" << end();
 
 		return false;
@@ -197,7 +196,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 		for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
 		{
-			(*ic) << PHONE_OK << ' ' << id.c_str() << " DESC "
+			(*ic) << V3_OK << ' ' << id.c_str() << " DESC "
 				<< c.current()->getName() << ' ' 
 				<< c.current()->getNumber() << ' '
 				<< (c.current()->isDigital() ? "digital" : "analog")
@@ -216,11 +215,11 @@ bool Interface::data(InterfaceConnection *ic)
 
 			sprintf(name, "Conf[%d]", conf->getHandle());
 
-			ic->begin() << PHONE_OK << ' ' << id.c_str() << " CNFO " << name << end();
+			ic->begin() << V3_OK << ' ' << id.c_str() << " CNFO " << name << end();
 		}
 		else
 		{
-			ic->begin() << PHONE_ERROR_NO_RESOURCE << ' ' << id.c_str() << " CNFO " << end();
+			ic->begin() << V3_ERROR_NO_RESOURCE << ' ' << id.c_str() << " CNFO " << end();
 		}
 	}
 	else if (command == "CNFC")
@@ -233,7 +232,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			ic->clear();
 
-			ic->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << end();
+			ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << end();
 
 			return true;
 		}
@@ -244,18 +243,18 @@ bool Interface::data(InterfaceConnection *ic)
 
 		if (!handle)
 		{
-			ic->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() << " CFNC " << end();
+			ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CFNC " << end();
 
 			return false;
 		}
 
 		if (gConferences.close(handle))
 		{
-			ic->begin() << PHONE_OK << ' ' << id.c_str() << " CNFC " << end();
+			ic->begin() << V3_OK << ' ' << id.c_str() << " CNFC " << end();
 		}
 		else
 		{
-			ic->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << end();
+			ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << end();
 		}
 	}
 	else if (command == "LSTN")
@@ -270,7 +269,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			ic->clear();
 
-			ic->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str() << " LSTN " 
+			ic->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str() << " LSTN " 
 				<< " syntax error - expecting trunk name and DID" 
 				<< end();
 
@@ -293,7 +292,7 @@ bool Interface::data(InterfaceConnection *ic)
 					<< "attempted to add listen for invalid trunk " 
 					<< trunkname.c_str() << logend();
 
-				ic->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() 
+				ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() 
 					<< " LSTN unknown trunk: " << trunkname.c_str() << end();
 
 				return true;
@@ -425,7 +424,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			ic->clear();
 
-			ic->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - missing device name for: " 
+			ic->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - missing device name for: " 
 				<< command << end();
 
 			return false;
@@ -435,7 +434,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 		if (!s)
 		{
-			ic->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str()
+			ic->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str()
 				<< " error - unknown device: " << device.c_str()
 				<< end();
 

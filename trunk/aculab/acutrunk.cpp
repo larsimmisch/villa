@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.22 2003/12/04 00:59:49 lars Exp $
+	$Id: acutrunk.cpp,v 1.23 2003/12/17 23:27:21 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -172,7 +172,7 @@ int AculabTrunk::listen()
 
 		log(log_error, "trunk") << "call_openin failed: " << rc << logend();
 
-		return PHONE_ERROR_FAILED;
+		return V3_ERROR_FAILED;
 	}
 
 	s_dispatcher.add(incoming.handle, this);
@@ -182,7 +182,7 @@ int AculabTrunk::listen()
 	m_handle = incoming.handle;
 	unlock();
 
-	return PHONE_OK;
+	return V3_OK;
 }
 
 int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
@@ -197,13 +197,13 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 	{
 		unlock();
 
-		return PHONE_ERROR_INVALID_STATE;
+		return V3_ERROR_INVALID_STATE;
 	}
 
     if (remote.getAddress() == 0)   
 	{
 		unlock();
-		return PHONE_ERROR_INVALID_ARGUMENT;
+		return V3_ERROR_INVALID_ARGUMENT;
 	}
 
 	int sigsys = call_type(m_port);
@@ -276,7 +276,7 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 
 		s_dispatcher.unlock();
 
-        return PHONE_ERROR_FAILED;
+        return V3_ERROR_FAILED;
     }
 
 	s_dispatcher.add(m_handle, this);
@@ -286,7 +286,7 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
     m_handle = outdetail.handle;
 	unlock();
 
-	return PHONE_OK;
+	return V3_OK;
 }
 	
 int AculabTrunk::accept(unsigned callref)
@@ -297,7 +297,7 @@ int AculabTrunk::accept(unsigned callref)
 	{
 		unlock();
 
-		return PHONE_ERROR_INVALID_STATE;
+		return V3_ERROR_INVALID_STATE;
 	}
 
 	m_cmd = t_accept;
@@ -312,10 +312,10 @@ int AculabTrunk::accept(unsigned callref)
 		log(log_error, "trunk", getName()) 
 			<< "call_accept failed: " << rc << logend();
 
-		return PHONE_ERROR_FAILED;
+		return V3_ERROR_FAILED;
 	}
 
-	return PHONE_OK;
+	return V3_OK;
 }
 
 int AculabTrunk::disconnect(unsigned callref, int cause)
@@ -331,7 +331,7 @@ int AculabTrunk::disconnect(unsigned callref, int cause)
 	if (m_callref != callref)
 	{
 		unlock();
-		return PHONE_ERROR_INVALID_STATE;
+		return V3_ERROR_INVALID_STATE;
 	}
 	m_cmd = t_disconnect;
 	unlock();
@@ -342,10 +342,10 @@ int AculabTrunk::disconnect(unsigned callref, int cause)
 		log(log_error, "trunk", getName()) 
 			<< "call_disconnect failed: " << rc << logend();
 
-		return PHONE_ERROR_FAILED;
+		return V3_ERROR_FAILED;
 	}
 
-	return PHONE_OK;
+	return V3_OK;
 }
 
 void AculabTrunk::release()
@@ -382,37 +382,37 @@ int AculabTrunk::getCause()
 			<< "call_getcause failed: " << rc << " in command " 
 			<< commandName(m_cmd) << logend();
 
-		return PHONE_ERROR_FAILED;
+		return V3_ERROR_FAILED;
 	}
 
 	switch(cause.cause)
 	{
 	case LC_NORMAL:
-		return PHONE_OK;
+		return V3_OK;
 	case LC_NUMBER_BUSY:
-		return PHONE_ERROR_BUSY;
+		return V3_ERROR_BUSY;
 	case LC_NO_ANSWER:
-		return PHONE_ERROR_TIMEOUT;
+		return V3_ERROR_TIMEOUT;
 	case LC_NUMBER_UNOBTAINABLE:
-		return PHONE_ERROR_UNREACHABLE;
+		return V3_ERROR_UNREACHABLE;
 	case LC_NUMBER_CHANGED:
-		return PHONE_ERROR_NUMBER_CHANGED;
+		return V3_ERROR_NUMBER_CHANGED;
 	case LC_OUT_OF_ORDER:
-		return PHONE_ERROR_FAILED;
+		return V3_ERROR_FAILED;
 	case LC_INCOMING_CALLS_BARRED:
-		return PHONE_ERROR_FAILED;
+		return V3_ERROR_FAILED;
 	case LC_CALL_REJECTED:
-		return PHONE_ERROR_REJECTED;
+		return V3_ERROR_REJECTED;
 	case LC_CALL_FAILED:
-		return PHONE_ERROR_FAILED;
+		return V3_ERROR_FAILED;
 	case LC_CHANNEL_BUSY:
-		return PHONE_ERROR_BUSY;
+		return V3_ERROR_BUSY;
 	case LC_NO_CHANNELS:
-		return PHONE_ERROR_BUSY;
+		return V3_ERROR_BUSY;
 	case LC_CONGESTION:
-		return PHONE_ERROR_BUSY;
+		return V3_ERROR_BUSY;
 	default:
-		return PHONE_ERROR_FAILED;
+		return V3_ERROR_FAILED;
 	}
 }
 
@@ -499,10 +499,10 @@ void AculabTrunk::onIdle()
 	{
 	case t_connect:
 		// outgoing failed or stopped
-		m_client->connectDone(this, callref, stopped ? PHONE_ERROR_ABORTED : cause);
+		m_client->connectDone(this, callref, stopped ? V3_ABORTED : cause);
 		break;
 	case t_disconnect:
-		m_client->disconnectDone(this, callref, PHONE_OK);
+		m_client->disconnectDone(this, callref, V3_OK);
 		break;
 	case t_accept:
 		m_client->acceptDone(this, callref, cause);
@@ -584,11 +584,11 @@ void AculabTrunk::onCallConnected()
 
 	if (details.calltype == INCOMING)
 	{
-		m_client->acceptDone(this, m_callref, PHONE_OK);
+		m_client->acceptDone(this, m_callref, V3_OK);
 	}
 	else
 	{
-		m_client->connectDone(this, m_callref, PHONE_OK);
+		m_client->connectDone(this, m_callref, V3_OK);
 	}
 }
 
@@ -617,14 +617,14 @@ void AculabTrunk::onRemoteDisconnect()
 		m_client->disconnectRequest(this, m_callref, getCause());
 		break;
 	case t_disconnect:
-		m_client->disconnectDone(this, m_callref, PHONE_OK);
+		m_client->disconnectDone(this, m_callref, V3_OK);
 		break;
 	case t_connect:
-		m_client->connectDone(this, m_callref, PHONE_ERROR_REJECTED);
+		m_client->connectDone(this, m_callref, V3_ERROR_REJECTED);
 		disconnect(m_callref);
 		break;
 	case t_accept:
-		m_client->acceptDone(this, m_callref, PHONE_ERROR_REJECTED);
+		m_client->acceptDone(this, m_callref, V3_ERROR_REJECTED);
 		disconnect(m_callref);
 		break;
 	default:

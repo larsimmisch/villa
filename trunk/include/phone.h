@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.18 2003/12/01 22:26:56 lars Exp $
+	$Id: phone.h,v 1.19 2003/12/17 23:27:21 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -15,7 +15,7 @@
 #include "log.h"
 #include "phoneclient.h"
 #include "switch.h"
-#include "errors.h"
+#include "v3error.h"
 #include "exc.h"
 
 enum { INDEFINITE = -1, INVALID_CALLREF = 0 };
@@ -51,7 +51,7 @@ public:
 	// transfer
 	virtual int transfer(unsigned callref, const SAP& remote, unsigned timeout = INDEFINITE) 
 	{ 
-		return PHONE_ERROR_NOT_IMPLEMENTED; 
+		return V3_ERROR_NOT_IMPLEMENTED; 
 	}
 
 	// Dissolve a connection
@@ -110,7 +110,7 @@ public:
 	};
 
     Sample(unsigned pos = 0) : m_position(pos), m_userData(0), 
-		m_status(PHONE_OK), m_state(idle) {}
+		m_status(V3_OK), m_state(idle) {}
     virtual ~Sample() {}
 
     virtual unsigned start(Media* aMedia) = 0;

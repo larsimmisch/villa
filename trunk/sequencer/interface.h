@@ -11,7 +11,6 @@
 
 #include <list>
 #include <map>
-#include "rphone.h"
 #include "text.h"
 #include "configuration.h"
 
@@ -42,7 +41,7 @@ public:
 	{
 		clear();
 
-		begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - ";
+		begin() << V3_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - ";
 
 		return *this;
 

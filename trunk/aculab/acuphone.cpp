@@ -1,7 +1,7 @@
 /*
 	acuphone.cpp
 
-	$Id: acuphone.cpp,v 1.21 2003/12/10 21:54:32 lars Exp $
+	$Id: acuphone.cpp,v 1.22 2003/12/17 23:27:21 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -17,6 +17,7 @@
 #include "names.h"
 #include "acuphone.h"
 #include "fal.h"
+#include "v3error.h"
 #include "prosody_error.i"
 #include "beep.i"
 
@@ -422,7 +423,7 @@ bool ProsodyChannel::Beep::stop(Media *phone)
 	m_position = (m_count * sizeof(beep) + p.offset) / 8;
 
 	m_state = stopping;
-	m_status = PHONE_ERROR_ABORTED;
+	m_status = V3_ABORTED;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping beep " << m_beeps << logend();
@@ -547,7 +548,7 @@ bool ProsodyChannel::Touchtones::stop(Media *phone)
 		throw ProsodyError(__FILE__, __LINE__, "sm_play_tone_abort", rc);
 
 	m_state = stopping;
-	m_status = PHONE_ERROR_ABORTED;
+	m_status = V3_ABORTED;
 
 	log(log_debug, "phone", phone->getName()) 
 		<< "touchtones " << m_tt.c_str() << " stopped" << logend();
@@ -752,7 +753,7 @@ bool ProsodyChannel::FileSample::stop(Media *phone)
 	m_position = p.offset * 1000 / m_storage->bytesPerSecond;
 
 	m_state = stopping;
-	m_status = PHONE_ERROR_ABORTED;
+	m_status = V3_ABORTED;
 
 	log(log_debug+1, "phone", phone->getName()) 
 		<< "stopping file sample " << m_name.c_str() << logend();
@@ -815,6 +816,8 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 {
 	struct sm_record_parms record;
 
+	memset(&record, 0, sizeof(record));
+
 	record.channel = m_prosody->m_channel;
 	record.alt_data_source = kSMNullChannelId;
 	record.type = m_storage->encoding;
@@ -822,7 +825,7 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 	record.max_octets = 0;
 	record.max_elapsed_time = m_maxTime;
 	// this shouldn't be hardcoded...
-	record.max_silence = 1000;
+	record.max_silence = 2000;
 
 	omni_mutex_lock(m_prosody->m_mutex);
 
@@ -893,11 +896,17 @@ unsigned ProsodyChannel::RecordFileSample::receive(Media *phone)
 int ProsodyChannel::RecordFileSample::process(Media *phone)
 {
 	struct sm_record_status_parms record;
+	struct sm_record_how_terminated_parms how;
+
+	memset(&record, 0, sizeof(record));
+	memset(&how, 0, sizeof(how));
+
 	// we need a local copy because the client might delete us
 	// in completed
 	ProsodyChannel *p = m_prosody;
 
 	record.channel = p->m_channel;
+	how.channel = p->m_channel;
 	
 	while (true)
 	{
@@ -916,6 +925,31 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 			m_state = idle;
 			p->m_current = 0;
 			p->m_mutex.unlock();
+			
+			if (m_status != V3_ABORTED)
+			{
+				rc = sm_record_how_terminated(&how);
+				if (rc)
+					throw ProsodyError(__FILE__, __LINE__, "sm_record_how_terminated", rc);
+
+				switch(how.termination_reason)
+				{
+				case kSMRecordHowTerminatedLength: 
+				case kSMRecordHowTerminatedMaxTime:
+					m_status = V3_TIMEOUT;
+					break;
+				case kSMRecordHowTerminatedSilence:
+					m_status = V3_SILENCE;
+					break;
+				case kSMRecordHowTerminatedAborted:
+					m_status = V3_ABORTED;
+					break;
+				default:
+					m_status = V3_ERROR_FAILED;
+					break;
+				}
+			}
+
 			phone->completed(this);
 			p->m_mutex.lock();
 			return record.status;

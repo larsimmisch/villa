@@ -14,9 +14,9 @@
 #include <new.h>
 #include <assert.h>
 
+#include "fal.h"
 #include "phoneclient.h"
 #include "acuphone.h"
-#include "rphone.h"
 #include "ctbus.h"
 #include "activ.h"
 #include "sequence.h"
@@ -79,7 +79,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 		server->syntax_error(id) << "expecting jobid, mode and priority" << end(); 
 
-		return PHONE_FATAL_SYNTAX;
+		return V3_FATAL_SYNTAX;
 	}
 
 	Molecule* molecule = new Molecule(mode, priority, id);
@@ -102,7 +102,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 				atom = new PlayAtom(this, file.c_str());
 			}
-			else if (type == "record")
+			else if (type == "rec")
 			{
 				std::string file;
 				unsigned max;
@@ -129,7 +129,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 				atom = new BeepAtom(this, count);
 
 			}
-			else if (type == "silence")
+			else if (type == "slnc")
 			{
 				int len;
 
@@ -137,7 +137,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 				atom = new SilenceAtom(len);
 			}
-			else if (type == "conference")
+			else if (type == "conf")
 			{
 				std::string conf;
 
@@ -156,39 +156,52 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 			(*server) >> notifications;
 
 			if (notifications == "start")
-				atom->setNotifications(notify_start);
+				atom->setNotifications(NOTIFY_START);
 			else if (notifications == "stop")
-				atom->setNotifications(notify_stop);
+				atom->setNotifications(NOTIFY_STOP);
 			else if (notifications == "both")
-				atom->setNotifications(notify_start | notify_stop);
+				atom->setNotifications(NOTIFY_START | NOTIFY_STOP);
 			// todo: syntax error if not 'none'
 		}
-		catch (const char* e)
+		catch (const char *e)
 		{
 			log(log_error, "sequencer") << "Exception in addMolecule: " << e << logend();
 			atom = 0;
 
 			if (m_interface)
 			{
-				m_interface->begin() << PHONE_ERROR_FAILED << ' ' << id
+				m_interface->begin() << V3_ERROR_FAILED << ' ' << id
 					<< " MLCA " << m_trunk->getName() << " 0 " 
 					<< molecule->getLength() << end();
 			}
 
-			return PHONE_ERROR_FAILED;
+			return V3_ERROR_FAILED;
 		}
-		catch (const Exception& e)
+		catch (const FileDoesNotExist &e)
 		{
 			log(log_error, "sequencer") << e << logend();
 			atom = 0;
 
 			if (m_interface)
 			{
-				m_interface->begin() << PHONE_ERROR_FAILED << ' ' << id  
+				m_interface->begin() << V3_ERROR_NOT_FOUND << ' ' << id  
 					<< " MLCA " << m_trunk->getName() << " 0 " << molecule->getLength() << end();
 			}
 
-			return PHONE_ERROR_FAILED;
+			return V3_ERROR_FAILED;
+		}
+		catch (const Exception &e)
+		{
+			log(log_error, "sequencer") << e << logend();
+			atom = 0;
+
+			if (m_interface)
+			{
+				m_interface->begin() << V3_ERROR_FAILED << ' ' << id  
+					<< " MLCA " << m_trunk->getName() << " 0 " << molecule->getLength() << end();
+			}
+
+			return V3_ERROR_FAILED;
 		}
 
 		molecule->add(*atom);
@@ -201,7 +214,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 		log(log_warning, "sequencer") << "Molecule is empty. will not be added." 
 			<< logend();
 
-		return PHONE_WARNING_EMPTY;
+		return V3_WARNING_EMPTY;
 	}
 
 	lock();
@@ -211,7 +224,7 @@ int Sequencer::addMolecule(InterfaceConnection *server, const std::string &id)
 
 	unlock();
 
-	return PHONE_OK;
+	return V3_OK;
 }
 
 
@@ -225,7 +238,7 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 	if (!server->good())
 	{
 		server->syntax_error(id) << "expecting <molecule id>" << end();
-		return PHONE_FATAL_SYNTAX;
+		return V3_FATAL_SYNTAX;
 	}
 
 	Molecule* molecule = m_activity.find(mid);
@@ -235,10 +248,10 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 		log(log_error, "sequencer") << "discard molecule: (" << mid.c_str() 
 			<< ") not found" << logend();
 
-		server->begin() << PHONE_ERROR_NOT_FOUND << ' ' << id.c_str() << " invalid molecule "
+		server->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " invalid molecule "
 			<< mid.c_str() << end();
 
-		return PHONE_ERROR_NOT_FOUND;
+		return V3_ERROR_NOT_FOUND;
 	}
 
 	// if active, stop and send ack when stopped, else remove and send ack immediately
@@ -253,16 +266,16 @@ int Sequencer::discardMolecule(InterfaceConnection *server, const std::string &i
 	{
 		m_activity.remove(molecule);
 
-		server->begin() << PHONE_OK << ' ' << id.c_str() 
+		server->begin() << V3_OK << ' ' << id.c_str() 
 			<< " MLCD " << m_id.c_str() << " removed" << end();
 	}
 
-	return PHONE_OK;
+	return V3_OK;
 }
 
 int Sequencer::discardByPriority(InterfaceConnection *server, const std::string &id)
 {
-	int discarded = 0;
+	bool done = true;
 	int fromPriority;
 	int toPriority;
 	int immediately;
@@ -274,7 +287,7 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 	if (!server->good())
 	{
 		server->syntax_error(id) << "expecting <fromPriority> <toPriority> <immediately>" << end();
-		return PHONE_FATAL_SYNTAX;
+		return V3_FATAL_SYNTAX;
 	}
 
 	log(log_debug, "sequencer") << "discarding molecules with " << fromPriority 
@@ -287,12 +300,17 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 		Molecule *molecule = i.current();
 
 		if (molecule->getMode() & Molecule::dont_interrupt)  
+		{
+			done = false;
 			continue;
+		}
 
 		if (molecule->getPriority() >= fromPriority && molecule->getPriority() <= toPriority)
 		// if active, stop and send ack when stopped, else remove and send ack immediately
 		if (molecule->isActive() && immediately)
 		{
+			done = false;	
+
 			molecule->setMode(Molecule::discard);
 			molecule->stop(this);
 			
@@ -303,8 +321,6 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 		}
 		else
 		{
-			discarded++;
-			
 			log(log_debug, "sequencer") << "removing molecule "  
 				<< molecule->getId() << logend();
 
@@ -312,14 +328,13 @@ int Sequencer::discardByPriority(InterfaceConnection *server, const std::string 
 		}
 	}
 
-	if (discarded)
+	if (done)
 	{
-		server->begin() << PHONE_OK << ' ' << id.c_str()
-			<< " MLDP removed molecules with priorities from " 
-			<< fromPriority << " to " << toPriority << end();
+		server->begin() << V3_OK << ' ' << id.c_str()
+			<< " MLDP " << m_trunk->getName() << end();
 	}
 
-	return PHONE_OK;
+	return V3_OK;
 }
 
 void Sequencer::sendAtomDone(const char *id, unsigned nAtom, 
@@ -327,7 +342,7 @@ void Sequencer::sendAtomDone(const char *id, unsigned nAtom,
 {
 	if (m_interface)
 	{
-		m_interface->begin() <<  PHONE_EVENT << " ATOM " 
+		m_interface->begin() << V3_EVENT << " ATOM " 
 			<< m_trunk->getName() << ' ' << id << ' '
 			<< nAtom << ' ' << status << ' ' << msecs << end();
 	}
@@ -356,12 +371,12 @@ int Sequencer::connect(ConnectCompletion* complete)
 		log(log_debug, "sequencer", m_trunk->getName())
 			<< "connect failed - busy" << logend();
 
-		return PHONE_ERROR_BUSY;
+		return V3_ERROR_BUSY;
 	}
 
 	m_connectComplete = complete;
 
-	return PHONE_OK;
+	return V3_OK;
 }
 
 int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
@@ -377,7 +392,7 @@ int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
 
 		packet->clear(1);
 		packet->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
-		packet->setContent(phone_transfer_done);
+		packet->setContent(V3_transfer_done);
 		packet->setUnsignedAt(0, _invalid);
 
 		tcp.send(*packet);
@@ -405,7 +420,7 @@ int Sequencer::transfer(InterfaceConnection *server, const std::string &id)
 
 	m_trunk->transfer(remote, timeout);
 */
-	return PHONE_OK;
+	return V3_OK;
 }
 
 int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
@@ -425,10 +440,10 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 	if (m_id.size())
 	{
 		unlock();
- 		server->begin() << PHONE_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
+ 		server->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
 			<< " DISC protocol violation" << end();
 
-		return PHONE_ERROR_PROTOCOL_VIOLATION;
+		return V3_ERROR_PROTOCOL_VIOLATION;
 	}
 
 	m_id = id;
@@ -436,7 +451,7 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 
 	int rc = disconnect(cause);
 
-	if (rc != PHONE_OK) 
+	if (rc != V3_OK) 
 	{
  		server->begin() << rc << ' ' << id.c_str() 
 			<< " DISC" << end();
@@ -447,7 +462,7 @@ int Sequencer::disconnect(InterfaceConnection *server, const std::string &id)
 
 int Sequencer::disconnect(int cause)
 {
-	int rc = PHONE_OK;
+	int rc = V3_OK;
 
 	omni_mutex_lock l(m_mutex);
 	m_disconnecting = m_callref;
@@ -517,11 +532,11 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 
 		if (m_interface)
 		{
-			m_interface->begin() << PHONE_OK << ' ' << m_clientSpec->m_id.c_str() 
+			m_interface->begin() << V3_OK << ' ' << m_clientSpec->m_id.c_str() 
 				<< " LSTN " << m_trunk->getName()
-				<< " \"" << m_remote.getAddress() << "\" \""
-				<< m_configuration->getNumber() << "\" \""
-				<< m_local.getAddress() << "\" "
+				<< " '" << m_remote.getAddress() << "' '"
+				<< m_configuration->getNumber() << "' '"
+				<< m_local.getAddress() << "' "
 				<< server->getTimeslot().ts << end();
 		}
 	}
@@ -574,7 +589,7 @@ void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 	log(log_debug, "sequencer", m_trunk->getName()) 
 		<< "connect done: " << result << logend();
 
-	if (result == PHONE_OK)
+	if (result == V3_OK)
 	{
 		// good. we got through
 
@@ -584,7 +599,7 @@ void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 		{
 			m_connectComplete->m_interface->begin() 
 				<< m_connectComplete->m_id.c_str() << ' ' << result 
-				<< (result == PHONE_OK ? " connected" : " connect failed") << end();
+				<< (result == V3_OK ? " connected" : " connect failed") << end();
 
 			delete m_connectComplete;
 
@@ -621,7 +636,7 @@ void Sequencer::transferDone(Trunk *server, unsigned callref, int result)
 	lock();
 	packet->clear(1);
 
-	packet->setContent(phone_transfer_done);
+	packet->setContent(V3_transfer_done);
 	packet->setUnsignedAt(0, _ok);
  
 	tcp.send(*packet);
@@ -652,7 +667,7 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 	if (m_interface && m_disconnecting != INVALID_CALLREF 
 		&& m_activity.getState() == Activity::idle)
 	{
-		m_interface->begin() << PHONE_EVENT << " RDIS " << m_trunk->getName() 
+		m_interface->begin() << V3_EVENT << " RDIS " << m_trunk->getName() 
 			<< end();
 	}
 }
@@ -688,18 +703,18 @@ int Sequencer::accept(InterfaceConnection *server, const std::string &id)
 	{
 		if (server)
 		{
- 			server->begin() << PHONE_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
+ 			server->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
 				<< " protocol violation" << end();
 		}
 
-		return PHONE_ERROR_PROTOCOL_VIOLATION;
+		return V3_ERROR_PROTOCOL_VIOLATION;
 	}
 
 	m_id = id;
 
 	int rc = m_trunk->accept(m_callref);
 
-	if (rc != PHONE_OK) 
+	if (rc != V3_OK) 
 	{
  		server->begin() << rc << ' ' << id.c_str() << " ACPT"
 			<< end();
@@ -710,7 +725,7 @@ int Sequencer::accept(InterfaceConnection *server, const std::string &id)
 
 void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 {
-	if (result == PHONE_OK)
+	if (result == V3_OK)
 	{
 		log(log_debug, "sequencer", server->getName()) << "call accepted" << logend();
 
@@ -718,7 +733,7 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 
 		if (m_interface)
 		{
-			m_interface->begin() << PHONE_OK << ' ' << m_id.c_str() << " ACPT " 
+			m_interface->begin() << V3_OK << ' ' << m_id.c_str() << " ACPT " 
 				<< m_trunk->getName() << end();
 		}
 
@@ -781,7 +796,7 @@ void Sequencer::started(Media *server, Sample *aSample)
 
 		if (m_interface)
 		{
-			m_interface->begin() << PHONE_EVENT << m->getId() << " ABEG "
+			m_interface->begin() << V3_EVENT << m->getId() << " ABEG "
 				<< m->currentAtom() << end();
 		}
 	}
@@ -840,7 +855,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	// handle the various disconnect conditions
 	if (m_disconnecting != INVALID_CALLREF)
 	{
-		sendMoleculeDone(id.c_str(), PHONE_ERROR_DISCONNECTED, pos, length);
+		sendMoleculeDone(id.c_str(), V3_ERROR_DISCONNECTED, pos, length);
 
 		log(log_debug, "sequencer", m_trunk->getName()) << "disconnect - activity idle" << logend();
 
@@ -852,10 +867,10 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	if (m_trunk->remoteDisconnect())
 	{
-		sendMoleculeDone(id.c_str(), PHONE_ERROR_DISCONNECTED, pos, length);
+		sendMoleculeDone(id.c_str(), V3_ERROR_DISCONNECTED, pos, length);
 		if (m_interface)
 		{
-			m_interface->begin() << PHONE_EVENT << " RDIS " << m_trunk->getName() 
+			m_interface->begin() << V3_EVENT << " RDIS " << m_trunk->getName() 
 				<< end();
 		}
 
@@ -865,7 +880,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 	// start next molecule before sending reply to minimise delay
 	m_activity.start();
 
-	if (atEnd)
+	if (atEnd && done)
 	{
 		sendMoleculeDone(id.c_str(), status, pos, length);
 	}
@@ -878,7 +893,7 @@ void Sequencer::touchtone(Media* server, char tt)
 
 	if (m_interface)
 	{
-		m_interface->begin() << PHONE_EVENT << " DTMF " << server->getName() 
+		m_interface->begin() << V3_EVENT << " DTMF " << server->getName() 
 			<< ' ' << tt << end();
 	}
 }
@@ -936,7 +951,7 @@ bool Sequencer::data(InterfaceConnection* server, const std::string &command,
 		transfer(server, id);
 	else
 	{
-		server->begin() << PHONE_FATAL_SYNTAX << ' ' << id.c_str()  
+		server->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str()  
 			<< " syntax error - unknown command " << command.c_str()
 			<< end();
 
@@ -1109,7 +1124,7 @@ int main(int argc, char* argv[])
 
 		SAP local;
 		
-		local.setService(interface_port);
+		local.setService(SEQUENCER_PORT);
 
 		Interface iface(local);
 
