@@ -58,6 +58,7 @@ void Conference::add(ProsodyChannel *channel, mode m)
 		/* 
 		 * Add the new party to the other parties' low-level conferences. 
 		 */
+		
 		for (t_party_set::iterator i = m_parties.begin(); i != m_parties.end(); ++i)
 		{
 			if (i->second & listen)

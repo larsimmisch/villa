@@ -310,6 +310,8 @@ public:
 
 	void start();
 
+	size_t size() { return m_media.size(); }
+
 	std::vector<AculabMedia*> m_media;
 	omni_mutex m_mutex;
 };

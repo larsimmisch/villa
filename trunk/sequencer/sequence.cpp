@@ -1387,7 +1387,18 @@ int main(int argc, char* argv[])
 		log(log_debug, "sequencer") 
 			 << nmodules << " prosody modules found" << logend();
 
-		gMediaPool.add(nmodules * 30);
+		try
+		{
+			// We try to allocate as many channels as we can - 60 seems an upper bound
+			gMediaPool.add(nmodules * 60);
+		}
+		catch (const ProsodyError &e)
+		{
+			if (!gMediaPool.size() || e.m_error != ERR_SM_NO_RESOURCES)
+			{
+				throw;
+			}
+		}
 
 		if (gConfiguration.numElements() == 0)
 		{
