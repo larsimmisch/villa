@@ -449,6 +449,7 @@ public:
 		// Get the size of the data subchunk. 
 		m_dataSize = m_subchunk.cksize;
 		m_dataOffset = m_subchunk.dwDataOffset; 
+		m_encoding = findEncoding(format);
 
 	}
 

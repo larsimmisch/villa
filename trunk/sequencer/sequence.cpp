@@ -1264,17 +1264,13 @@ int main(int argc, char* argv[])
 	int sw = 0;
 	char szKey[256];
 	char *firmware = 0;
-
-    std::ofstream logfile("sequence.log");
+	bool filelogging = false;
+	int loglevel = log_info;
+	std::ofstream logfile;
     Log file_log(logfile);
-
 
 	ULONG rc;
 	WSADATA wsa;
-
-	set_log_instance(&file_log);
-    // set_log_instance(&cout_log);
-    set_log_level(log_info);
 
 	rc = WSAStartup(MAKEWORD(2,0), &wsa);
 
@@ -1285,11 +1281,13 @@ int main(int argc, char* argv[])
 		switch(c) 
 		{
 		case 'd':
-			set_log_level(atoi(optarg));
+			loglevel = atoi(optarg);
 			std::cout << "debug level " << atoi(optarg) << std::endl;
 			break;
 		case 'l':
 			std::cout << "logging to: " << optarg << std::endl;
+			logfile.open(optarg);
+			filelogging = true;
 			// todo
 			break;
 		case 'f':
@@ -1301,6 +1299,15 @@ int main(int argc, char* argv[])
 			usage();
 		}
 	}
+
+	if (filelogging)
+		set_log_instance(&file_log);
+	else
+		set_log_instance(&cout_log);
+
+
+	set_log_level(loglevel);
+
 
 	try
 	{
@@ -1408,6 +1415,14 @@ int main(int argc, char* argv[])
 		nmodules = sm_get_modules();
 		log(log_info, "sequencer") 
 			 << nmodules << " prosody modules found" << logend();
+
+		if (nmodules)
+		{
+			nmodules = 1;
+
+			log(log_info, "sequencer") 
+				 << nmodules << " limiting prosody modules to 1 (conferencing workaround)" << logend();
+		}
 
 		if (firmware)
 		{
