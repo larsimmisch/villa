@@ -1,7 +1,7 @@
 /*
 	acuphone.h
 
-	$Id: acuphone.h,v 1.8 2001/06/23 09:55:20 lars Exp $
+	$Id: acuphone.h,v 1.9 2001/06/26 14:31:23 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -101,7 +101,9 @@ protected:
 	{
 	public:
 
-		DispatcherThread(ProsodyEventDispatcher& d, int o, int l) : dispatcher(d), offset(o), length(l) {}
+		DispatcherThread(ProsodyEventDispatcher& d, int o, int l) 
+			: dispatcher(d), offset(o), length(l), 
+			omni_thread(NULL, PRIORITY_HIGH) {}
 
 		void start() { start_undetached(); }
 
