@@ -19,12 +19,12 @@ InvalidAddress::InvalidAddress(
 		int lineNumber,
 		const char* function,
 		SAP& anAddress,
-		const Exception* previous)
+		const Exception* prev)
  : Exception(fileName, lineNumber, function, "invalid address", prev), address(anAddress)
 {
 }
 
-void InvalidAddress::printOn(std::ostream& os)
+void InvalidAddress::printOn(std::ostream& os) const
 {
 	Exception::printOn(os);
 
@@ -44,7 +44,7 @@ SocketError::SocketError(
 
 SocketError::~SocketError()
 {
-	LocalFree((void*)Exception::name);
+	LocalFree((void*)Exception::m_name);
 }
 
 const char* SocketError::name(unsigned long error)

@@ -128,7 +128,7 @@ public:
 
 	virtual ~InvalidAddress() {}
 
-    virtual void printOn(std::ostream& aStream);
+    virtual void printOn(std::ostream& aStream) const;
 
 	SAP address;
 };

@@ -35,7 +35,7 @@ public:
 
 	virtual ~APIError()
 	{
-		LocalFree((void*)Exception::name);
+		LocalFree((void*)Exception::m_name);
 	}
 
 	const char* name(int error)
