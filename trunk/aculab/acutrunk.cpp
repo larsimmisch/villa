@@ -1,7 +1,7 @@
 /*
 	acutrunk.cpp
 
-	$Id: acutrunk.cpp,v 1.9 2001/06/24 07:07:45 lars Exp $
+	$Id: acutrunk.cpp,v 1.10 2001/06/29 16:04:20 lars Exp $
 
 	Copyright 1995-2001 Lars Immisch
 
@@ -619,6 +619,8 @@ void AculabTrunk::onRemoteDisconnect()
 
 	switch (state)
 	{
+	case disconnecting:
+		break;
 	case connected:
 	
 		cause = getCause();
