@@ -1,5 +1,7 @@
 /*
-    Packet.h
+    packet.h
+
+	$id$
 
 	Caution! 
 	
