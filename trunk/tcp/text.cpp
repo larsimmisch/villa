@@ -52,7 +52,7 @@ unsigned SocketStream::send()
 {
 	assert(m_pbuf.size());
 
-	std::ostream &o = log(log_debug, "text") << m_remote << " sent: ";
+	std::ostream &o = log(log_info, "text") << m_remote << " sent: ";
 	o.write(m_pbuf.c_str(), m_pbuf.size() - 2);
 	o << logend();
 
@@ -99,7 +99,7 @@ unsigned SocketStream::fillGBuf()
 	m_gsize = p + 1;
 	m_rpos += p + 2;
 
-	std::ostream &o = log(log_debug, "text") << m_remote << " received: ";
+	std::ostream &o = log(log_info, "text") << m_remote << " received: ";
 	o.write(m_gbuf, p);
 	o << logend();
 

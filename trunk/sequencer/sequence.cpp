@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <new.h>
 #include <assert.h>
+#include <fstream>
 
 #include "fal.h"
 #include "phoneclient.h"
@@ -142,6 +143,15 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 		return V3_FATAL_SYNTAX;
 	}
+
+
+    // Don't start anything while we are disconnecting
+    if (m_disconnecting != INVALID_CALLREF || m_sent_rdis != INVALID_CALLREF)
+    {
+        sendMLCA(id, V3_STOPPED_DISCONNECT, 0, 0);
+
+        return V3_STOPPED_DISCONNECT;
+    }
 
 	Molecule* molecule = new Molecule(channel, mode, priority, id);
 
@@ -588,10 +598,12 @@ unsigned Sequencer::DISC(InterfaceConnection *server, const std::string &id)
 	unlock();
 
 	int rc = disconnect(cause);
-
 	if (rc != V3_OK) 
 	{
- 		server->begin() << rc << ' ' << id.c_str() 
+        m_id.erase();
+
+        // Ok. We lie. The Villa can't live with the truth
+ 		server->begin() << V3_OK << ' ' << id.c_str() 
 			<< " DISC" << end();
 	}
 
@@ -780,7 +792,7 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 	{
 		if (!contained)
 		{
-			log(log_warning, "sequencer", getName()) 
+			log(log_debug, "sequencer", getName()) 
 				<< "no client found. rejecting call." << logend(); 
 
 			m_trunk->disconnect(m_callref);
@@ -902,8 +914,8 @@ void Sequencer::disconnectRequest(Trunk *server, unsigned callref, int cause)
 
 	checkCompleted();
 
-	// notify client unless already disconnecting or still stopping
-	if (channelsIdle() && m_disconnecting == INVALID_CALLREF)
+	// notify client unless already disconnecting
+	if (m_disconnecting == INVALID_CALLREF)
 	{
 		sendRDIS();
 	}
@@ -916,11 +928,9 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 
 	omni_mutex_lock lock(m_mutex);
 
-	if (m_interface)
+	if (m_interface && m_id.size())
 	{
 		m_interface->remove(server->getName());
-
-		assert(m_id.size());
 
 		m_interface->begin() << result << ' ' << m_id.c_str() << " DISC "
 			<< getName() << end();
@@ -947,11 +957,10 @@ unsigned Sequencer::ACPT(InterfaceConnection *server, const std::string &id)
 	m_id = id;
 
 	int rc = m_trunk->accept(m_callref);
-
 	if (rc != V3_OK) 
 	{
- 		server->begin() << rc << ' ' << id.c_str() << " ACPT"
-			<< end();
+		server->begin() << rc << ' ' << m_id.c_str() << " ACPT " 
+			<< getName() << end();
 	}
 
 	return rc;
@@ -979,16 +988,16 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 	}
 	else
 	{
-		lock();
-		m_callref = INVALID_CALLREF;
-		gMediaPool.release(m_media);
-		m_media = 0;
-		m_id.erase();
-
 		if (m_interface)
 		{
-			m_interface->remove(server->getName());
+			m_interface->begin() << result << ' ' << m_id.c_str() << " ACPT " 
+				<< getName() << end();
+
+            m_interface->remove(server->getName());
 		}
+
+		lock();
+        release();
 		unlock();
 
 		log(log_error, "sequencer", server->getName()) << "call accept failed: " 
@@ -1092,7 +1101,7 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 	// handle the various disconnect/close conditions
 
-	if ((m_trunk && (m_disconnecting != INVALID_CALLREF || m_trunk->remoteDisconnect()))
+	if ((m_trunk && (m_disconnecting != INVALID_CALLREF || status == V3_STOPPED_DISCONNECT))
 		|| m_closing)
 	{
 		start = false;
@@ -1134,14 +1143,6 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 			m_media->disconnected(m_trunk);
 			m_trunk->disconnect(m_disconnecting);
-		}
-		// remote disconnect
-		else if (m_trunk->remoteDisconnect())
-		{
-			log(log_debug, "sequencer", getName()) << "remote disconnect - all channels idle" 
-				<< logend();
-
-			sendRDIS();
 		}
 	}
 
@@ -1264,11 +1265,16 @@ int main(int argc, char* argv[])
 	char szKey[256];
 	char *firmware = 0;
 
+    std::ofstream logfile("sequence.log");
+    Log file_log(logfile);
+
+
 	ULONG rc;
 	WSADATA wsa;
 
-	set_log_instance(&cout_log);
-	set_log_level(log_debug);
+	set_log_instance(&file_log);
+    // set_log_instance(&cout_log);
+    set_log_level(log_info);
 
 	rc = WSAStartup(MAKEWORD(2,0), &wsa);
 
@@ -1370,7 +1376,7 @@ int main(int argc, char* argv[])
 					case C_REV4:
 					case C_REV5:
 					case C_PM4:
-						lines = 30;
+						lines = 25; // hardcoded for Hacko
 						break;
 					case C_BR4:
 					case C_BR8:

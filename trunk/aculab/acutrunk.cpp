@@ -379,6 +379,10 @@ int AculabTrunk::disconnect(unsigned callref, int cause)
 		log(log_error, "trunk", getName()) 
 			<< "call_disconnect failed: " << rc << logend();
 
+        lock();
+        m_cmd = t_none;
+        unlock();
+
 		return V3_ERROR_FAILED;
 	}
 
@@ -549,7 +553,7 @@ void AculabTrunk::onIdle()
 		m_client->disconnectDone(this, callref, V3_OK);
 		break;
 	case t_accept:
-		m_client->acceptDone(this, callref, cause);
+        m_client->acceptDone(this, callref, V3_ERROR_FAILED);
 		break;
 	default:
 		m_client->disconnectRequest(this, callref, cause);
