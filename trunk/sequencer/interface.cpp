@@ -245,7 +245,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CFNC " << end();
 
-			return false;
+			return true;
 		}
 
 		if (gConferences.close(handle))
@@ -322,7 +322,7 @@ bool Interface::data(InterfaceConnection *ic)
 				<< " syntax error - expecting trunk name and DID" 
 				<< end();
 
-			return false;
+			return true;
 		}
 
 		TrunkConfiguration* trunk = 0;
@@ -391,7 +391,7 @@ bool Interface::data(InterfaceConnection *ic)
 				<< " syntax error - expected trunk name, timeslot and called address" 
 				<< end();
 
-			return false;
+			return true;
 		}
 
 		remote.setAddress(called.c_str());
@@ -417,7 +417,7 @@ bool Interface::data(InterfaceConnection *ic)
 				ic->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CONN " 
 					<< " trunk not found" << end();
 
-				return false;
+				return true;
 			}
 		}
 
@@ -499,6 +499,8 @@ bool Interface::data(InterfaceConnection *ic)
 	{
 		std::string device;
 
+        device.reserve(32);
+
 		(*ic) >> device;
 		if (ic->eof())
 		{
@@ -507,7 +509,7 @@ bool Interface::data(InterfaceConnection *ic)
 			ic->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - missing device name for: " 
 				<< command << end();
 
-			return false;
+			return true;
 		}
 
 		Sequencer *s = ic->find(device);
@@ -518,7 +520,7 @@ bool Interface::data(InterfaceConnection *ic)
 				<< " error - unknown device: " << device.c_str()
 				<< end();
 
-			return false;
+			return true;
 		}
 		else
 		{
