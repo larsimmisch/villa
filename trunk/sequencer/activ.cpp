@@ -97,7 +97,7 @@ int ConferenceAtom::start(Sequencer* sequencer, void* aUserData)
 
 int ConferenceAtom::stop(Sequencer* sequencer)
 {
-    Time now;
+    // Time now;
 
     // now.now();
 
@@ -129,13 +129,15 @@ int SilenceAtom::stop(Sequencer* sequencer)
 {
     if (timer.is_valid())
 	{
-		pos = length - sequencer->getTimer().remove(entry);
+		// todo: calculate position
+
+		sequencer->getTimer().remove(timer);
 
 		// if we have to use completed() or addCompleted() depends on the thread context
 		// here we are in the sequencers context, so we use addCompleted
-	    sequencer->addCompleted(sequencer->getPhone(), (Molecule*)entry->userData, 0, pos);
+	    sequencer->addCompleted(sequencer->getPhone(), (Molecule*)timer.m_data, 0, pos);
 
-		entry = 0;
+		timer.invalidate();
 
 		return 1;
 	}
@@ -143,13 +145,15 @@ int SilenceAtom::stop(Sequencer* sequencer)
 	return 0;
 }
 
-void SilenceAtom::timer(AsyncTimer* server, void* userData)
+void SilenceAtom::on_timer(const Timer::TimerID &id)
 {
 	// if we have to use completed() or addCompleted() depends on the thread context.
 	// here we are in the Timers context, so we use completed
 
-    seq->completed(seq->getPhone(), (Molecule*)userData, 1, length);
-	entry = 0;
+	Molecule * m = (Molecule*)id.m_data;
+
+    seq->completed(seq->getPhone(), m, 1, length);
+	timer.invalidate();
 	pos = 0;
 }
 
@@ -193,7 +197,8 @@ int Molecule::start(Sequencer* sequencer, void* userData)
     {
         if (current)
         {
-            if (needRewind())   current->setPos(0);
+            if (needRewind())   
+				current->setPos(0);
             started = current->start(sequencer, this);
         }
         else
@@ -214,7 +219,7 @@ int Molecule::start(Sequencer* sequencer, void* userData)
         }
         else if ((mode & mute) || (mode & mix))
         {
-            DateTime now;
+            Time now;
             unsigned timeInactive;
 
             now.now();
@@ -222,8 +227,7 @@ int Molecule::start(Sequencer* sequencer, void* userData)
 
             if (debug > 3)
 			{
-				logger->start() << "was inactive: " << timeInactive << '(' << now << ", " << timeStopped << ')' << endl;
-				logger->end();
+				log(log_debug, "activ") << "was inactive: " << timeInactive << logend();
 			}
 
             if (setPos(pos + timeInactive)) started =  current->start(sequencer, this);
@@ -237,7 +241,11 @@ int Molecule::start(Sequencer* sequencer, void* userData)
     }
 
     flags &= ~stopped;
-    if (started) flags |= active;
+    if (started)
+	{
+		flags |= active;
+		timeStarted.now();
+	}
 
     return started;
 }
@@ -259,8 +267,8 @@ int Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 
 	if (debug > 3)
 	{
-		logger->start() << "Molecule::done. status: " << status << " msecs: " << msecs << " pos: " << pos << " length: " << length << endl;
-		logger->end();
+		log(log_debug, "activ") << "Molecule::done. status: " << status << " msecs: " 
+			<< msecs << " pos: " << pos << " length: " << length << logend();
 	}
 
     flags &= ~active;
@@ -270,8 +278,8 @@ int Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
         timeStopped.now();
         if (debug > 3)
 		{
-			logger->start() << "stopped at: " << timeStopped << endl;
-			logger->end();
+			log(log_debug, "activ") << "stopped after: " 
+				<< timeStarted - timeStopped << " ms" << logend();
 		}
     }
 
@@ -328,7 +336,7 @@ int Molecule::setPos(unsigned aPos)
     return 0;
 }
 
-ostream& operator<<(ostream& out, Molecule& m)  
+std::ostream& operator<<(std::ostream& out, Molecule& m)  
 { 
     out << "Molecule(" << m.getPriority() << ", " << m.getPos() << ", " << m.getLength() << ", ";
 
@@ -378,8 +386,8 @@ Molecule* Activity::add(Molecule& newMolecule)
 	{
 		if (debug > 3)
 		{
-			logger->start() << "adding " << newMolecule << "syncMinor: " << newMolecule.getSyncMinor() << " after " <<  *current << endl;
-			logger->end();
+			log(log_debug, "activ") << "adding " << newMolecule << "syncMinor: " 
+				<< newMolecule.getSyncMinor() << " after " <<  *current << logend();
 		}
 
  		DList::addAfter(current, &newMolecule);
@@ -388,8 +396,8 @@ Molecule* Activity::add(Molecule& newMolecule)
     {
         if (debug > 3)
 		{
-			logger->start() << "adding " << newMolecule << "syncMinor: " << newMolecule.getSyncMinor() << " as first" << endl;
-			logger->end();
+			log(log_debug, "activ") << "adding " << newMolecule << "syncMinor: " 
+				<< newMolecule.getSyncMinor() << " as first" << logend();
 		}
  
         addFirst(&newMolecule);
@@ -402,30 +410,29 @@ Molecule* Activity::add(Molecule& newMolecule)
             if (newMolecule.start(sequencer))   flags &= ~idle;
             else if (debug)
 			{
-				logger->start() << "new molecule start failed" << endl;
-				logger->end();
+				log(log_debug, "activ") << "new molecule start failed" << logend();
 			}
  
             if (debug > 3)
 			{
-				logger->start() << "new molecule while idle. flags: " << flags << endl;
-				logger->end();
+				log(log_debug, "activ") << "new molecule while idle. flags: " 
+					<< flags << logend();
 			}
         }
         else
         {
             if (debug > 3)
 			{
-				logger->start() << "new molecule " << newMolecule.getPriority() << " old " << lastActive->getPriority() << " interruptable: " << !(lastActive->getMode() & Molecule::dont_interrupt) << endl;
-				logger->end();
+				log(log_debug, "activ") << "new molecule " << newMolecule.getPriority() 
+					<< " old " << lastActive->getPriority() << " interruptable: " 
+					<< !(lastActive->getMode() & Molecule::dont_interrupt) << logend();
 			}
 
             if (newMolecule.getPriority() > lastActive->getPriority() && !(lastActive->getMode() & Molecule::dont_interrupt))
             {
                 if (debug > 3)
 				{
-					logger->start() << "interrupting " << *lastActive << endl;
-					logger->end();
+					log(log_debug, "activ") << "interrupting " << *lastActive << logend();
 				}
  
                 lastActive->stop(sequencer);
@@ -475,16 +482,14 @@ int Activity::start()
 		{
 			if (debug > 3)
 			{
-				logger->start() << "started: " << *molecule;
-				logger->end();
+				log(log_debug, "activ") << "started: " << *molecule << logend();
 			}
 		}
 		else
 		{
 			if (debug)
 			{
-				logger->start() << "start failed: " << *molecule;
-				logger->end();
+				log(log_error, "activ") << "start failed: " << *molecule << logend();
 			}
 	
 			sequencer->sendMoleculeDone(syncMajor, molecule->getSyncMinor(), molecule->getStatus(), molecule->getPos(), molecule->getLength());

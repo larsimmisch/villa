@@ -75,51 +75,57 @@ public:
 	virtual void recognized(Recognizer* server, Recognizer::Result& result);
 #endif
 
-	// TelephoneClients connectRequest & details are treated here
-	void onIncoming(Telephone* server, SAP& local, SAP& remote); 
+	// TrunkClients connectRequest & details are treated here
+	void onIncoming(Trunk *server, const SAP &local, const SAP &remote); 
 
-	// protocol of TelephoneClient
+	// TrunkClient protocol
+
 	// must call server.accept or server.reject
-	virtual void connectRequest(Telephone* server, SAP& remote);
-	virtual void connectRequestFailed(Telephone* server, int cause);
+	virtual void connectRequest(Trunk *server, const SAP &local, const SAP &remote);
+	virtual void connectRequestFailed(Trunk *server, int cause);
 	
 	// replies to call from far end
-	virtual void connectConfirm(Telephone* server);
-	virtual void connectFailed(Telephone* server, int cause);
+	virtual void connectDone(Trunk *server, int result);
 	
 	// must call server.disconnectAccept
-	virtual void disconnectRequest(Telephone* server);
+	virtual void disconnectRequest(Trunk *server, int cause);
 	
 	// disconnect completion
-	virtual void disconnectDone(Telephone* server, unsigned result);
+	virtual void disconnectDone(Trunk *server, unsigned result);
 
 	// accept completion
-	virtual void acceptDone(Telephone* server, unsigned result);
+	virtual void acceptDone(Trunk *server, unsigned result);
 
 	// reject completion
-	virtual void rejectDone(Telephone* server, unsigned result);
+	virtual void rejectDone(Trunk *server, unsigned result);
 
-	virtual void details(Telephone* server, SAP& local, SAP& remote);
-	virtual void remoteRinging(Telephone* server);
-	
-	// flow control
-	virtual void stopSending(Telephone* server) {}
-	virtual void resumeSending(Telephone* server) {}
+	virtual void details(Trunk *server, const SAP& local, const SAP& remote);
+	virtual void remoteRinging(Trunk *server);
 
-	// sent whenever a packet is delivered
-	virtual void dataReady(Telephone* server); 
+	// results from transfer
+	virtual void transferDone(Trunk *server);
+	virtual void transferFailed(Trunk *server, int cause);
+
+	// TelephoneClient protocol
+
+	// unused
+	virtual void disconnected(Telephone *server) {};
+	virtual void connected(Telephone *server) {};
+
+	// sent whenever a touchtone is received
+	virtual void touchtone(Telephone *server, char tt);
 
 	// sent whenever a sample is started
-	virtual void started(Telephone* server, Sample* aSample);
+	virtual void started(Telephone *server, Sample *aSample);
 
 	// sent whenever a Sample is sent
-	virtual void completed(Telephone* server, Sample* aSample, unsigned msecs);
-	virtual void completed(Telephone* server, Molecule* aMolecule, unsigned msecs, unsigned reason);
+	virtual void completed(Telephone *server, Sample *aSample, unsigned msecs);
+	virtual void completed(Telephone *server, Molecule *aMolecule, unsigned msecs, unsigned reason);
 	
-	virtual void aborted(Telephone* sender, int cause) {}
+	virtual void aborted(Telephone *sender, int cause) {}
 
-	virtual void fatal(Telephone* server, const char* e);
-	virtual void fatal(Telephone* server, Exception& e);
+	virtual void fatal(Telephone *server, const char *e);
+	virtual void fatal(Telephone *server, Exception& e);
 
 	// protocol of TransportClient
 	virtual void connectRequest(Transport* server, SAP& remote, Packet* initialPacket = 0);
@@ -133,10 +139,6 @@ public:
 	// helper for connectTimeout & connectReject
 	void connectFailed(Transport* server);
 	
-	// results from transfer
-	virtual void transferDone(Telephone* server);
-	virtual void transferFailed(Telephone* server, int cause);
-
 	// must call server.disconnectAccept or server.disconnectReject 
 	virtual void disconnectRequest(Transport* server, Packet* finalPacket = 0);
 	
@@ -164,12 +166,13 @@ public:
 	void addCompleted(Telephone* server, Molecule* molecule, unsigned msecs, unsigned reason);
 	void checkCompleted();
 
-	virtual void waitForCompletion()	{ done.wait(); }
+	// todo: needed?
+	// virtual void waitForCompletion()	{ done.wait(); }
 
-	void loadSwitch(const char* aName, int is32bit = 1, int aDevice = 0)	{ phone.loadSwitch(aName, aDevice); }
+	// void loadSwitch(const char* aName, int is32bit = 1, int aDevice = 0)	{ phone.loadSwitch(aName, aDevice); }
 
 	Timer& getTimer()				{ return timer; }
-	Telephone*	getPhone()				{ return &phone; }
+	Telephone*	getPhone()				{ return phone; }
 
 protected:
 
@@ -178,21 +181,21 @@ protected:
 	Activity* findActivity(unsigned anActivity) { return activities.find(anActivity); }
 	Packet* newPacket(unsigned args, unsigned size = 1024);
 
-	TrunkConfiguration* configuration;
+	TrunkConfiguration *configuration;
 	AsyncTCP tcp;
+	Telephone *phone;
 #ifdef __RECOGNIZER__
-	AsyncRecognizer* recognizer;
+	AsyncRecognizer *recognizer;
 #endif
-	ClientQueue::Item* clientSpec;
-//	Event done;
-	Activity* activity;
-	Activity* nextActivity;
+	ClientQueue::Item *clientSpec;
+	Activity *activity;
+	Activity *nextActivity;
 	ActivityCollection activities;
 	CompletedQueue delayedCompletions;
-	Packet* packet;
+	Packet *packet;
 	char buffer[1024];
 	omni_mutex mutex;
-	ConnectCompletion* connectComplete;
+	ConnectCompletion *connectComplete;
 	int outOfService;
 
 	static Timer timer;

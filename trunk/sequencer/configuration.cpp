@@ -1,14 +1,14 @@
 
-#include <Services/Lock.h>
-#include "Configuration.h"
-#include "Sequence.h"
+#include "omnithread.h"
+#include "configuration.h"
+#include "sequence.h"
 
 extern int debug;
-extern Log* logger;
+// extern Log* logger;
 
 char* copyString(const char* aString);
 
-void InvalidKey::printOn(ostream& aStream)
+void InvalidKey::printOn(std::ostream& aStream)
 {
 	Exception::printOn(aStream);
 
@@ -33,71 +33,6 @@ int TrunkConfiguration::readFromKey(RegistryKey& key)
 	number = copyString(key.getStringAt("Number"));
 
 	return 1;
-}
-
-NmsAnalogTrunkConfiguration::~NmsAnalogTrunkConfiguration()
-{
-	delete protocol;
-	delete sequencer;
-}
-
-int NmsAnalogTrunkConfiguration::readFromKey(RegistryKey& key)
-{
-	if (!TrunkConfiguration::readFromKey(key))	return 0;
-
-	if (!key.hasValue("Stream")) return 0;
-	if (!key.hasValue("Timeslot")) return 0;
-	if (!key.hasValue("Protocol")) return 0;
-
-	slot.st = key.getUnsignedAt("Stream");
-	slot.ts = key.getUnsignedAt("Timeslot");
-
-	protocol = copyString(key.getStringAt("Protocol"));
-	
-	free = 1;
-
-	return 1;
-}
-
-void NmsAnalogTrunkConfiguration::start()
-{
-	sequencer = new Sequencer(this);
-
-	logger->start() << "NMS WTI-8 started 1 line on [" << slot << "]" << endl;
-	logger->end();
-}
-
-void NmsAnalogTrunkConfiguration::removeClient(void* tag)
-{
-	Lock lock(mutex);
-
-	queue.remove(tag);
-}
-
-void NmsAnalogTrunkConfiguration::removeClient(void* tag, SAP& aSAP)
-{
-	Lock lock(mutex);
-
-	queue.remove(tag, aSAP);
-}
-
-ClientQueue::Item* NmsAnalogTrunkConfiguration::dequeue(SAP& details)
-{
-	Lock lock(mutex);
-
-	return queue.dequeue();
-}
-
-void NmsAnalogTrunkConfiguration::enqueue(SAP& details, SAP& client, void* tag)
-{
-	Lock lock(mutex);
-
-	queue.enqueue(details, client, tag);
-}
-
-unsigned NmsAnalogTrunkConfiguration::connect(ConnectCompletion* complete)
-{
-	return sequencer->connect(complete);
 }
 
 AculabPRITrunkConfiguration::~AculabPRITrunkConfiguration()
@@ -125,20 +60,19 @@ int AculabPRITrunkConfiguration::readFromKey(RegistryKey& key)
 
 void AculabPRITrunkConfiguration::start()
 {
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 
 	for (unsigned index = 0; index < lines; index++)
 	{
 		sequencers[index] = new Sequencer(this);
 	}
 
-	logger->start() << "Aculab PRI started " << lines << " lines on device " << device << endl;
-	logger->end();
+	log(log_debug, "sequencer") << "Aculab PRI started " << lines << " lines on device " << device << logend();
 }
 
 void AculabPRITrunkConfiguration::removeClient(void* tag)
 {
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 
 	for (DDIIterator i(ddis); !i.isDone(); i.next())
 	{
@@ -146,9 +80,9 @@ void AculabPRITrunkConfiguration::removeClient(void* tag)
 	}
 }
 
-void AculabPRITrunkConfiguration::removeClient(void* tag, SAP& aSAP)
+void AculabPRITrunkConfiguration::removeClient(void* tag, const SAP& aSAP)
 {
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 
 	for (DDIIterator i(ddis); !i.isDone(); i.next())
 	{
@@ -156,9 +90,9 @@ void AculabPRITrunkConfiguration::removeClient(void* tag, SAP& aSAP)
 	}
 }
 
-ClientQueue::Item* AculabPRITrunkConfiguration::dequeue(SAP& details)
+ClientQueue::Item* AculabPRITrunkConfiguration::dequeue(const SAP& details)
 {
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 
 	DDIs::Node* node = ddis.find(details.getService());
 
@@ -167,9 +101,9 @@ ClientQueue::Item* AculabPRITrunkConfiguration::dequeue(SAP& details)
 	return node->queue.dequeue();
 }
 
-void AculabPRITrunkConfiguration::enqueue(SAP& details, SAP& client, void* tag)
+void AculabPRITrunkConfiguration::enqueue(const SAP& details, const SAP& client, void* tag)
 {
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 
 	DDIs::Node* node = ddis.create(details.getService());
 
@@ -178,7 +112,7 @@ void AculabPRITrunkConfiguration::enqueue(SAP& details, SAP& client, void* tag)
 
 unsigned AculabPRITrunkConfiguration::connect(ConnectCompletion* complete)
 {
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 
 	unsigned result = _busy;
 
@@ -203,29 +137,24 @@ void ClientQueue::remove(void* tag)
 		Item* item = (Item*)gc.current();
 		if (item->tag == tag)
 		{
-			if (debug > 1)
-			{
-				logger->start() << "removed client at: " << item->client << endl;
-				logger->end();
-			}
+			log(log_debug, "sequencer") 
+				<< "removed client at: " << item->client << logend();
+
 			DList::remove(item);
 			delete item;
 		}
 	}
 }
 
-void ClientQueue::remove(void* tag, SAP& aSAP)
+void ClientQueue::remove(void* tag, const SAP& aSAP)
 {
 	for (ListIter gc(*this); !gc.isDone(); gc.next())
 	{
 		Item* item = (Item*)gc.current();
 		if (item->tag == tag && item->client == aSAP)
 		{
-			if (debug > 1)
-			{
-				logger->start() << "removed client at: " << item->client << endl;
-				logger->end();
-			}
+			log(log_debug, "sequencer") 
+				<< "removed client at: " << item->client << logend();
 
 			DList::remove(item);
 			delete item;

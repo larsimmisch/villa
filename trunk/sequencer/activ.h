@@ -22,8 +22,12 @@ char* copyString(const char* aString);
 
 struct Time
 {
-	unsigned sec;
-	unsigned nsec;
+	Time() : sec(0), nsec(0) {}
+
+	void now() { omni_thread::get_time(&sec, &nsec); }
+	
+	unsigned long sec;
+	unsigned long nsec;
 
 	unsigned operator-(const Time &b)
 	{
@@ -53,8 +57,8 @@ public:
 
 	void setNotifications(int notify)	{ notifications = notify; }
 
-	int notifyStart()			  { return notifications & notify_start; }
-	int notifyStop()			  { return notifications & notify_done; }
+	int notifyStart() const { return notifications & notify_start; }
+	int notifyStop() const { return notifications & notify_done; }
 
 	virtual void printOn(std::ostream& out)  { out << "abstract atom"; }
 
@@ -80,36 +84,36 @@ public:
 	virtual int stop(Sequencer* sequencer);
 	virtual int done(Sequencer* sequencer, unsigned msecs, unsigned reason);
 	virtual int setPos(unsigned aPosition);
-	unsigned getPos()				 { return pos; }
-	virtual unsigned getLength()	 { return length; }
+	unsigned getPos() const { return pos; }
+	virtual unsigned getLength() const { return length; }
 
 	// atEnd is slightly different than done. 
 	// atEnd returns true at the end of a looped sample, which done doesn't
-	int atEnd() 					 { return current == tail; }
+	int atEnd() const { return current == tail; }
 
-	unsigned getPriority()	 { return priority; }
+	unsigned getPriority() const { return priority; }
 
 	void setMode(unsigned aMode) { mode = aMode; }
-	unsigned getMode()			 { return mode;  }
-	unsigned getStatus()		 { return status; }
+	unsigned getMode() const	 { return mode;  } 
+	unsigned getStatus() const	 { return status; } 
 
 	void add(Atom& anAtom)		 { addLast(&anAtom); length += anAtom.getLength(); }
 	void remove(Atom* anAtom)	 { length -= anAtom->getLength(); DList::remove(anAtom); }
 
-	int isActive()				 { return flags & active; }
-	int needRewind()			 { return flags & need_rewind; }
-	int isStopped() 			 { return flags & stopped; }
+	int isActive() const { return flags & active; }
+	int needRewind() const { return flags & need_rewind; }
+	int isStopped() const { return flags & stopped; }
 
-	unsigned getSyncMinor() 		  { return syncMinor; }
+	unsigned getSyncMinor() const  { return syncMinor; }
 
-	int notifyStart()			 { return current ? current->notifyStart() : 0; }
-	int notifyStop()			 { return current ? current->notifyStop() : 0;	}
+	int notifyStart() const	 { return current ? current->notifyStart() : 0; }
+	int notifyStop() const { return current ? current->notifyStop() : 0;	}
 
-	unsigned currentAtom()		 { return nCurrent; }
-
-	friend std::ostream& operator<<(std::ostream& out, Molecule& aMolecule);
+	unsigned currentAtom() const { return nCurrent; }
 	
 protected:
+
+	friend std::ostream& operator<<(std::ostream& out, Molecule& aMolecule);
 
 	virtual void freeLink(List::Link* aLink);
 
@@ -117,6 +121,7 @@ protected:
 	unsigned priority;
 	unsigned syncMinor;
 	unsigned flags;
+	Time timeStarted;
 	Time timeStopped;
 	unsigned pos;
 	unsigned length;
@@ -132,8 +137,6 @@ public:
 	PlayAtom(Sequencer* sequencer, const char* aFile);
 	virtual ~PlayAtom() { delete file; delete sample; }
 
-	virtual int start(Sequencer* sequencer, void* userData = 0);
-	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos) { return sample->setPos(pos); }
 	virtual unsigned getLength()	{ return sample->getLength(); }
 
@@ -152,8 +155,6 @@ public:
 	RecordAtom(Sequencer* sequencer, const char* aFile, unsigned aTime);
 	virtual ~RecordAtom() { delete file; delete sample; }
 
-	virtual int start(Sequencer* sequencer, void* userData = 0);
-	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos) { return sample->setPos(pos); }
 	virtual unsigned getLength()	{ return sample->getLength(); }
 	virtual unsigned getStatus()	{ return sample->getLength() == 0 ? _empty : _ok; }
@@ -176,8 +177,6 @@ public:
 	BeepAtom(Sequencer* sequencer, unsigned count);
 	virtual ~BeepAtom() { delete beep; }
 
-	virtual int start(Sequencer* sequencer, void* userData = 0);
-	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos) { return 1; }
 	virtual unsigned getLength()	{ return nBeeps * 250; } // todo fix this
 	virtual unsigned getStatus()	{ return _ok; }
@@ -197,8 +196,6 @@ public:
 	TouchtoneAtom(Sequencer* sequencer, const char* att);
 	virtual ~TouchtoneAtom() { delete sample; delete tt; }
 
-	virtual int start(Sequencer* sequencer, void* userData = 0);
-	virtual int stop(Sequencer* sequencer);
 	virtual int setPos(unsigned pos) { return 1; }
 	virtual unsigned getLength()	{ return strlen(tt) * 80; } // this is a rough guess
 	virtual unsigned getStatus()	{ return sample->getStatus(); }

@@ -50,7 +50,7 @@ public:
 	virtual int asynchronous(Transport* server)	{ return 1; }
 	virtual void data(Transport* server, Packet* aPacket) {}
 
-    virtual void fatal(const char* e) { std::cerr << e << endl; }
+    virtual void fatal(const char* e) { std::cerr << e << std::endl; }
     virtual void fatal(Exception& e)  { std::cerr << e; }
 };
 #endif

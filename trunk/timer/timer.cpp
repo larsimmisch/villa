@@ -7,8 +7,8 @@
 #include "timer.h"
 
 Timer::TimerID::TimerID(unsigned long delta, unsigned i,
-		TimerClient *client, unsigned user)
-	: m_abs_sec(0), m_abs_nsec(0), m_id(i), m_client(client), m_data(user)
+		TimerClient *client, void *data)
+	: m_abs_sec(0), m_abs_nsec(0), m_id(i), m_client(client), m_data(data)
 {
 	omni_thread::get_time(&m_abs_sec, &m_abs_nsec,
 			delta / 1000, (delta % 1000) * 1000000);
@@ -70,9 +70,7 @@ bool Timer::run(void)
 	return true;
 }
 
-Timer::TimerID Timer::add(unsigned delta,
-								   TimerClient *client,
-								   unsigned user)
+Timer::TimerID Timer::add(unsigned delta, TimerClient *client, void *data)
 {
 	omni_mutex_lock l(m_mutex);
 
@@ -81,7 +79,7 @@ Timer::TimerID Timer::add(unsigned delta,
 	if (!i)
 		++i;
 
-	TimerID tid(delta, i, client, user);
+	TimerID tid(delta, i, client, data);
 
 	std::pair<std::set<TimerID>::iterator,bool> j = m_timers.insert(tid);
 

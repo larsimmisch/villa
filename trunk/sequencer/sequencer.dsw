@@ -15,6 +15,18 @@ Package=<4>
 
 ###############################################################################
 
+Project: "collect"=..\collect\collect.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+}}}
+
+###############################################################################
+
 Project: "omnithread"=..\omnithread\omnithread.dsp - Package Owner=<4>
 
 Package=<5>
@@ -43,6 +55,9 @@ Package=<4>
     End Project Dependency
     Begin Project Dependency
     Project_Dep_Name tcp
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name collect
     End Project Dependency
 }}}
 

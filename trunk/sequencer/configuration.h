@@ -27,7 +27,7 @@ public:
 
     virtual ~InvalidKey() { delete key; }
 
-    virtual void printOn(ostream& aStream);
+    virtual void printOn(std::ostream& aStream);
 
 	char* key;
 };
@@ -38,7 +38,8 @@ public:
 
 	struct Item : public DList::DLink
 	{
-		Item(SAP& aDetail, SAP& aClient, void* aTag = 0) : details(aDetail), client(aClient), tag(aTag) {}
+		Item(const SAP &aDetail, const SAP &aClient, void* aTag = 0) 
+			: details(aDetail), client(aClient), tag(aTag) {}
 		
 		SAP details;
 		SAP client;
@@ -48,11 +49,11 @@ public:
 	ClientQueue() : DList() {}
 	virtual ~ClientQueue() { for (LinkIter i(head); !i.isDone(); i.next() ) freeLink( i.current() );}
 	
-	void enqueue(SAP details, SAP& client, void* tag = 0)	{ addLast(new Item(details, client, tag)); }
+	void enqueue(const SAP &details, const SAP &client, void* tag = 0)	{ addLast(new Item(details, client, tag)); }
 	Item* dequeue();
 
 	void remove(void* tag);
-	void remove(void* tag, SAP& aSAP);
+	void remove(void* tag, const SAP &aSAP);
 
 	virtual void freeLink(List::Link* item)	{ delete (Item*)item; }
 };
@@ -136,11 +137,11 @@ public:
 
 	// removes a Client with given tag
 	virtual void removeClient(void* tag) = 0;
-	virtual void removeClient(void* tag, SAP& aSAP) = 0;
+	virtual void removeClient(void* tag, const SAP& aSAP) = 0;
 
-	virtual void enqueue(SAP& details, SAP& client, void* tag) = 0;
-	virtual ClientQueue::Item*  dequeue(SAP& details) = 0;
-	virtual int  isContained(SAP& details)	{ return 0; }
+	virtual void enqueue(const SAP& details, const SAP& client, void* tag) = 0;
+	virtual ClientQueue::Item* dequeue(const SAP& details) = 0;
+	virtual int isContained(const SAP& details)	{ return 0; }
 
 	virtual unsigned connect(ConnectCompletion* complete) = 0;
 
@@ -167,18 +168,21 @@ public:
 
 	virtual int isDigital()		{ return 1; }
 
-	virtual Trunk* getTrunk()	{ return new AculabTrunk(0, device, swdevice); }
+	virtual Trunk* getTrunk()	{ return new AculabTrunk(0, device, 0); }
 	virtual unsigned numLines()	{ return lines; }
 
 	virtual int readFromKey(RegistryKey& key);
 
 	virtual void start();
 	virtual void removeClient(void* tag);
-	virtual void removeClient(void* tag, SAP& aSAP);
+	virtual void removeClient(void* tag, const SAP& aSAP);
 
-	virtual void enqueue(SAP& details, SAP& client, void* tag);
-	virtual ClientQueue::Item* dequeue(SAP& details);
-	virtual int  isContained(SAP& details)	{ return ddis.isSubKey(details.getService()) != 0; }
+	virtual void enqueue(const SAP& details, const SAP& client, void* tag);
+	virtual ClientQueue::Item* dequeue(const SAP& details);
+	virtual int  isContained(const SAP& details)
+	{ 
+		return ddis.isSubKey(details.getService()) != 0;
+	}
 
 	virtual unsigned connect(ConnectCompletion* complete);
 

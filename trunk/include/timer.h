@@ -19,7 +19,7 @@ public:
 		{}
 
 		TimerID(unsigned long delta, unsigned i,
-			TimerClient *client, unsigned user);
+			TimerClient *client, void *data);
 
 		bool operator==(const TimerID &a) const throw()
 		{
@@ -51,7 +51,7 @@ public:
 		unsigned long m_abs_nsec;
 		unsigned long m_id;
 		TimerClient *m_client;
-		unsigned m_data;
+		void *m_data;
 	};
 
 	Timer(void) :
@@ -61,7 +61,7 @@ public:
 	virtual ~Timer() {}
 
 	/// returns a unique TimerID, delta is in ms
-	TimerID add(unsigned delta, TimerClient *client, unsigned user = 0);
+	TimerID add(unsigned delta, TimerClient *client, void *data = 0);
 
 	/// returns true if id removed, false if id not found
 	bool remove(const TimerID &id);

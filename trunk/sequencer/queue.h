@@ -9,8 +9,8 @@
 #ifndef _COMPLETED_QUEUE_H_
 #define _COMPLETED_QUEUE_H_
 
-#include <Collect/List.h>
-#include <Sequence/Activ.h>
+#include "list.h"
+#include "activ.h"
 
 class CompletedQueue : public List
 {

@@ -32,7 +32,7 @@ control data!\n"); exit(23); }
 	return 1;
 }
 
-void* Packet::getValueAt(int aPosition)
+void* Packet::getValueAt(int aPosition) const
 {
 	if (typeAt(aPosition) == type_string || typeAt(aPosition) == type_binary)
 	{
@@ -42,7 +42,7 @@ void* Packet::getValueAt(int aPosition)
 	else return getDescriptor(aPosition)->value;
 }
 
-void* Packet::getControlValueAt(int aPosition)
+void* Packet::getControlValueAt(int aPosition) const
 {
 	if (controlTypeAt(aPosition) == type_string || controlTypeAt(aPosition) == type_binary)
 	{
@@ -52,7 +52,7 @@ void* Packet::getControlValueAt(int aPosition)
 	else return getControlDescriptor(aPosition)->value;
 }
 
-unsigned Packet::getBinarySizeAt(int aPosition)
+unsigned Packet::getBinarySizeAt(int aPosition) const
 {
 	unsigned* value = (unsigned*)getValueAt(aPosition);
 	
@@ -161,7 +161,7 @@ void Packet::setControlContent(int aContent)
 	getControlData()->content = aContent;
 }
 
-int Packet::getControlContent()
+int Packet::getControlContent() const
 {
     return hasControlData() ? getControlData()->content : -1;
 }
@@ -280,40 +280,41 @@ void Packet::swapByteOrder(int isNative)
     }
 }
 
-ostream& operator<<(ostream& out, Packet& aPacket)
+std::ostream& operator<<(std::ostream& out, const Packet& aPacket)
 {
 	unsigned index;
 	
 	out << "Packet. size " << aPacket.size << " syncMajor " << aPacket.getSyncMajor()
-		<< " syncMinor " << aPacket.getSyncMinor() << endl;
+		<< " syncMinor " << aPacket.getSyncMinor() << std::endl;
 	
 	for(index=0;index<aPacket.getNumArgs();index++)
 	{
-        if (index == 0) out << "content: " << aPacket.getContent() << endl;
+        if (index == 0) out << "content: " << aPacket.getContent() << std::endl;
 		out << aPacket.typeAt(index) << ' ';
 		switch(aPacket.typeAt(index))
 		{
 		case Packet::type_unsigned:
-			out << "(unsigned)" << aPacket.getUnsignedAt(index) << endl;
+			out << "(unsigned)" << aPacket.getUnsignedAt(index) << std::endl;
 			break;
 		case Packet::type_integer:
-			out << "(int)" << aPacket.getIntegerAt(index) << endl;
+			out << "(int)" << aPacket.getIntegerAt(index) << std::endl;
 			break;
 		case Packet::type_unsignedchar:
-			out << "(unsigned char)" << aPacket.getUnsignedCharAt(index) << endl;
+			out << "(unsigned char)" << aPacket.getUnsignedCharAt(index) << std::endl;
 			break;
 		case Packet::type_character:
-			out << "(char)" << aPacket.getCharacterAt(index) << endl;
+			out << "(char)" << aPacket.getCharacterAt(index) << std::endl;
 			break;
 		case Packet::type_string:
-			out << "(string)" << aPacket.getStringAt(index) << endl;
+			out << "(string)" << aPacket.getStringAt(index) << std::endl;
 			break;
 		case Packet::type_binary:
-			out << "(binary)" << aPacket.getBinarySizeAt(index) << endl;
+			out << "(binary)" << aPacket.getBinarySizeAt(index) << std::endl;
 			break;
 		}
 	}
-	if (aPacket.hasControlData()) out << "control part content " << aPacket.getControlContent() << endl;
+	if (aPacket.hasControlData()) 
+		out << "control part content " << aPacket.getControlContent() << std::endl;
 	
 	return out;
 }

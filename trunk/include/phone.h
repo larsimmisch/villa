@@ -1,7 +1,7 @@
 /*
 	phone.h    
 
-	$Id: phone.h,v 1.5 2000/11/06 13:10:59 lars Exp $
+	$Id: phone.h,v 1.6 2001/05/19 18:12:38 lars Exp $
 
 	Copyright 2000 ibp (uk) Ltd.
 
@@ -47,7 +47,8 @@ public:
 
     enum states  { idle, listening, connecting, connected, disconnecting, transferring, waiting, collecting_details, accepting, rejecting };
 
-	Trunk(TrunkClient* aClient, Telephone* aTelephone = 0) : client(aClient), phone(aTelephone), state(idle) {}
+	Trunk(TrunkClient* aClient, Telephone* aTelephone = 0) 
+		: client(aClient), phone(aTelephone), state(idle) {}
     virtual ~Trunk() {}
 
 	// Connection establishment 
@@ -127,8 +128,12 @@ class Telephone
 {
 public:
 
-    Telephone(TelephoneClient *aClient, Trunk *aTrunk, Timeslot rcv = Timeslot(-1,-1), Timeslot xmit = Timeslot(-1,-1), void* aClientData = 0) 
-		: client(aClient), trunk(aTrunk), receive(rcv), transmit(xmit), clientData(aClientData), current(NULL) {}
+    Telephone(TelephoneClient *aClient, Trunk *aTrunk, 
+		Timeslot rcv = Timeslot(-1,-1), 
+		Timeslot xmit = Timeslot(-1,-1), void* aClientData = 0) 
+		: client(aClient), trunk(aTrunk), receive(rcv), transmit(xmit), 
+		clientData(aClientData), current(0) {}
+
     virtual ~Telephone() {}
 
     // Connection establishment
@@ -212,7 +217,7 @@ public:
 	// must be called with mutex held
 	virtual void completed(Sample *sample)
 	{
-		current = NULL;
+		current = 0;
 
 		client->completed(this, sample, sample->position);
 	}

@@ -84,7 +84,8 @@ enum
     _aborted,
     _rejected,
 	_disconnected,
-	_failed, 
+	_failed,
+	_not_implemented,
 	_invalid, 
 	_busy,
 	_not_available,
@@ -102,8 +103,7 @@ enum
     atom_beep,
     atom_conference,
 	atom_touchtones,
-	atom_silence,
-	atom_energy_detector
+	atom_silence
 };
 
 

@@ -7,24 +7,17 @@
 */
 
 #include "omnithread.h"
-#include <Conference/Conference.h>
+#include "conference.h"
 #include "rphone.h"
-#include "Sequence.h"
-#include "Configuration.h"
-#include "Interface.h"
+#include "sequence.h"
+#include "configuration.h"
+#include "interface.h"
 
 extern int debug;
-extern Log* logger;
-
-#ifdef __AG__
-extern Conferences gConferences;
-#endif
 
 extern ClientQueue gClientQueue;
 
 extern ConfiguredTrunks gConfiguration;
-
-void* operator new(unsigned size, void* buffer);
 
 InterfaceConnection::InterfaceConnection(TransportClient& aClient, SAP& local) 
 : AsyncTCPNoThread(aClient)
@@ -36,7 +29,7 @@ InterfaceConnection::InterfaceConnection(TransportClient& aClient, SAP& local)
 
 void InterfaceConnection::sendConnectDone(unsigned syncMajor, unsigned syncMinor, unsigned result)
 {
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 	
 	Packet* reply = staticPacket(1);
 
@@ -62,8 +55,7 @@ void Interface::cleanup(Transport* server)
 
 	// first in the global queue
 
-	logger->start() << "client aborted" << endl;
-	logger->end();
+	log(log_debug, "sequencer") << "client aborted" << logend();
 
 	gClientQueue.remove(server);
 
@@ -77,8 +69,8 @@ void Interface::cleanup(Transport* server)
 	gConfiguration.unlock();
 
 	// force close all conferences opened by this app
-	gConferences.lock();
 	/*
+	gConferences.lock();
 	for (ConferencesIterator c(gConferences); !c.isDone(); c.next())
 	{
 		if (c.current()->getUserData() == server)
@@ -86,26 +78,21 @@ void Interface::cleanup(Transport* server)
 			gConferences.close(c.current()->getHandle(), 1);
 		}
 	}
-	*/
 	gConferences.unlock();
+	*/
 }
 
 void Interface::connectRequest(Transport* server, SAP& remote, Packet* initialPacket)
 {
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 
 	unused--;
 
-	logger->start() << "client attached from " << remote << endl;
-	logger->end();
+	log(log_debug, "sequencer") << "client attached from " << remote << logend();
 
 	if (unused == 0)
 	{
-		if (debug)
-		{
-			logger->start() << "spawning new interface listener" << endl;
-			logger->end();
-		}
+		log(log_debug, "sequencer") << "spawning new interface listener" << logend();
 
 		connections.addFirst(new InterfaceConnectionThread(*this, local));
 		unused++;
@@ -159,7 +146,7 @@ void Interface::disconnectRequest(Transport* server, Packet* cause)
 {
 	SAP remote;
 
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 	
 	unused++;
 
@@ -178,14 +165,14 @@ void Interface::disconnectTimeout(Transport* server)
 
 void Interface::disconnectReject(Transport* server, Packet* aPacket)
 {
-    // future extension. We won't actively disconnect right now.
+    // We don't actively disconnect
 }
 
 void Interface::abort(Transport* server, Packet* finalPacket)
 {
 	SAP remote;
 
-	Lock lock(mutex);
+	omni_mutex_lock lock(mutex);
 	
 	unused++;
 
@@ -200,7 +187,7 @@ void Interface::data(Transport* server, Packet* aPacket)
     Packet* reply;
 	InterfaceConnection* ico = (InterfaceConnection*)server;
 
-	Lock lock(ico->getMutex());
+	omni_mutex_lock lock(ico->getMutex());
 
     switch(aPacket->getContent())
     {
@@ -210,7 +197,7 @@ void Interface::data(Transport* server, Packet* aPacket)
         reply->setContent(if_open_conference_done);
         reply->setSync(aPacket->getSyncMajor(), aPacket->getSyncMinor());
 
-		Conference* conference = gConferences.create();
+		Conference* conference = 0; //gConferences.create();
 
         reply->setUnsignedAt(0, conference ? _ok : _failed);
         if (conference) reply->setUnsignedAt(1, conference->getHandle());
@@ -225,15 +212,15 @@ void Interface::data(Transport* server, Packet* aPacket)
 
         // check parameters
         if (aPacket->typeAt(0) != Packet::type_unsigned 
-		 || !gConferences[aPacket->getUnsignedAt(0)])
+		 || 0 /*!gConferences[aPacket->getUnsignedAt(0)]*/)
         {
 			reply->setUnsignedAt(0, _failed);
 			server->send(*reply);
             break;
         }
 
-		gConferences.close(aPacket->getUnsignedAt(0));
-		reply->setUnsignedAt(0, _ok);
+		// gConferences.close(aPacket->getUnsignedAt(0));
+		reply->setUnsignedAt(0, _not_implemented);
 		server->send(*reply);
 		break;
 	case if_listen:
@@ -264,38 +251,36 @@ void Interface::data(Transport* server, Packet* aPacket)
 
 		if (trunk)
 		{
-			if (debug)
-			{
-				logger->start() << "client " << client << " added listen for " << trunk->getName() << " " << (detail.getService() ? detail.getService() : "any") << endl;
-				logger->end();
-			}
+			log(log_debug, "sequencer") << "client " << client 
+				<< " added listen for " << trunk->getName() 
+				<< ' ' << (detail.getService() ? detail.getService() : "any") 
+				<< logend();
+
 			trunk->enqueue(detail, client, server);
 		}
 		else
 		{
 			if (aPacket->getStringAt(0))
 			{
-				if (debug)
-				{
-					logger->start() << "client " << client << " attempted to add listen for invalid trunk " << aPacket->getStringAt(0) << endl;
-					logger->end();
+				log(log_error, "sequencer")
+					<< "client " << client 
+					<< " attempted to add listen for invalid trunk " 
+					<< aPacket->getStringAt(0) << logend();
 
-					reply->setUnsignedAt(0, _invalid);
-					server->send(*reply);
+				reply->setUnsignedAt(0, _invalid);
+				server->send(*reply);
 
-					break;
-				}
+				break;
 			}
 			else
 			{
-				if (debug)
-				{
-					logger->start() << "client " << client << " added listen for any trunk " << endl;
-					logger->end();
-				}
+				log(log_debug, "sequencer") << "client " << client 
+					<< " added listen for any trunk " << logend();
+
 				gClientQueue.enqueue(detail, client, server);
 			}
 		}
+
 		reply->setUnsignedAt(0, _ok);
 		server->send(*reply);
 
@@ -343,11 +328,10 @@ void Interface::data(Transport* server, Packet* aPacket)
 
 		trunk = gConfiguration[aPacket->getStringAt(2)];
 
-		if (debug)
-		{
-			logger->start() << "client " << client << " wants outgoing line on " << (aPacket->getStringAt(2) ? aPacket->getStringAt(2) : "any trunk") << endl;
-			logger->end();
-		}
+		log(log_debug, "sequencer") << "client " << client 
+			<< " wants outgoing line on " 
+			<< (aPacket->getStringAt(2) ? aPacket->getStringAt(2) : "any trunk") 
+			<< logend();
 
 		ConnectCompletion* complete = 
 			new ConnectCompletion(*ico, aPacket->getSyncMajor(), aPacket->getSyncMinor(), client);
@@ -418,8 +402,7 @@ void Interface::data(Transport* server, Packet* aPacket)
 	}
 	case if_shutdown:
 	{
-		logger->start() << "shutting down" << endl;
-		logger->end();
+		log(log_debug, "sequencer") << "shutting down" << logend();
 
 		gConfiguration.lock();
 		for (ConfiguredTrunksIterator t(gConfiguration); !t.isDone(); t.next())
