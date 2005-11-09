@@ -310,7 +310,7 @@ void DDIs::remove(const char* aKey)
 	for (index = strlen(key) -1;index >= 0; index--)
 	{
 		c = key[index];
-		key[index] = '0';
+		key[index] = '\0';
 
 		node = find(key);
 
