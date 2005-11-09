@@ -26,7 +26,7 @@ void InterfaceConnection::lost_connection()
 		<< m_remote << " aborted" << logend();
 
     // Villa shortcut
-    ::_exit(0);
+    // ::_exit(0);
 
 	// remove all listeners for the disconnected app
 	// first in the global queue
@@ -211,15 +211,13 @@ bool Interface::data(InterfaceConnection *ic)
 
 	if (command == "DESC")
 	{
-		ic->begin();
+		ic->begin() << V3_OK << ' ' << id.c_str() << " DESC global";
 
 		for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
 		{
-			(*ic) << V3_OK << ' ' << id.c_str() << " DESC "
-				<< c.current()->getName() << ' ' 
+			(*ic) << ' ' << c.current()->getName() << ' ' 
 				<< c.current()->getNumber() << ' '
-				<< (c.current()->isDigital() ? "digital" : "analog")
-				<< "\n";
+				<< c.current()->numLines();
 		}
 
 		(*ic) << end();
