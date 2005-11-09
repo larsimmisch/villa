@@ -1,4 +1,8 @@
-import socket,sys,time,getopt,string
+import sys
+import string
+import time
+import socket
+import getopt
 
 _device_add = [ 'LSTN', 'CONN', 'BGRO' ]
 _device_remove = [ 'DISC', 'BGRC' ]
@@ -62,7 +66,7 @@ class Sequencer:
     def send(self, sender, command, data = None):
         # perform next transaction/command
         tid = self.transactions.create(sender, data)
-        cmd = str(tid) + ' ' + command
+        cmd = '%d %s\r\n' % (tid, command)
 
         # update self.devices
         split = command.split(' ')
@@ -74,7 +78,7 @@ class Sequencer:
 
         print 'command sent to sequencer:', cmd
         
-        self.stdout.write(cmd + '\r\n')
+        self.stdout.write(cmd)
         self.stdout.flush()
 
         return tid
