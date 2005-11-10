@@ -161,8 +161,9 @@ class Sequencer(LineReceiver):
             self.parse(line)
 
 class SequencerFactory(ReconnectingClientFactory):
-    def __init__(self, start = None):
+    def __init__(self, start = None, stop = None):
         self.start = start
+        self.stop = stop
 
     def buildProtocol(self, addr):
         log.info('Connected to %s', addr)
@@ -170,6 +171,8 @@ class SequencerFactory(ReconnectingClientFactory):
 
     def clientConnectionLost(self, connector, reason):
         log.info('Lost connection.  Reason: %s', reason)
+        if self.stop:
+            self.stop()
         ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
     def clientConnectionFailed(self, connector, reason):
@@ -177,14 +180,14 @@ class SequencerFactory(ReconnectingClientFactory):
         ReconnectingClientFactory.clientConnectionFailed(self, connector,
                                                          reason)
 
-def run(host = 'localhost', port = 2104, start = None,
+def run(host = 'localhost', port = 2104, start = None, stop = None,
         loglevel = logging.DEBUG):
     from twisted.internet import reactor
     from util import defaultLogging
 
     defaultLogging(loglevel)
 
-    reactor.connectTCP(host, port, SequencerFactory(start))
+    reactor.connectTCP(host, port, SequencerFactory(start, stop))
     reactor.run()
 
 if __name__ == '__main__':

@@ -110,7 +110,10 @@ ClientQueue::Item* AculabPRITrunkConfiguration::dequeue(const SAP& details)
 {
 	omni_mutex_lock lock(mutex);
 
-	DDIs::Node* node = ddis.find(details.getService());
+	DDIs::Node* node = ddis.find(details.getAddress());
+
+	if (!node)
+		node = ddis.find(0);
 
 	if (!node) 
 		return 0;
@@ -124,7 +127,7 @@ void AculabPRITrunkConfiguration::enqueue(const std::string &id,
 {
 	omni_mutex_lock lock(mutex);
 
-	DDIs::Node* node = ddis.create(details.getService());
+	DDIs::Node* node = ddis.create(details.getAddress());
 
 	node->queue.enqueue(id, details, iface);
 }
@@ -224,7 +227,8 @@ DDIs::Node* DDIs::find(const char* key)
 	unsigned index;
 	Node* node = &root;
 
-	if (key == 0)	return 0;
+	if (key == 0)	
+		return node;
 
 	try
 	{

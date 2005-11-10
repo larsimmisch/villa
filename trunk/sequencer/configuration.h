@@ -235,7 +235,7 @@ public:
 
 	virtual int  isContained(const SAP& details)
 	{ 
-		return ddis.isSubKey(details.getService()) != 0;
+		return ddis.isSubKey(details.getAddress()) != 0;
 	}
 
 	virtual unsigned connect(ConnectCompletion* complete);
