@@ -74,9 +74,9 @@ class Sequencer(LineReceiver):
         if self.start:
             self.start(self)
 
-    def send(self, sender, command, data = None):
+    def send(self, sender, command, tid_data = None):
         # perform next transaction/command
-        tid = self.transactions.create(sender, data)
+        tid = self.transactions.create(sender, tid_data)
         cmd = '%d %s' % (tid, command)
 
         # update self.devices
@@ -84,7 +84,7 @@ class Sequencer(LineReceiver):
         action = split[0]
         if action in _device_remove:
             device = split[1]
-            if  device in self.devices:
+            if device in self.devices:
                 del self.devices[device]
 
         log.debug('sent: %s', cmd)
@@ -99,32 +99,36 @@ class Sequencer(LineReceiver):
         was just performed and additional data.
         """
 
-        result = None
+        status = None
+        tid = None
         action = None
         device = None
         data = None
         
         tr = line.split(' ')
         # check if unsolicited event
-        if tr[0] == '100':
-            if len(tr) < 3:
-                log.error('Parse error: %s', line)
+        try:
+            status = int(tr[0])
+        except ValueError:
+            log.error('Invalid event/response: status must be an int: %s',
+                      line)
+            return
+
+        if status >= 200:
+            try:
+                tid = long(tr[1])
+            except ValueError:
+                log.error('Invalid response: tid must be a long int: %s',
+                          line)
                 return
 
-            action = tr[1]
-            device = tr[2]
-            if len(tr) >= 3:
-                data = tr[3:]
-        else:
-            if len(tr) < 4:
-                log.error('Parse error: %s', line)
-                return
+            # remove the tid
+            del tr[1]
 
-            result = tr[0]
-            action = tr[2]
-            device = tr[3]
-            if len(tr) >= 4:
-                data = tr[4:]
+        action = tr[1]
+        device = tr[2]
+        if len(tr) >= 3:
+            data = tr[3:]
                 
         # the sequencer protocol uses dashes '-'
         # - we need to translate them
@@ -133,13 +137,13 @@ class Sequencer(LineReceiver):
 
         # update self.devices
         if action in _device_add:
-            self.devices[device] = self.transactions.find(long(tr[1]))[0]
+            self.devices[device] = self.transactions.find(tid)[0]
 
         event = { 'action': action, 'device': device, 'data': data }
-        if result:
-            event['result'] = result
+        if status:
+            event['status'] = status
 
-        if tr[0] == '100':
+        if status == 100:
             if not self.devices.has_key(device):
                 log.warning('No receiver found for %s '
                             '(probably already disconnected)', device)
@@ -148,16 +152,25 @@ class Sequencer(LineReceiver):
             receiver = self.devices[device]
             receiver.__class__.__dict__[action](receiver, event)
         else:
-            receiver, user_data = self.transactions.remove(long(tr[1]))
-            event['tid'] = long(tr[1])
-            receiver.__class__.__dict__[action](receiver, event, user_data)
+            receiver, user_data = self.transactions.remove(tid)
+            event['tid'] = tid
             
+            if status >= 600:
+                log.error('Fatal sequencer error: %s', line)
+            else:
+                try:
+                    receiver.__class__.__dict__[action](receiver, event,
+                                                        user_data)
+                except KeyError:
+                    log.error('Receiver %s does not implement: %s',
+                              receiver.__class__, action)
+                                        
     def lineReceived(self, line):
         if not self.initialized:
             self.send(self, 'DESC')
             self.initialized = True
         else:
-            log.debug('event: %s', line)
+            log.debug('rcvd: %s', line)
             self.parse(line)
 
 class SequencerFactory(ReconnectingClientFactory):
