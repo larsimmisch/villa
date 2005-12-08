@@ -1,0 +1,162 @@
+#!/usr/bin/env python
+
+import os
+
+_root = ''
+
+def set_root(root):
+    global _root
+    _root = root
+
+class Atom(object):
+    def __init__(self):
+        """notify should be 'none', 'begin', 'end' or 'both'"""
+        self.notify = 'none'
+
+class PlayAtom(Atom):
+    def __init__(self, filename):
+        Atom.__init__(self)
+        self.filename = os.path.join(_root, filename)
+
+    def as_command(self):
+        return 'play %s %s' % (self.filename, self.notify)
+
+class RecordAtom(Atom):
+    def __init__(self, filename, maxtime, maxsilence = 2.0):
+        Atom.__init__(self)
+        self.filename = os.path.join(_root, filename)
+        self.maxtime = maxtime
+        self.maxsilence = maxsilence
+
+    def as_command(self):
+        return 'rec %s %d %d %s' % (self.filename, self.maxtime * 1000,
+                                    self.maxsilence * 1000, self.notify)
+
+class BeepAtom(Atom):
+    def __init__(self, count):
+        Atom.__init__(self)
+        self.count = count
+
+    def as_command(self):
+        return 'beep %d %s' % (self.count, self.notify)
+
+class DTMFAtom(Atom):
+    def __init__(self, digits):
+        Atom.__init__(self)
+        self.digits = digits
+
+    def as_command(self):
+        return 'dtmf %s %s' % (self.digits, self.notify)
+                          
+class ConferenceAtom(Atom):
+    def __init__(self, conference, mode):
+        Atom.__init__(self)
+        self.conference = conference
+        if type(mode) != type('') or not mode in ['listen', 'speak', 'duplex']:
+            raise TypeError("mode must be one of 'listen', 'speak' or " \
+                            "'duplex'")
+        self.mode = mode
+
+    def as_command(self):
+        return 'conf %s %s' % (self.conference, self.notify)
+
+class Molecule(list):
+    def __init__(self, policy, *atoms):
+        self.policy = policy
+        for a in atoms:
+            self.append(a)
+
+    def __setitem__(self, key, item):
+        if not isinstance(item, Atom):
+            raise TypeError('%s must be a subclass of Atom' % repr(item))
+        super(Molecule, self).__setitem__(self, key, item)
+
+    def as_command(self):
+        s = '%d %d %d' % (self.policy.channel, self.policy.mode,
+                          self.policy.priority)
+        for i in self:
+            s = s + ' ' + i.as_command()
+
+        return s
+
+class PlayMolecule(Molecule):
+    def __init__(self, policy, filename):
+        self.policy = policy
+        self.append(PlayAtom(filename))
+
+class BeepMolecule(Molecule):
+    def __init__(self, policy, count):
+        self.policy = policy
+        self.append(BeepAtom(count))
+
+class RecordMolecule(Molecule):
+    def __init__(self, policy, filename, maxtime, maxsilence = 2000):
+        self.policy = policy
+        self.append(RecordAtom(filename, maxtime, maxsilence))
+
+class RecordBeepMolecule(Molecule):
+    def __init__(self, policy, filename, maxtime, maxsilence = 2000):
+        self.policy = policy
+        self.append(BeepAtom(policy, 1))
+        self.append(RecordAtom(filename, maxtime, maxsilence))
+
+mode_discard = 0x01
+mode_pause = 0x02
+mode_mute = 0x04
+mode_restart = 0x08
+# Don't interrupt molecule for molecules with higher priority. 
+# mode_dtmf_stop is unaffected 
+mode_dont_interrupt = 0x10
+mode_loop = 0x20
+mode_dtmf_stop = 0x40
+
+class Policy(object):
+    def __init__(self, channel, priority, mode):
+        self.channel = channel
+        self.priority = priority
+        self.mode = mode
+
+# define some policies
+
+Background = Policy(0, 0, mode_mute|mode_loop)
+ConferenceBackground = Policy(1, 0, mode_mute|mode_loop)
+Normal = Policy(0, 1, mode_mute)
+Discard = Policy(0, 1, mode_discard)
+Transition = Policy(0, 2, mode_dont_interrupt)
+Urgent = Policy(0, 3, mode_dont_interrupt)
+
+if __name__ == '__main__':
+    import unittest
+
+    class MoleculeTest(unittest.TestCase):
+
+        def testAtoms(self):
+            'Construction of a Molecule with all Atom subclasses'
+            m = Molecule(Normal,
+                         BeepAtom(1),
+                         RecordAtom('foo.wav', 10000, 1000),
+                         PlayAtom('foo.wav'),
+                         DTMFAtom('1234'),
+                         ConferenceAtom('conf[0]', 'duplex'))
+
+            self.assertEqual(m.as_command(),
+                             '0 4 1 beep 1 none '\
+                             'rec foo.wav 10000 1000 none '\
+                             'play foo.wav none ' \
+                             'dtmf 1234 none ' \
+                             'conf conf[0] none') 
+
+        def testInvalidAtom(self):
+            'Adding an invalid atom raises a TypeError'
+            m = Molecule(Normal)
+
+            self.assertRaises(TypeError, lambda m: m.append(12)) 
+
+        def testInvalidConferenceMode(self):
+            'Invalid conference mode raises a TypeError'
+            self.assertRaises(TypeError,
+                              lambda x:
+                              Molecule(Normal,
+                                       ConferenceAtom('conf[0]', 'foo'))) 
+
+    unittest.main()

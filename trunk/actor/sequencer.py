@@ -6,6 +6,7 @@ import time
 import socket
 import getopt
 import logging
+from twisted.internet import reactor
 from twisted.protocols.basic import LineReceiver
 from twisted.internet.protocol import ReconnectingClientFactory
 
@@ -150,7 +151,11 @@ class Sequencer(LineReceiver):
                 return
             
             receiver = self.devices[device]
-            receiver.__class__.__dict__[action](receiver, event)
+            try:
+                receiver.__class__.__dict__[action](receiver, event)
+            except KeyError:
+                log.error('Receiver %s does not implement: %s',
+                          receiver, action)
         else:
             receiver, user_data = self.transactions.remove(tid)
             event['tid'] = tid
@@ -163,7 +168,7 @@ class Sequencer(LineReceiver):
                                                         user_data)
                 except KeyError:
                     log.error('Receiver %s does not implement: %s',
-                              receiver.__class__, action)
+                              receiver, action)
                                         
     def lineReceived(self, line):
         if not self.initialized:
@@ -193,9 +198,11 @@ class SequencerFactory(ReconnectingClientFactory):
         ReconnectingClientFactory.clientConnectionFailed(self, connector,
                                                          reason)
 
+callLater = reactor.callLater
+
 def run(host = 'localhost', port = 2104, start = None, stop = None,
         loglevel = logging.DEBUG):
-    from twisted.internet import reactor
+
     from util import defaultLogging
 
     defaultLogging(loglevel)

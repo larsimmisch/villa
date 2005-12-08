@@ -17,10 +17,14 @@ class Caller(object):
         self.trunk = trunk
         self.spec = spec
         self.world = world
+        # self.device stays valid in world.leave and location.leave
+        # use is_disconnected to avoid sending messages to disconnected
+        # devices
         self.device = None
         self.location = None
         self.user_data = None
         self.sequencer = sequencer
+        self.is_disconnected = False
         self.send(self, 'LSTN %s %s' % (trunk, spec))
 
     def __repr__(self):
@@ -30,13 +34,24 @@ class Caller(object):
         return self.device
 
     def enqueue(self, molecule):
-        id = self.send(self, 'MLCA %s %s' %
-                       (self.device, molecule.as_command()))
+        return self.send(self, 'MLCA %s %s', self.device,
+                         molecule.as_command())
 
-    def send(self, sender, command, tid_data = None):
-        return self.sequencer.send(sender, command, tid_data)
+    def discard(self, from_policy, to_policy, channel = 'all',
+                immediately = True):
+        return self.send(self, 'MLDP %s %s %d %d %d', self.device, channel,
+                         from_policy.priority, to_policy.priority, immediately)
+        
+    def stop(self, mid):
+        return self.send(self, 'MLCD %s %d', self.device, mid)
+
+    def send(self, sender, command, *args, **kwargs):
+        if not self.is_disconnected:
+            return self.sequencer.send(sender, command % args,
+                                       kwargs.get('tid_data', None))
 
     def LSTN(self, event, user_data):
+        self.is_disconnected = False
         self.device = event['device']
         d = event['data']
         self.details = CallDetails(d[0], d[2])
@@ -48,11 +63,23 @@ class Caller(object):
         if self.world:
             self.world.enter(self)
 
+    def DTMF(self, event):
+        dtmf = event['data'][0]
+        if self.location:
+            self.location.DTMF(self, dtmf)
+
     def disconnected(self):
-        if self.world:
-            self.world.leave(self)
+        disc = self.is_disconnected
+        self.is_disconnected = True
+        # avoid calling leave twice
+        if not disc:
+            if self.location:
+                self.location.leave(self)
+            if self.world:
+                self.world.leave(self)
         self.device = None
         self.details = None
+        self.location = None
 
     def RDIS(self, event):
         self.send(self, 'DISC %s 0' % self.device)
