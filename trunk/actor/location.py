@@ -1,7 +1,8 @@
 import sys
+import copy
 import logging
 from sequencer import callLater
-from molecule import BeepMolecule, Background, Normal
+from molecule import *
 
 log = logging.getLogger('location')
 
@@ -84,30 +85,21 @@ class Location(object):
         return LocationData()
 
     def enter(self, caller):
-        '''Enter the location. Play door_in sound to all'''
+        '''Enter the location'''
         caller.location = self
         caller.user_data = self.user_data()
 
-        log.debug('enter: %s', caller)
+        log.debug('%s enter: %s', self.__class__.__name__, caller)
         
         self.callers.append(caller)
-
-        # door sound
-        if hasattr(self, 'door_in'):
-            caller.enqueue(self.door_in)
-
-            # play door sound to other callers
-            for c in self.callers:
-                if c != caller:
-                    c.enqueue(self.door_in)
 
         if hasattr(self, 'background'):
             caller.enqueue(self.background)
 
     def leave(self, caller, gone = False):
         '''Leave the location. Adjust caller list iterators
-        in all participants.
-        Play door_out sound to all.'''
+        in all participants.'''
+
         for c in self.callers:
             it = c.user_data.it_callers
             if it:
@@ -115,26 +107,35 @@ class Location(object):
                 
         self.callers.remove(caller)
 
-        caller.discard(Background, Normal)
+        caller.discard(P_Background, P_Normal)
     
-        if hasattr(self, 'door_out'):
-            caller.enqueue(self.door_out)
-
-            # play door sound to other callers
-            for c in self.callers:
-                c.enqueue(self.door_out)
+        log.debug('%s left: %s', self.__class__.__name__, caller)
 
         d = caller.user_data
         caller.user_data = None
         del d
         caller.location = None
 
-    def move(self, caller, location):
+    def move(self, caller, transition):
+        # transition sound
+        print transition.m_trans.as_command()
+        caller.enqueue(transition.m_trans)
+
+        # play door out sound to other callers
+        for c in self.callers:
+            if c != caller:
+                c.enqueue(transition.m_out)
+
         self.leave(caller)
-        location.enter(caller)
+        transition.dest.enter(caller)
+
+        # play door in sound to other callers
+        for c in transition.dest.callers:
+            if c != caller:
+                c.enqueue(transition.m_in)
 
     def generic_invalid(self, caller):
-        caller.enqueue(BeepMolecule(Normal, 2))
+        caller.enqueue(BeepMolecule(P_Normal, 2))
 
     def move_invalid(self, caller): 
         self.generic_invalid(caller)
@@ -177,9 +178,12 @@ class Location(object):
                 data.cancel('tm_move')
                 self.move_invalid(caller)
             if dir:
-                m = getattr(self, dir)
-                if m:
-                    m(caller)
+                data.cancel('tm_move')
+                trans = getattr(self, dir, None)
+                if trans:
+                    self.move(caller, trans)
+                else:
+                    self.move_invalid(caller)
 
             return True
         elif data.tm_starhash:
@@ -227,7 +231,44 @@ class Room(Location):
         data = caller.user_data
         if data.tid_talk:
             caller.stop(data.tid_talk)
-            data.tid.talk = None
+            data.tid_talk = None
         elif dtmf == '4':
             data.tid_talk = caller.enqueue(
-                RecordBeepAtom(Normal, str(caller) + '.wav', 10.0))
+                RecordBeepMolecule(P_Normal, str(caller) + '.wav', 10.0))
+
+class Transition(object):
+    def __init__(self, m_trans, m_in, m_out):
+        self.m_trans = m_trans
+        self.m_in = m_in
+        self.m_out = m_out
+        
+class Door(Transition):
+    def __init__(self):
+        self.m_in = PlayMolecule(P_Transition,
+                                 'RBH_Household_front_door_open.wav')
+
+        self.m_out = PlayMolecule(P_Transition,
+                                  'RBH_Household_front_door_close.wav')
+
+        self.m_trans = PlayMolecule(P_Transition,
+                                    'RBH_Household_front_door_open.wav',
+                                    'RBH_Household_front_door_close.wav')
+
+_mirror = { 'north': 'south',
+            'northeast': 'southwest',
+            'east': 'west',
+            'southeast': 'northwest',
+            'south': 'north',
+            'southwest': 'northeast',
+            'west': 'east',
+            'northwest': 'southeast' }
+
+def connect(source, dest, direction, trans):
+    trans.source = source
+    trans.dest = dest
+    setattr(source, direction, trans)
+    t = copy.copy(trans)
+    t.source = dest
+    t.dest = source
+    setattr(dest, _mirror[direction], t)
+    

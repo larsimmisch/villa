@@ -80,9 +80,10 @@ class Molecule(list):
         return s
 
 class PlayMolecule(Molecule):
-    def __init__(self, policy, filename):
+    def __init__(self, policy, *args):
         self.policy = policy
-        self.append(PlayAtom(filename))
+        for a in args:
+            self.append(PlayAtom(a))
 
 class BeepMolecule(Molecule):
     def __init__(self, policy, count):
@@ -90,14 +91,14 @@ class BeepMolecule(Molecule):
         self.append(BeepAtom(count))
 
 class RecordMolecule(Molecule):
-    def __init__(self, policy, filename, maxtime, maxsilence = 2000):
+    def __init__(self, policy, filename, maxtime, maxsilence = 2.0):
         self.policy = policy
         self.append(RecordAtom(filename, maxtime, maxsilence))
 
 class RecordBeepMolecule(Molecule):
-    def __init__(self, policy, filename, maxtime, maxsilence = 2000):
+    def __init__(self, policy, filename, maxtime, maxsilence = 2.0):
         self.policy = policy
-        self.append(BeepAtom(policy, 1))
+        self.append(BeepAtom(1))
         self.append(RecordAtom(filename, maxtime, maxsilence))
 
 mode_discard = 0x01
@@ -118,12 +119,12 @@ class Policy(object):
 
 # define some policies
 
-Background = Policy(0, 0, mode_mute|mode_loop)
-ConferenceBackground = Policy(1, 0, mode_mute|mode_loop)
-Normal = Policy(0, 1, mode_mute)
-Discard = Policy(0, 1, mode_discard)
-Transition = Policy(0, 2, mode_dont_interrupt)
-Urgent = Policy(0, 3, mode_dont_interrupt)
+P_Background = Policy(0, 0, mode_mute|mode_loop)
+P_ConferenceBackground = Policy(1, 0, mode_mute|mode_loop)
+P_Normal = Policy(0, 1, mode_mute)
+P_Discard = Policy(0, 1, mode_discard)
+P_Transition = Policy(0, 2, mode_dont_interrupt)
+P_Urgent = Policy(0, 3, mode_dont_interrupt)
 
 if __name__ == '__main__':
     import unittest
