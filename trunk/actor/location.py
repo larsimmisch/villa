@@ -173,7 +173,7 @@ class Location(object):
             elif dtmf == '8':
                 dir = 'south'
             elif dtmf == '9':
-                dir == 'southeast'
+                dir = 'southeast'
             else:
                 data.cancel('tm_move')
                 self.move_invalid(caller)
@@ -254,6 +254,16 @@ class Door(Transition):
                                     'RBH_Household_front_door_open.wav',
                                     'RBH_Household_front_door_close.wav')
 
+class Stairs(Transition):
+    def __init__(self):
+        self.m_in = PlayMolecule(P_Transition,
+                                 'RBH_Household_front_door_open.wav')
+
+        self.m_out = PlayMolecule(P_Transition,
+                                  'RBH_Household_front_door_close.wav')
+
+        self.m_trans = PlayMolecule(P_Transition, 'treppe.wav')
+
 _mirror = { 'north': 'south',
             'northeast': 'southwest',
             'east': 'west',
@@ -263,12 +273,19 @@ _mirror = { 'north': 'south',
             'west': 'east',
             'northwest': 'southeast' }
 
-def connect(source, dest, direction, trans):
-    trans.source = source
-    trans.dest = dest
-    setattr(source, direction, trans)
-    t = copy.copy(trans)
+def connect(source, dest, transition, direction, reverse = None):
+    k = _mirror.keys()
+    if not direction in k:
+        raise ValueError('direction must be in %s', k)
+    
+    if reverse is None:
+        reverse = _mirror[direction]
+
+    transition.source = source
+    transition.dest = dest
+    setattr(source, direction, transition)
+    t = copy.copy(transition)
     t.source = dest
     t.dest = source
-    setattr(dest, _mirror[direction], t)
+    setattr(dest, reverse, t)
     
