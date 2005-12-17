@@ -49,6 +49,9 @@ class Caller(object):
         if not self.is_disconnected:
             return self.sequencer.send(sender, command % args,
                                        kwargs.get('tid_data', None))
+        
+    def MLCA(self, event, user_data):
+        pass
 
     def LSTN(self, event, user_data):
         self.is_disconnected = False

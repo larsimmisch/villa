@@ -93,9 +93,6 @@ class Location(object):
         
         self.callers.append(caller)
 
-        if hasattr(self, 'background'):
-            caller.enqueue(self.background)
-
     def leave(self, caller, gone = False):
         '''Leave the location. Adjust caller list iterators
         in all participants.'''
@@ -107,8 +104,6 @@ class Location(object):
                 
         self.callers.remove(caller)
 
-        caller.discard(P_Background, P_Normal)
-    
         log.debug('%s left: %s', self.__class__.__name__, caller)
 
         d = caller.user_data
@@ -224,6 +219,16 @@ class Room(Location):
     def __init__(self):
         super(Room, self).__init__()
 
+    def enter(self, caller):
+        super(Room, self).enter(caller)
+        if hasattr(self, 'background'):
+            caller.enqueue(self.background)
+
+    def leave(self, caller, gone = False):
+        super(Room, self).leave(caller, gone)
+        if hasattr(self, 'background'):
+            caller.discard(P_Background, P_Normal)
+
     def DTMF(self, caller, dtmf):
         if super(Room, self).DTMF(caller, dtmf):
             return True
@@ -235,6 +240,51 @@ class Room(Location):
         elif dtmf == '4':
             data.tid_talk = caller.enqueue(
                 RecordBeepMolecule(P_Normal, str(caller) + '.wav', 10.0))
+
+class Conference(Location):
+    def __init__(self, seq):
+        super(Conference, self).__init__()
+        self.seq = seq
+        seq.send(self, 'CNFO')
+        self.conf = None
+        self.bg_dev = None
+
+    def CNFO(self, event, user_data):
+        '''Conference open acknowledgement'''
+        self.conf = event['device']
+        log.debug('%s conference is: %s', self.__class__.__name__, self.conf)
+
+    def BGRO(self, event, user_data):
+        '''Background open acknowledgement'''
+        self.bg_dev = event['device']
+        log.debug('%s background: %s', self.__class__.__name__,
+                  self.bg_dev)
+        # add background to conference on channel 0
+        self.seq.send(self, 'MLCA %s 0 %d %d conf %s speak' %
+                      (self.bg_dev, mode_discard, pr_background, self.conf))
+        # play loop in background on channel 1
+        self.seq.send(self, 'MLCA %s %s' %
+                      (self.bg_dev, self.background.as_command(channel=1)))
+
+    def BGRC(self, event, user_data):
+        '''Background close acknowledgement'''
+        self.bg_dev = None
+    
+    def enter(self, caller):
+        super(Conference, self).enter(caller)
+        # open background channel
+        if hasattr(self, 'background') and not self.bg_dev:
+            self.seq.send(self, 'BGRO')
+
+        caller.enqueue(ConferenceMolecule(P_Background, self.conf, 'duplex'))
+
+    def leave(self, caller, gone = False):
+        super(Conference, self).leave(caller, gone)
+
+        caller.discard(P_Background, P_Normal)
+
+        if hasattr(self, 'background') and self.bg_dev and not self.callers:
+            self.seq.send(self, 'BGRC %s' % self.bg_dev)
 
 class Transition(object):
     def __init__(self, m_trans, m_in, m_out):

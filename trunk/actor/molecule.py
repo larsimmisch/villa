@@ -71,9 +71,15 @@ class Molecule(list):
             raise TypeError('%s must be a subclass of Atom' % repr(item))
         super(Molecule, self).__setitem__(self, key, item)
 
-    def as_command(self):
-        s = '%d %d %d' % (self.policy.channel, self.policy.mode,
-                          self.policy.priority)
+    def as_command(self, channel = None):
+        """Generate the molecule as a sequencer command.
+        The policy's channel can be overwritten"""
+        if channel:
+            s = '%d %d %d' % (channel, self.policy.mode, self.policy.priority)
+        else:
+            s = '%d %d %d' % (self.policy.channel, self.policy.mode,
+                              self.policy.priority)
+                        
         for i in self:
             s = s + ' ' + i.as_command()
 
@@ -101,6 +107,12 @@ class RecordBeepMolecule(Molecule):
         self.append(BeepAtom(1))
         self.append(RecordAtom(filename, maxtime, maxsilence))
 
+class ConferenceMolecule(Molecule):
+    def __init__(self, policy, conference, mode):
+        self.policy = policy
+        self.append(ConferenceAtom(conference, mode))
+
+# mode definitions
 mode_discard = 0x01
 mode_pause = 0x02
 mode_mute = 0x04
@@ -111,20 +123,24 @@ mode_dont_interrupt = 0x10
 mode_loop = 0x20
 mode_dtmf_stop = 0x40
 
+# priority definitions
+pr_background = 0
+pr_normal = 1
+pr_transition = 2
+pr_urgent = 3
+
 class Policy(object):
     def __init__(self, channel, priority, mode):
         self.channel = channel
         self.priority = priority
         self.mode = mode
 
-# define some policies
-
-P_Background = Policy(0, 0, mode_mute|mode_loop)
-P_ConferenceBackground = Policy(1, 0, mode_mute|mode_loop)
-P_Normal = Policy(0, 1, mode_mute)
-P_Discard = Policy(0, 1, mode_discard)
-P_Transition = Policy(0, 2, mode_dont_interrupt)
-P_Urgent = Policy(0, 3, mode_dont_interrupt)
+# define application specific policies
+P_Background = Policy(0, pr_background, mode_mute|mode_loop)
+P_Normal = Policy(0, pr_normal, mode_mute)
+P_Discard = Policy(0, pr_normal, mode_discard)
+P_Transition = Policy(0, pr_transition, mode_dont_interrupt)
+P_Urgent = Policy(0, pr_urgent, mode_dont_interrupt)
 
 if __name__ == '__main__':
     import unittest

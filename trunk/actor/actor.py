@@ -16,7 +16,7 @@ set_root('c:\\Users\\lars\\Sounds\\8k')
 class A_Hackcenter(Room):
     background = PlayMolecule(P_Background, 'hepepe_-_Bingo_Baby_Babe.wav')
 
-class A_Haecksen(Room):
+class A_Haecksen(Conference):
     background = PlayMolecule(P_Background, 'party.wav')
 
 class B_NW(Room):
@@ -77,7 +77,7 @@ class World(object):
                 self.callers.append(Caller(seq, self, t.name))
 
         self.a_hackcenter = A_Hackcenter()
-        self.a_haecksen = A_Haecksen()
+        self.a_haecksen = A_Haecksen(seq)
         
         self.b_se = B_SE()
         self.b_nw = B_NW()

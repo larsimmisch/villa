@@ -151,24 +151,26 @@ class Sequencer(LineReceiver):
                 return
             
             receiver = self.devices[device]
-            try:
-                receiver.__class__.__dict__[action](receiver, event)
-            except KeyError:
+            m = getattr(receiver, action, None)
+            if not m:
                 log.error('Receiver %s does not implement: %s',
                           receiver, action)
+                return
+                
+            m(event)
         else:
             receiver, user_data = self.transactions.remove(tid)
             event['tid'] = tid
+            m = getattr(receiver, action, None)
+            if not m:
+                log.error('Receiver %s does not implement: %s',
+                          receiver, action)
+                return
             
             if status >= 600:
                 log.error('Fatal sequencer error: %s', line)
             else:
-                try:
-                    receiver.__class__.__dict__[action](receiver, event,
-                                                        user_data)
-                except KeyError:
-                    log.error('Receiver %s does not implement: %s',
-                              receiver, action)
+                m(event, user_data)
                                         
     def lineReceived(self, line):
         if not self.initialized:
