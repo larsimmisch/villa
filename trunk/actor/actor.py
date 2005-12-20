@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
 import sys
+import os
 import logging
 import sequencer
 import sequencer
 from location import *
 from molecule import *
-from caller import Caller
+from caller import Caller, DBData
+from twisted.enterprise import adbapi
 
 log = logging.getLogger('world')
 
@@ -14,64 +16,139 @@ log = logging.getLogger('world')
 set_root('c:\\Users\\lars\\Sounds\\8k')
 
 class A_Hackcenter(Room):
-    background = PlayMolecule(P_Background, 'hepepe_-_Bingo_Baby_Babe.wav')
+    background = Play(P_Background, 'hepepe_-_Bingo_Baby_Babe.wav')
 
-class A_Haecksen(Conference):
-    background = PlayMolecule(P_Background, 'party.wav')
+class A_Haecksen(ConferenceRoom):
+    background = Play(P_Background, 'party.wav')
 
 class B_NW(Room):
-    background = PlayMolecule(P_Background, 'nimmo_-_la_salle_verte.wav')
+    background = Play(P_Background, 'nimmo_-_la_salle_verte.wav')
 
 class B_NE(Room):
-    background = PlayMolecule(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav')
+    background = Play(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav')
 
 class B_SW(Room):
-    background = PlayMolecule(P_Background, 'nimmo_-_pedacito.wav')
+    background = Play(P_Background, 'nimmo_-_pedacito.wav')
 
 class B_SE(Room):
-    background = PlayMolecule(P_Background,
-                              '369_TwistedLemon_ComeAndGo-metro-BCN_lars.wav')
+    background = Play(P_Background,
+                      '369_TwistedLemon_ComeAndGo-metro-BCN_lars.wav')
 
 class B_Lounge(Room):
-    background = PlayMolecule(P_Background,
-                              'melquiades_-_Brahms_Intermezzo_116.4.wav')
+    background = Play(P_Background, 'melquiades_-_Brahms_Intermezzo_116.4.wav')
 
 class B_Saal2(Room):
-    background = PlayMolecule(P_Background,
-                              'ith_brahms-10-4.wav')
+    background = Play(P_Background, 'ith_brahms-10-4.wav')
 
 class B_Saal3(Room):
-    background = PlayMolecule(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav')
+    background = Play(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav')
 
 class C_NW(Room):
-    background = PlayMolecule(P_Background, 'cdk_-_one_moment_(cdk_play_it_cool_mix).wav')
+    background = Play(P_Background, 'cdk_-_one_moment_(cdk_play_it_cool_mix).wav')
 
 class C_Office(Room):
-    background = PlayMolecule(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav')
+    background = Play(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav')
 
 class C_SW(Room):
-    background = PlayMolecule(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav')
+    background = Play(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav')
 
 class C_SE(Room):
-    background = PlayMolecule(P_Background,
-                              'marcoraaphorst_-_Blowing_Snow.wav')
+    background = Play(P_Background,
+                      'marcoraaphorst_-_Blowing_Snow.wav')
 
 class C_Saal1(Room):
-    background = PlayMolecule(P_Background, 'ith_don_schumann-arabesque.wav')
+    background = Play(P_Background, 'ith_don_schumann-arabesque.wav')
+
+class EntryDialog:
+
+    max_retries = 3
+
+    def __init__(self, caller, world):
+        self.caller = caller
+        self.world = world
+        self.buffer = ''
+        self.retries = 0
+
+        q = self.db.runQuery('SELECT * FROM user WHERE cli = %s;' %
+                             caller.details.calling)
+            
+        q.addCallback(self.db_cli)
+        q.addErrback(self.db_error)
+        
+    def db_cli(self, result):
+        log.debug('%s db_cli result: %s', self.caller, result[0])
+        if result:
+            caller.db = DBData(*result[0])
+
+    def db_id(self, result):
+        log.debug('%s db_id result: %s', self.caller, result[0])
+        if result:
+            caller.db = DBData(*result[0])
+            self.state = 'pin'
+            caller.enqueue(Play(P_Urgent, 'prima.wav', 'pin.wav',
+                                prefix='lars'))
+        else:
+            caller.enqueue(Play(P_Urgent,'id-wrong.wav', prefix='lars'))
+            self.invalid()
+
+    def db_error(self, result):
+        log.debug('%s db error: %s', caller, result)
+        caller.disconnect()
+
+    def startId(self):
+        self.state = 'id'
+        caller.enqueue(Play(P_Urgent,
+                            os.path.join('lars', 'id.wav')))
+
+    def startPin(self):
+        self.state = 'pin'
+        caller.enqueue(Play(P_Urgent,
+                            os.path.join('lars', 'pin.wav')))
+
+    def invalid(self):
+        self.retries = self.retries + 1
+        if self.retries > self.max_retries:
+            caller.enqueue(Play(P_Urgent, 'sorry.wav', prefix='lars'))
+        else:
+            self.startId()
+
+    def hash(self, caller):
+        if self.state == 'id':
+            q = self.world.db.runQuery('SELECT * FROM user WHERE id = %s;' %
+                                       buffer)
+            
+            q.addCallback(self.db_id, caller)
+            q.addErrback(self.db_error, caller)
+            buffer = ''
+            self.state = 'waiting'
+        else:
+            if self.buffer == self.caller.db.pin:
+                self.entry.enter(caller)
+                return True
+
+            self.retries = self.retries + 1
+            self.startId()
+            
+    def DTMF(self, caller, dtmf):
+        # block DTMF while DB lookup pending
+        if self.state == 'waiting':
+            caller.enqueue(BeepMolecule(P_Normal, 2))
+            return
+        
+        if dtmf == '#':
+            return self.hash(caller)
+        else:
+            self.buffer = self.buffer + dtmf
 
 class World(object):
     def __init__(self):
         self.callers = []
 
-    def enter(self, caller):
-        log.debug('%s entered', caller)
-        caller.enqueue(PlayMolecule(P_Transition, '4011_suonho_sweetchoff_iLLCommunications_suonho.wav'))
-        self.entry.enter(caller)
-
-    def leave(self, caller):
-        log.debug('%s left', caller)
-
     def start(self, seq):
+        self.db = adbapi.ConnectionPool('MySQLdb', host='localhost',
+                                        user='actor', passwd='HerrMeister',
+                                        db='actor')
+
         for t in seq.trunks:
             for i in range(t.lines):
                 self.callers.append(Caller(seq, self, t.name))
@@ -132,6 +209,15 @@ class World(object):
 
     def stop(self):
         self.callers = []
+
+    def enter(self, caller):
+        log.debug('%s entered', caller)
+        caller.enqueue(Play(P_Transition, '4011_suonho_sweetchoff_iLLCommunications_suonho.wav'))
+
+        self.entry.enter(caller)
+
+    def leave(self, caller):
+        log.debug('%s left', caller)
 
     def run(self):
         sequencer.run(start = self.start, stop = self.stop)

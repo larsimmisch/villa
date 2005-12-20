@@ -63,7 +63,6 @@ class LocationData(object):
         self.tm_starhash = None
         self.bf_starhash = ''
         self.it_callers = None
-        self.dialog = None
 
     def __del__(self):
         self.cancel('tm_move')
@@ -113,7 +112,6 @@ class Location(object):
 
     def move(self, caller, transition):
         # transition sound
-        print transition.m_trans.as_command()
         caller.enqueue(transition.m_trans)
 
         # play door out sound to other callers
@@ -130,7 +128,7 @@ class Location(object):
                 c.enqueue(transition.m_in)
 
     def generic_invalid(self, caller):
-        caller.enqueue(BeepMolecule(P_Normal, 2))
+        caller.enqueue(Beep(P_Normal, 2))
 
     def move_invalid(self, caller): 
         self.generic_invalid(caller)
@@ -239,11 +237,11 @@ class Room(Location):
             data.tid_talk = None
         elif dtmf == '4':
             data.tid_talk = caller.enqueue(
-                RecordBeepMolecule(P_Normal, str(caller) + '.wav', 10.0))
+                RecordBeep(P_Normal, str(caller) + '.wav', 10.0))
 
-class Conference(Location):
+class ConferenceRoom(Location):
     def __init__(self, seq):
-        super(Conference, self).__init__()
+        super(ConferenceRoom, self).__init__()
         self.seq = seq
         seq.send(self, 'CNFO')
         self.conf = None
@@ -271,15 +269,15 @@ class Conference(Location):
         self.bg_dev = None
     
     def enter(self, caller):
-        super(Conference, self).enter(caller)
+        super(ConferenceRoom, self).enter(caller)
         # open background channel
         if hasattr(self, 'background') and not self.bg_dev:
             self.seq.send(self, 'BGRO')
 
-        caller.enqueue(ConferenceMolecule(P_Background, self.conf, 'duplex'))
+        caller.enqueue(Conference(P_Background, self.conf, 'duplex'))
 
     def leave(self, caller, gone = False):
-        super(Conference, self).leave(caller, gone)
+        super(ConferenceRoom, self).leave(caller, gone)
 
         caller.discard(P_Background, P_Normal)
 
@@ -294,25 +292,25 @@ class Transition(object):
         
 class Door(Transition):
     def __init__(self):
-        self.m_in = PlayMolecule(P_Transition,
-                                 'RBH_Household_front_door_open.wav')
+        self.m_in = Play(P_Transition,
+                         'RBH_Household_front_door_open.wav')
 
-        self.m_out = PlayMolecule(P_Transition,
-                                  'RBH_Household_front_door_close.wav')
+        self.m_out = Play(P_Transition,
+                          'RBH_Household_front_door_close.wav')
 
-        self.m_trans = PlayMolecule(P_Transition,
-                                    'RBH_Household_front_door_open.wav',
-                                    'RBH_Household_front_door_close.wav')
+        self.m_trans = Play(P_Transition,
+                            'RBH_Household_front_door_open.wav',
+                            'RBH_Household_front_door_close.wav')
 
 class Stairs(Transition):
     def __init__(self):
-        self.m_in = PlayMolecule(P_Transition,
-                                 'RBH_Household_front_door_open.wav')
+        self.m_in = Play(P_Transition,
+                         'RBH_Household_front_door_open.wav')
 
-        self.m_out = PlayMolecule(P_Transition,
-                                  'RBH_Household_front_door_close.wav')
+        self.m_out = Play(P_Transition,
+                          'RBH_Household_front_door_close.wav')
 
-        self.m_trans = PlayMolecule(P_Transition, 'treppe.wav')
+        self.m_trans = Play(P_Transition, 'treppe.wav')
 
 _mirror = { 'north': 'south',
             'northeast': 'southwest',

@@ -14,17 +14,23 @@ class Atom(object):
         self.notify = 'none'
 
 class PlayAtom(Atom):
-    def __init__(self, filename):
+    def __init__(self, filename, prefix = None):
         Atom.__init__(self)
-        self.filename = os.path.join(_root, filename)
+        if prefix:
+            self.filename = os.path.join(_root, prefix, filename)
+        else:
+            self.filename = os.path.join(_root, filename)
 
     def as_command(self):
         return 'play %s %s' % (self.filename, self.notify)
 
 class RecordAtom(Atom):
-    def __init__(self, filename, maxtime, maxsilence = 2.0):
+    def __init__(self, filename, maxtime, maxsilence = 2.0, prefix = None):
         Atom.__init__(self)
-        self.filename = os.path.join(_root, filename)
+        if prefix:
+            self.filename = os.path.join(_root, prefix, filename)
+        else:
+            self.filename = os.path.join(_root, filename)
         self.maxtime = maxtime
         self.maxsilence = maxsilence
 
@@ -85,29 +91,32 @@ class Molecule(list):
 
         return s
 
-class PlayMolecule(Molecule):
-    def __init__(self, policy, *args):
+class Play(Molecule):
+    def __init__(self, policy, *args, **kwargs):
         self.policy = policy
+        prefix = kwargs.get('prefix', None)
         for a in args:
-            self.append(PlayAtom(a))
+            self.append(PlayAtom(a, prefix))
 
-class BeepMolecule(Molecule):
+class Beep(Molecule):
     def __init__(self, policy, count):
         self.policy = policy
         self.append(BeepAtom(count))
 
-class RecordMolecule(Molecule):
-    def __init__(self, policy, filename, maxtime, maxsilence = 2.0):
+class Record(Molecule):
+    def __init__(self, policy, filename, maxtime, maxsilence = 2.0,
+                 prefix = None):
         self.policy = policy
-        self.append(RecordAtom(filename, maxtime, maxsilence))
+        self.append(RecordAtom(filename, maxtime, maxsilence, prefix))
 
-class RecordBeepMolecule(Molecule):
-    def __init__(self, policy, filename, maxtime, maxsilence = 2.0):
+class RecordBeep(Molecule):
+    def __init__(self, policy, filename, maxtime, maxsilence = 2.0,
+                 prefix = None):
         self.policy = policy
         self.append(BeepAtom(1))
-        self.append(RecordAtom(filename, maxtime, maxsilence))
+        self.append(RecordAtom(filename, maxtime, maxsilence, prefix))
 
-class ConferenceMolecule(Molecule):
+class Conference(Molecule):
     def __init__(self, policy, conference, mode):
         self.policy = policy
         self.append(ConferenceAtom(conference, mode))

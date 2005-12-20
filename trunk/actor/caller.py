@@ -12,6 +12,14 @@ class CallDetails(object):
     def __repr__(self):
         return 'called: %s, calling: %s' % (self.called, self.calling)
 
+class DBData(object):
+    def __init__(self, id, password, cli, email, flags):
+        self.id = id
+        self.password = password
+        self.cli = cli
+        self.email = email
+        self.flags = flags
+
 class Caller(object):
     def __init__(self, sequencer, world = None, trunk='any', spec='any'):
         self.trunk = trunk
@@ -24,6 +32,8 @@ class Caller(object):
         self.location = None
         self.user_data = None
         self.sequencer = sequencer
+        self.db = None
+        self.dialog = None
         self.is_disconnected = False
         self.send(self, 'LSTN %s %s' % (trunk, spec))
 
@@ -45,10 +55,16 @@ class Caller(object):
     def stop(self, mid):
         return self.send(self, 'MLCD %s %d', self.device, mid)
 
+    def disconnect(self):
+        return self.send(self, 'DISC %s', self.device)
+
     def send(self, sender, command, *args, **kwargs):
         if not self.is_disconnected:
             return self.sequencer.send(sender, command % args,
                                        kwargs.get('tid_data', None))
+
+    def startDialog(self, dialog):
+        self.dialog = dialog
         
     def MLCA(self, event, user_data):
         pass
@@ -65,10 +81,14 @@ class Caller(object):
         self.send(self, 'LSTN %s %s' % (self.trunk, self.spec))
         if self.world:
             self.world.enter(self)
-
+        
     def DTMF(self, event):
         dtmf = event['data'][0]
-        if self.location:
+
+        if self.dialog:
+            if self.dialog.DTMF(self, dtmf):
+                self.dialog = None
+        elif self.location:
             self.location.DTMF(self, dtmf)
 
     def disconnected(self):
@@ -83,6 +103,8 @@ class Caller(object):
         self.device = None
         self.details = None
         self.location = None
+        self.db = None
+        self.dialog = None
 
     def RDIS(self, event):
         self.send(self, 'DISC %s 0' % self.device)
