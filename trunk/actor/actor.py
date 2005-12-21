@@ -19,73 +19,87 @@ class A_Hackcenter(Room):
     prefix = 'a_hackcenter'
     background = Play(P_Background, 'hepepe_-_Bingo_Baby_Babe.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class A_Haecksen(ConferenceRoom):
     prefix = 'a_haecksen'
     background = Play(P_Background, 'party.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class B_NW(Room):
     prefix = 'b_nw'
     background = Play(P_Background, 'nimmo_-_la_salle_verte.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class B_NE(Room):
     prefix = 'b_ne'
     background = Play(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class B_SW(Room):
     prefix = 'b_sw'
     background = Play(P_Background, 'nimmo_-_pedacito.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class B_SE(Room):
     prefix = 'b_se'
     background = Play(P_Background,
                       '369_TwistedLemon_ComeAndGo-metro-BCN_lars.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class B_Lounge(Room):
     prefix = 'b_lounge'
     background = Play(P_Background, 'ith_chopin-55-1.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class B_Saal2(Room):
     prefix = 'b_saal2'
     background = Play(P_Background, 'ith_brahms-10-4.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class B_Saal3(Room):
     prefix = 'b_saal3'
     background = Play(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class C_NW(Room):
     prefix = 'c_nw'
     background = Play(P_Background, 'cdk_-_one_moment_(cdk_play_it_cool_mix).wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class C_Office(Room):
     prefix = 'c_office'
     background = Play(P_Background, 'weirdpolymer_-_Still_People.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class C_SW(Room):
     prefix = 'c_sw'
     background = Play(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class C_SE(Room):
     prefix = 'c_se'
     background = Play(P_Background,
                       'marcoraaphorst_-_Blowing_Snow.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class C_Saal1(Room):
     prefix = 'c_saal1'
     background = Play(P_Background, 'ith_don_schumann-arabesque.wav',
                       prefix=prefix)
+    orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
 class EntryDialog:
     max_retries = 3

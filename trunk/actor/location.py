@@ -61,12 +61,14 @@ class LocationData(object):
         self.tid_talk = None
         self.tm_move = None
         self.tm_starhash = None
+        self.tm_orientation = None
         self.bf_starhash = ''
         self.it_callers = None
 
     def __del__(self):
         self.cancel('tm_move')
         self.cancel('tm_starhash')
+        self.cancel('tm_orientation')
 
     def cancel(self, tm):
         '''Cancel the timer called tm. Sets the attribute tm to None'''
@@ -87,6 +89,9 @@ class Location(object):
         '''Enter the location'''
         caller.location = self
         caller.user_data = self.user_data()
+        if hasattr(self, 'orientation'):
+            caller.user_data.tm_orientation = \
+                callLater(12.0, self.orientation_timer, caller)
 
         log.debug('%s enter: %s', self.__class__.__name__, caller)
         
@@ -130,10 +135,14 @@ class Location(object):
     def generic_invalid(self, caller):
         caller.enqueue(Beep(P_Normal, 2))
 
-    def move_invalid(self, caller): 
-        self.generic_invalid(caller)
+    def orientation_timer(self, caller):
+        caller.user_data.tm_orientation = None
+        caller.enqueue(self.orientation)
 
-    def move_timed_out(self, caller):
+    def move_invalid(self, caller): 
+        caller.enqueue(Play(P_Normal, 'da_ist_nichts.wav', prefix='lars'))
+
+    def move_timer(self, caller):
         caller.user_data.tm_move = None
         self.generic_invalid(caller)
 
@@ -143,12 +152,13 @@ class Location(object):
     def starhash_invalid(self, caller):
         self.generic_invalid(caller)
 
-    def starhash_timed_out(self, caller):
+    def starhash_timer(self, caller):
         caller.user_data.tm_starhash = None
         self.generic_invalid(caller)
     
     def DTMF(self, caller, dtmf):
         data = caller.user_data
+        data.cancel('tm_orientation')
         if data.tm_move:
             dir = None
             if dtmf == '1':
@@ -189,13 +199,13 @@ class Location(object):
             else:
                 data.cancel('tm_starhash')
                 # inter digit timer for direct access
-                data.tm_starhash = callLater(2.0, self.starhash_timed_out)
+                data.tm_starhash = callLater(2.0, self.starhash_timer)
                 data.bf_starhash = data.bf_starhash + dtmf
 
             return True
 
         if dtmf == '5':
-            data.tm_move = callLater(2.0, self.move_timed_out, caller)
+            data.tm_move = callLater(2.0, self.move_timer, caller)
             return True
         elif dtmf == '6':
             # Todo: this is probably bullshit
@@ -203,12 +213,14 @@ class Location(object):
             c = data.it_callers.next()
             caller.play(PRIORITY_NORMAL, MODE_NORMAL, c.name_audio)
         elif dtmf == '*':
-            data.tm_starhash = callLater(2.0, self.starhash_timed_out,
+            data.tm_starhash = callLater(2.0, self.starhash_timer,
                                          caller)
             return True
         elif dtmf == '#':
             if hasattr(self, 'help'):
                 caller.enqueue(self.help)
+            elif hasattr(self, 'orientation'):
+                caller.enqueue(self.orientation)
             return True
         
         return False
