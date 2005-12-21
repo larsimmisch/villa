@@ -110,70 +110,83 @@ class EntryDialog:
         self.buffer = ''
         self.retries = 0
 
-        q = self.db.runQuery('SELECT * FROM user WHERE cli = %s;' %
-                             caller.details.calling)
+        if self.caller.details.calling:
+            q = world.db.runQuery('SELECT * FROM user WHERE cli = %s;' %
+                                  self.caller.details.calling)
             
-        q.addCallback(self.db_cli)
-        q.addErrback(self.db_error)
+            q.addCallback(self.db_cli)
+            q.addErrback(self.db_error)
         
     def db_cli(self, result):
-        log.debug('%s db_cli result: %s', self.caller, result[0])
         if result:
-            caller.db = DBData(*result[0])
+            log.debug('%s db_cli result: %s', self.caller, result[0])
+            self.caller.db = DBData(*result[0])
+            self.startPin()
+        else:
+            log.debug('%s db_cli empty result', self.caller)
+            self.startId()
 
     def db_id(self, result):
-        log.debug('%s db_id result: %s', self.caller, result[0])
         if result:
-            caller.db = DBData(*result[0])
+            log.debug('%s db_id result: %s', self.caller, result[0])
+            self.caller.db = DBData(*result[0])
             self.state = 'pin'
-            caller.enqueue(Play(P_Urgent, 'prima.wav', 'pin.wav',
-                                prefix='lars'))
+            self.caller.enqueue(Play(P_Normal, 'prima.wav', 'pin.wav',
+                                     prefix='lars'))
         else:
-            caller.enqueue(Play(P_Urgent,'id-wrong.wav', prefix='lars'))
+            log.debug('%s db_id empty result', self.caller)
             self.invalid()
 
     def db_error(self, result):
-        log.debug('%s db error: %s', caller, result)
-        caller.disconnect()
+        log.debug('%s db error: %s', self.caller, result)
+        self.caller.disconnect()
 
     def startId(self):
         self.state = 'id'
-        caller.enqueue(Play(P_Urgent,
-                            os.path.join('lars', 'id.wav')))
+        self.caller.enqueue(Play(P_Normal, 'id.wav', prefix='lars'))
 
     def startPin(self):
         self.state = 'pin'
-        caller.enqueue(Play(P_Urgent,
-                            os.path.join('lars', 'pin.wav')))
+        self.caller.enqueue(Play(P_Normal, 'pin.wav', prefix='lars'))
 
     def invalid(self):
         self.retries = self.retries + 1
         if self.retries > self.max_retries:
-            caller.enqueue(Play(P_Urgent, 'sorry.wav', prefix='lars'))
+            self.state = 'rejected'
+            self.caller.enqueue(Play(P_Normal, '4003_suonho_accessdenied_iLLCommunications_suonho.wav'))
         else:
+            if self.state == 'id':
+                self.caller.enqueue(Play(P_Normal,'id_wrong.wav',
+                                         prefix='lars'))
+            else:
+                self.caller.enqueue(Play(P_Normal, 'pin_wrong.wav',
+                                         prefix='lars'))
             self.startId()
 
     def hash(self, caller):
+        log.debug('%s entry state %s', self.caller, self.state)
         if self.state == 'id':
-            q = self.world.db.runQuery('SELECT * FROM user WHERE id = %s;' %
-                                       buffer)
-            
-            q.addCallback(self.db_id, caller)
-            q.addErrback(self.db_error, caller)
-            buffer = ''
-            self.state = 'waiting'
+            if self.buffer:
+                q = self.world.db.runQuery(
+                    'SELECT * FROM user WHERE id = %s;' % self.buffer)
+                
+                q.addCallback(self.db_id)
+                q.addErrback(self.db_error)
+                self.state = 'waiting'
+                self.buffer = ''
+            else:
+                self.invalid()
         else:
             if self.buffer == self.caller.db.pin:
-                self.entry.enter(caller)
+                self.world.entry.enter(caller)
                 return True
 
-            self.retries = self.retries + 1
-            self.startId()
+            self.invalid()
             
     def DTMF(self, caller, dtmf):
         # block DTMF while DB lookup pending
         if self.state == 'waiting':
-            caller.enqueue(BeepMolecule(P_Normal, 2))
+            self.caller.enqueue(BeepMolecule(P_Normal, 2))
             return
         
         if dtmf == '#':
@@ -253,9 +266,12 @@ class World(object):
 
     def enter(self, caller):
         log.debug('%s entered', caller)
+
         caller.enqueue(Play(P_Transition, '4011_suonho_sweetchoff_iLLCommunications_suonho.wav'))
 
-        self.entry.enter(caller)
+        caller.startDialog(EntryDialog(caller, self))
+
+        # self.entry.enter(caller)
 
     def leave(self, caller):
         log.debug('%s left', caller)

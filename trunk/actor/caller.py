@@ -13,9 +13,9 @@ class CallDetails(object):
         return 'called: %s, calling: %s' % (self.called, self.calling)
 
 class DBData(object):
-    def __init__(self, id, password, cli, email, flags):
+    def __init__(self, id, pin, cli, email, flags):
         self.id = id
-        self.password = password
+        self.pin = pin
         self.cli = cli
         self.email = email
         self.flags = flags
