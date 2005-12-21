@@ -13,54 +13,81 @@ from twisted.enterprise import adbapi
 log = logging.getLogger('world')
 
 # set the filesystem root for all molecules
-set_root('c:\\Users\\lars\\Sounds\\8k')
+set_root('c:\\Users\\lars\\voice3\\trunk\\actor\\congress')
 
 class A_Hackcenter(Room):
-    background = Play(P_Background, 'hepepe_-_Bingo_Baby_Babe.wav')
+    prefix = 'a_hackcenter'
+    background = Play(P_Background, 'hepepe_-_Bingo_Baby_Babe.wav',
+                      prefix=prefix)
 
 class A_Haecksen(ConferenceRoom):
-    background = Play(P_Background, 'party.wav')
+    prefix = 'a_haecksen'
+    background = Play(P_Background, 'party.wav',
+                      prefix=prefix)
 
 class B_NW(Room):
-    background = Play(P_Background, 'nimmo_-_la_salle_verte.wav')
+    prefix = 'b_nw'
+    background = Play(P_Background, 'nimmo_-_la_salle_verte.wav',
+                      prefix=prefix)
 
 class B_NE(Room):
-    background = Play(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav')
+    prefix = 'b_ne'
+    background = Play(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav',
+                      prefix=prefix)
 
 class B_SW(Room):
-    background = Play(P_Background, 'nimmo_-_pedacito.wav')
+    prefix = 'b_sw'
+    background = Play(P_Background, 'nimmo_-_pedacito.wav',
+                      prefix=prefix)
 
 class B_SE(Room):
+    prefix = 'b_se'
     background = Play(P_Background,
-                      '369_TwistedLemon_ComeAndGo-metro-BCN_lars.wav')
+                      '369_TwistedLemon_ComeAndGo-metro-BCN_lars.wav',
+                      prefix=prefix)
 
 class B_Lounge(Room):
-    background = Play(P_Background, 'melquiades_-_Brahms_Intermezzo_116.4.wav')
+    prefix = 'b_lounge'
+    background = Play(P_Background, 'ith_chopin-55-1.wav',
+                      prefix=prefix)
 
 class B_Saal2(Room):
-    background = Play(P_Background, 'ith_brahms-10-4.wav')
+    prefix = 'b_saal2'
+    background = Play(P_Background, 'ith_brahms-10-4.wav',
+                      prefix=prefix)
 
 class B_Saal3(Room):
-    background = Play(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav')
+    prefix = 'b_saal3'
+    background = Play(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav',
+                      prefix=prefix)
 
 class C_NW(Room):
-    background = Play(P_Background, 'cdk_-_one_moment_(cdk_play_it_cool_mix).wav')
+    prefix = 'c_nw'
+    background = Play(P_Background, 'cdk_-_one_moment_(cdk_play_it_cool_mix).wav',
+                      prefix=prefix)
 
 class C_Office(Room):
-    background = Play(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav')
+    prefix = 'c_office'
+    background = Play(P_Background, 'weirdpolymer_-_Still_People.wav',
+                      prefix=prefix)
 
 class C_SW(Room):
-    background = Play(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav')
+    prefix = 'c_sw'
+    background = Play(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav',
+                      prefix=prefix)
 
 class C_SE(Room):
+    prefix = 'c_se'
     background = Play(P_Background,
-                      'marcoraaphorst_-_Blowing_Snow.wav')
+                      'marcoraaphorst_-_Blowing_Snow.wav',
+                      prefix=prefix)
 
 class C_Saal1(Room):
-    background = Play(P_Background, 'ith_don_schumann-arabesque.wav')
+    prefix = 'c_saal1'
+    background = Play(P_Background, 'ith_don_schumann-arabesque.wav',
+                      prefix=prefix)
 
 class EntryDialog:
-
     max_retries = 3
 
     def __init__(self, caller, world):
