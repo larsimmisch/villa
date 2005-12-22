@@ -66,9 +66,6 @@ class Caller(object):
     def startDialog(self, dialog):
         self.dialog = dialog
         
-    def MLCA(self, event, user_data):
-        pass
-
     def LSTN(self, event, user_data):
         self.is_disconnected = False
         self.device = event['device']
@@ -82,6 +79,9 @@ class Caller(object):
         if self.world:
             self.world.enter(self)
         
+    def MLCA(self, event, user_data):
+        pass
+
     def DTMF(self, event):
         dtmf = event['data'][0]
 

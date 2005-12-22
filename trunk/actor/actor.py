@@ -52,19 +52,19 @@ class B_SE(Room):
                       prefix=prefix)
     orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
-class B_Lounge(Room):
+class B_Lounge(ConferenceRoom):
     prefix = 'b_lounge'
     background = Play(P_Background, 'ith_chopin-55-1.wav',
                       prefix=prefix)
     orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
-class B_Saal2(Room):
+class B_Saal2(ConferenceRoom):
     prefix = 'b_saal2'
     background = Play(P_Background, 'ith_brahms-10-4.wav',
                       prefix=prefix)
     orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
-class B_Saal3(Room):
+class B_Saal3(ConferenceRoom):
     prefix = 'b_saal3'
     background = Play(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav',
                       prefix=prefix)
@@ -95,7 +95,7 @@ class C_SE(Room):
                       prefix=prefix)
     orientation = Play(P_Normal, 'orientation.wav', prefix=prefix)
 
-class C_Saal1(Room):
+class C_Saal1(ConferenceRoom):
     prefix = 'c_saal1'
     background = Play(P_Background, 'ith_don_schumann-arabesque.wav',
                       prefix=prefix)
@@ -199,9 +199,9 @@ class World(object):
         self.callers = []
 
     def start(self, seq):
-        self.db = adbapi.ConnectionPool('MySQLdb', host='localhost',
-                                        user='actor', passwd='HerrMeister',
-                                        db='actor')
+##         self.db = adbapi.ConnectionPool('MySQLdb', host='localhost',
+##                                         user='actor', passwd='HerrMeister',
+##                                         db='actor')
 
         for t in seq.trunks:
             for i in range(t.lines):
@@ -214,15 +214,15 @@ class World(object):
         self.b_nw = B_NW()
         self.b_ne = B_NE()
         self.b_sw = B_SW()
-        self.b_lounge = B_Lounge()
-        self.b_saal2 = B_Saal2()
-        self.b_saal3 = B_Saal3()
+        self.b_lounge = B_Lounge(seq)
+        self.b_saal2 = B_Saal2(seq)
+        self.b_saal3 = B_Saal3(seq)
 
         self.c_se = C_SE()
         self.c_nw = C_NW()
         self.c_ne = C_Office()
         self.c_sw = C_SW()
-        self.c_saal1 = C_Saal1()
+        self.c_saal1 = C_Saal1(seq)
         
         self.entry = self.b_se
 
@@ -269,9 +269,9 @@ class World(object):
 
         caller.enqueue(Play(P_Transition, '4011_suonho_sweetchoff_iLLCommunications_suonho.wav'))
 
-        caller.startDialog(EntryDialog(caller, self))
+        # caller.startDialog(EntryDialog(caller, self))
 
-        # self.entry.enter(caller)
+        self.entry.enter(caller)
 
     def leave(self, caller):
         log.debug('%s left', caller)

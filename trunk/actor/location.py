@@ -140,7 +140,7 @@ class Location(object):
         caller.enqueue(self.orientation)
 
     def move_invalid(self, caller): 
-        caller.enqueue(Play(P_Normal, 'da_ist_nichts.wav', prefix='lars'))
+        caller.enqueue(Play(P_Normal, 'there_is_nothing.wav', prefix='lars'))
 
     def move_timer(self, caller):
         caller.user_data.tm_move = None
@@ -155,7 +155,25 @@ class Location(object):
     def starhash_timer(self, caller):
         caller.user_data.tm_starhash = None
         self.generic_invalid(caller)
-    
+
+    def announce_others(self, caller):
+        count = len(self.callers) - 1
+        if count == 0:
+            caller.enqueue(Play(P_Normal, 'you_are_alone.wav', prefix='lars'))
+        elif count in range(1, 9):
+            caller.enqueue(Play(P_Normal, 'there_are.wav',
+                                '%d.wav' % (count), 'people.wav',
+                                prefix='lars'))
+        else:
+            caller.enqueue(Play(P_Normal, 'there_are.wav', 'many.wav', 
+                                'people.wav', prefix='lars'))
+
+    def MLCA(self, event, user_data):
+        pass
+
+    def MLDP(self, event, user_data):
+        pass
+
     def DTMF(self, caller, dtmf):
         data = caller.user_data
         data.cancel('tm_orientation')
@@ -208,10 +226,8 @@ class Location(object):
             data.tm_move = callLater(2.0, self.move_timer, caller)
             return True
         elif dtmf == '6':
-            # Todo: this is probably bullshit
-            data.it_callers = CallerIterator(self.callers)
-            c = data.it_callers.next()
-            caller.play(PRIORITY_NORMAL, MODE_NORMAL, c.name_audio)
+            self.announce_others(caller)
+            return True
         elif dtmf == '*':
             data.tm_starhash = callLater(2.0, self.starhash_timer,
                                          caller)
