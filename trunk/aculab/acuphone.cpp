@@ -323,7 +323,7 @@ void ProsodyChannel::conferenceEC()
 
 	condition.channel = m_channel;
 	condition.reference	= m_channel;
-	condition.reference_type = kSMInputCondRefUseOutput;
+	condition.reference_type = kSMInputCondRefUseInput;
 	condition.conditioning_type	= kSMInputCondEchoCancelation;
 	condition.alt_dest_type			= kSMInputCondAltDestNone;
 
