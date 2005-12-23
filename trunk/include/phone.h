@@ -108,6 +108,7 @@ public:
 	enum state 
 	{
 		idle,
+		waiting,
 		active,
 		stopping
 	};

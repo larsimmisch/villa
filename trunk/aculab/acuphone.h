@@ -250,10 +250,37 @@ protected:
 		ProsodyChannel *m_prosody;
 	};
 
+	class UDPStreamingSample : public Sample
+	{
+	public:
+
+		UDPStreamingSample(ProsodyChannel *channel, int port);
+
+		virtual ~UDPStreamingSample();
+
+        virtual unsigned start(Media *phone);
+        virtual bool stop(Media *phone, unsigned status = V3_STOPPED);
+		virtual unsigned submit(Media *phone);
+		// fills prosody buffers if space available, notifies about completion if done
+		virtual int process(Media *phone);
+
+		unsigned startOutput()
+
+		virtual unsigned getLength();
+
+	protected:
+		
+		ProsodyChannel *m_prosody;
+		SOCKET m_socket;
+		ringbuffer m_buffer;
+		unsigned m_bytes_played;
+	};
+
 	friend class FileSample;
 	friend class RecordFileSample;
 	friend class Touchtones;
 	friend class Beep;
+	friend class UDPStreamingSample:
 
 	tSMEventId set_event(tSM_INT type);
 
@@ -287,17 +314,27 @@ public:
 
     virtual Switch* getSwitch() { return &m_sw; }
 
-	virtual Sample* createFileSample(const char *name) { return new FileSample(this, name); }
+	virtual Sample* createFileSample(const char *name) 
+		{ return new FileSample(this, name); }
+
 	virtual Sample* createRecordFileSample(const char *name, unsigned maxTime,
 										   unsigned maxSilence)
-	{
-		return new RecordFileSample(this, name, maxTime, maxSilence);
-	}
-	virtual Sample* createTouchtones(const char *tt) { return new Touchtones(this, tt); }
-	virtual Sample* createBeeps(int nBeeps) { return new Beep(this, nBeeps); }
+		{ return new RecordFileSample(this, name, maxTime, maxSilence); }
 
-	virtual void startEnergyDetector(unsigned qualTime) { ProsodyChannel::startEnergyDetector(qualTime); }
-	virtual void stopEnergyDetector() { ProsodyChannel::stopEnergyDetector(); }
+	virtual Sample* createTouchtones(const char *tt) 
+		{ return new Touchtones(this, tt); }
+
+	virtual Sample* createBeeps(int nBeeps) 
+		{ return new Beep(this, nBeeps); }
+
+	virtual Sample* createUDPStream(int port) 
+		{ return new UDPStreamingSample(this, ports); }
+
+	virtual void startEnergyDetector(unsigned qualTime) 
+		{ ProsodyChannel::startEnergyDetector(qualTime); }
+
+	virtual void stopEnergyDetector() 
+		{ ProsodyChannel::stopEnergyDetector(); }
 
 	/* listen to our own output */
 	void loopback();

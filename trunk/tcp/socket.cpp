@@ -228,7 +228,7 @@ void Socket::setReuseAddress(int on)
 void Socket::setNonblocking(int on)
 {
 	int rc = ioctlsocket(m_socket, FIONBIO, (u_long *) &on);
-	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setReuseAddress(int)", GetLastError());
+	if (rc < 0) throw SocketError(__FILE__, __LINE__, "Socket::setNonBlocking(int)", GetLastError());
 }
 
 int Socket::rejected()

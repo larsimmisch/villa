@@ -821,6 +821,226 @@ int ProsodyChannel::FileSample::process(Media *phone)
 	return replay.status;
 }
 
+ProsodyChannel::UDPStreamingSample::UDPStreamingSample(ProsodyChannel *channel,
+													   int port)
+ :  m_bytes_played(0), m_port(port), m_socket(-1), m_prosody(channel)
+{
+}
+
+ProsodyChannel::UDPStreamingSample::~UDPStreamingSample()
+{
+	closesocket(m_socket);
+}
+
+unsigned ProsodyChannel::UDPStreamingSample::getLength() 
+{ 
+	return m_bytes_played / 8; 
+}
+
+unsigned ProsodyChannel::UDPStreamingSample::start(Media *phone)
+{
+	struct sockaddr_in addr;
+	int rc;
+	
+	addr.sin_family=PF_INET;
+	addr.sin_port=htons(m_port);
+    addr.sin_addr.s_addr=command->IP_ADDR_ANY;
+
+	m_socket = socket(PF_INET, SOCK_DGRAM, 0);
+	if (m_socket == SOCKET_ERROR)
+	{
+		throw SocketError(__FILE__, __LINE__, "socket", GetLastError());
+	}
+
+	rc = bind(m_socket, (sockaddr*)&addr, sizeof(addr));
+	if (rc < 0)
+	{
+		closesocket(m_socket);
+		throw SocketError(__FILE__, __LINE__, "bind()", GetLastError());
+	}
+
+	int on = 0;
+	rc = ioctlsocket(m_socket, FIONBIO, (u_long *) &on);
+	if (rc < 0)
+	{
+		closesocket(m_socket);
+		throw SocketError(__FILE__, __LINE__, "ioctlsocket(FIONBIO)", 
+						  GetLastError());
+	}
+
+	// associate the socket with our *write* event, because the channel is
+	// an output channel as seen from Prosody
+	rc = WSAEventSelect(m_socket, m_prosody->m_eventWrite, FD_READ);
+	if (rc < 0)
+	{
+		closesocket(m_socket);
+		throw SocketError(__FILE__, __LINE__, "WSAEventSelect", 
+						  GetLastError());
+	}
+
+	omni_mutex_lock lock(m_prosody->m_mutex);
+
+	m_state = waiting;
+	m_prosody->m_sending = this;
+}
+
+unsigned ProsodyChannel::UDPStreamingSample::startOutput()
+{
+	struct sm_replay_parms start;
+	memset(&start, 0, sizeof(start));
+
+	start.channel = m_prosody->m_channel;
+	start.background = kSMNullChannelId;
+	start.speed = 100;
+	start.type = kSMDataFormat8KHzALawPCM;
+
+	{
+		omni_mutex_lock lock(m_prosody->m_mutex);
+
+		int rc = sm_replay_start(&start);
+		if (rc)
+		{
+			throw ProsodyError(__FILE__, __LINE__, "sm_replay_start", rc);
+		}
+		m_state = active;
+	}
+
+	process(phone);
+
+	log(log_debug, "phone", phone->getName()) 
+		<< "udp streaming sample on port " << m_port << " started" << logend();
+
+	return m_position;
+}
+
+unsigned ProsodyChannel::UDPStreamingSample::submit(Media *phone)
+{	
+	char buffer[kSMMaxReplayDataBufferSize];
+
+	struct sm_ts_data_parms data;
+
+	data.channel = m_prosody->m_channel;
+	data.length = m_storage->read(buffer, sizeof(buffer));
+	data.data = buffer;
+
+	int rc = sm_put_replay_data(&data);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_put_replay_data", rc);
+
+	m_position += data.length / 8;
+
+	return data.length;
+}
+
+bool ProsodyChannel::UDPStreamingSample::stop(Media *phone, unsigned status)
+{
+	struct sm_replay_abort_parms p;
+
+	p.channel = m_prosody->m_channel;
+
+    {
+	    omni_mutex_lock lock(m_prosody->m_mutex);
+
+	    if (m_state != active)
+	    {
+		    log(log_debug+1, "phone", phone->getName()) 
+			    << "stopping udp streaming sample on port " << m_port << " - not active" << logend();
+
+		    return false;
+	    }
+
+	    m_state = stopping;
+	    m_status = status;
+    }
+
+	int rc = sm_replay_abort(&p);
+	if (rc)
+		throw ProsodyError(__FILE__, __LINE__, "sm_replay_abort", rc);
+
+    
+    m_position = p.offset / 8;
+
+	log(log_debug+1, "phone", phone->getName()) 
+		<< "stopping udp streaming sample on port " << m_port << logend();
+
+	return false;
+}
+
+// fills prosody buffers if space available, notifies about completion if done
+int ProsodyChannel::UDPStreamingSample::process(Media *phone)
+{
+	struct sockaddr_in addr;
+	int addr_len = sizeof(addr);
+	struct sm_replay_status_parms replay;
+	
+	// we need a local copy because the client might delete us
+	// in completed
+	ProsodyChannel *p = m_prosody;
+
+	replay.channel = p->m_channel;
+
+	int rc = recvfrom(m_socket, dgram, sizeof(dgram), 0, 
+					  (struct sockaddr *)&addr, &addr_len);
+	if (rc < 0)
+	{
+		if (GetLastError() != WSAEWOULDBLOCK)
+		{
+			throw SocketError(__FILE__, __LINE__, "recvfrom", 
+							  GetLastError());
+		}
+	}
+	
+	while (m_buffer.size() >= kSMMaxReplayDataBufferSize)
+	{
+		if (m_state == waiting)
+		{
+			startOutput();
+		}
+
+		int rc = sm_replay_status(&replay);
+		if (rc)
+			throw ProsodyError(__FILE__, __LINE__, "sm_replay_status", rc);
+
+		switch (replay.status)
+		{
+		case kSMReplayStatusComplete:
+			log(log_debug, "phone", phone->getName()) 
+				<< "udp streaming sample on port " << m_port << " done [" 
+				<< result_name(m_status) << ',' << m_position << ']' 
+				<< logend();
+
+			{
+				omni_mutex_lock lock(p->m_mutex);
+				m_state = idle;
+				p->m_sending = 0;
+			}
+			phone->completed(this);
+			return replay.status;
+		case kSMReplayStatusUnderrun:
+			log(log_warning, "phone", phone->getName()) 
+				<< "underrun!" << logend();
+			return replay.status;
+		case kSMReplayStatusHasCapacity:
+			if (!submit(phone))
+			{
+				// Villa test
+				log(log_error, "phone", phone->getName()) 
+					<< "premature end of data" << logend();
+				stop(phone);
+				return replay.status;
+			}
+			break;
+		case kSMReplayStatusCompleteData:
+			return replay.status;
+		case kSMReplayStatusNoCapacity:
+			return replay.status;
+		}
+	}
+
+	// unreached statement
+	return replay.status;
+}
+
 unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 {
 	struct sm_record_parms record;
@@ -834,7 +1054,6 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 	record.max_octets = 0;
 	record.max_elapsed_time = m_maxTime;
 	record.max_silence = m_maxSilence;
-
 	{
 		omni_mutex_lock lock(m_prosody->m_mutex);
 
