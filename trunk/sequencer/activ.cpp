@@ -151,9 +151,17 @@ bool SilenceAtom::setPos(unsigned pos)
 	return true;
 }
 
-Molecule::Molecule(unsigned channel, unsigned aMode, int aPriority, const std::string &id) 
-	: Atom(channel), m_mode(aMode), m_priority(aPriority), m_id(id), m_flags(0), 
-	m_current(0), m_pos(0), m_status(0), m_length(0), m_nCurrent(0)
+UDPAtom::UDPAtom(unsigned channel, Sequencer* sequencer, int port) 
+	: Atom(channel), m_port(port)
+{ 
+	m_sample = sequencer->getMedia()->createUDPStreamingSample(port);
+}
+
+Molecule::Molecule(unsigned channel, unsigned aMode, int aPriority, 
+				   const std::string &id) 
+	: Atom(channel), m_mode(aMode), m_priority(aPriority), m_id(id), 
+	  m_flags(0), m_current(0), m_pos(0), m_status(0), m_length(0), 
+	  m_nCurrent(0)
 {
 	m_timeStopped.now();
 }
@@ -234,7 +242,8 @@ bool Molecule::start(Sequencer* sequencer)
 
 bool Molecule::stop(Sequencer* sequencer, unsigned status)
 {
-	if ((m_mode & dont_interrupt) && !((m_mode & dtmf_stop) && status == V3_STOPPED_DTMF))
+	if ((m_mode & dont_interrupt) 
+		&& !((m_mode & dtmf_stop) && status == V3_STOPPED_DTMF))
 		return false;
 
 	return abort(sequencer, status);
@@ -256,8 +265,9 @@ bool Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 
 	m_pos += msecs;
 
-	log(log_debug, "activ") << "molecule done. status: " << status << " msecs: " 
-		<< msecs << " pos: " << m_pos << " length: " << m_length << logend();
+	log(log_debug, "activ") << "molecule done. status: " << status 
+							<< " msecs: " << msecs << " pos: " << m_pos 
+							<< " length: " << m_length << logend();
 
 	m_flags &= ~active;
 
@@ -265,9 +275,11 @@ bool Molecule::done(Sequencer* sequencer, unsigned msecs, unsigned status)
 	{
 		m_timeStopped.now();
 		log(log_debug + 2, "activ") << "stopped after: " 
-			<< m_timeStopped - m_timeStarted << " ms" << logend();
+									<< m_timeStopped - m_timeStarted 
+									<< " ms" << logend();
 
-		if ((m_mode & discard) | ((m_mode & dtmf_stop) && m_status == V3_STOPPED_DTMF))
+		if ((m_mode & discard) | 
+			((m_mode & dtmf_stop) && m_status == V3_STOPPED_DTMF))
 			return true;
 
 		return false;
@@ -325,7 +337,8 @@ bool Molecule::setPos(unsigned aPos)
 
 void Molecule::printOn(std::ostream &out)
 { 
-	out << "Molecule(" << getPriority() << ", " << getPos() << ", " << getLength() << ",";
+	out << "Molecule(" << getPriority() << ", " << getPos() << ", " 
+		<< getLength() << ",";
 
 	if (getMode() & Molecule::discard)  out << " discard";
 	if (getMode() & Molecule::mute)  out << " mute";
@@ -400,9 +413,11 @@ Molecule* Activity::add(Molecule& newMolecule)
 			<< " old " << lastActive->getPriority() << " interruptable: " 
 			<< !(lastActive->getMode() & Molecule::dont_interrupt) << logend();
 
-		if (newMolecule.getPriority() > lastActive->getPriority() && !(lastActive->getMode() & Molecule::dont_interrupt))
+		if (newMolecule.getPriority() > lastActive->getPriority() 
+			&& !(lastActive->getMode() & Molecule::dont_interrupt))
 		{
-			log(log_debug + 2, "activ") << "interrupting " << *lastActive << logend();
+			log(log_debug + 2, "activ") << "interrupting " 
+										<< *lastActive << logend();
 
 			lastActive->stop(m_sequencer);
 		}
@@ -451,14 +466,17 @@ bool Activity::start()
 	
 		if (started)
 		{
-			log(log_debug + 2, "activ") << "started: " << *molecule << logend();
+			log(log_debug + 2, "activ") << "started: " << *molecule 
+										<< logend();
 		}
 		else
 		{
-			log(log_error, "activ") << "start failed: " << *molecule << logend();
+			log(log_error, "activ") << "start failed: " << *molecule 
+									<< logend();
 	
 			m_sequencer->sendMLCA(molecule->getId(),
-				molecule->getStatus(), molecule->getPos(), molecule->getLength());
+								  molecule->getStatus(), 
+								  molecule->getPos(), molecule->getLength());
 
 			remove((Molecule*)head);
 		}

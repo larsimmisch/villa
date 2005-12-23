@@ -148,7 +148,8 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 	{
 		server->clear();
 
-		server->syntax_error(id) << "expecting channel, mode and priority" << end(); 
+		server->syntax_error(id) << "expecting channel, mode and priority" 
+								 << end(); 
 
 		return V3_FATAL_SYNTAX;
 	}
@@ -228,6 +229,14 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 				(*server) >> len;
 
 				atom = new SilenceAtom(channel, len);
+			}
+			else if (type == "udp")
+			{
+				int port;
+
+				(*server) >> port;
+
+				atom = new UDPAtom(channel, len);
 			}
 			else if (type == "conf")
 			{

@@ -297,6 +297,24 @@ protected:
 	Conference::mode m_mode;
 };
 
+class UDPAtom : public Atom
+{
+public:
+
+	UDPAtom(unsigned channel, Sequencer* sequencer, int port);
+	virtual ~PlayAtom() { delete m_sample; }
+
+	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
+	virtual unsigned getLength()	{ return m_sample->getLength(); }
+	virtual bool isGrowing() { return true; }
+
+	virtual void printOn(std::ostream& out)  { out << "UDPAtom(" << m_port << ")"; }
+	
+protected:
+	
+	int m_port;
+};
+
 class Activity : public DList
 {
 public:
