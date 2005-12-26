@@ -18,6 +18,7 @@
 #include "smosintf.h"
 #include "smbesp.h"
 #include "switch.h"
+#include "ringbuffer.h"
 
 const char* prosody_error(int);
 
@@ -250,29 +251,29 @@ protected:
 		ProsodyChannel *m_prosody;
 	};
 
-	class UDPStreamingSample : public Sample
+	class UDPStream : public Sample
 	{
 	public:
 
-		UDPStreamingSample(ProsodyChannel *channel, int port);
+		UDPStream(ProsodyChannel *channel, int port);
 
-		virtual ~UDPStreamingSample();
+		virtual ~UDPStream();
 
         virtual unsigned start(Media *phone);
         virtual bool stop(Media *phone, unsigned status = V3_STOPPED);
 		virtual unsigned submit(Media *phone);
 		// fills prosody buffers if space available, notifies about completion if done
 		virtual int process(Media *phone);
-
-		unsigned startOutput()
-
 		virtual unsigned getLength();
 
 	protected:
+
+		unsigned startOutput(Media *phone);
 		
 		ProsodyChannel *m_prosody;
 		SOCKET m_socket;
-		ringbuffer m_buffer;
+		int m_port;
+		ringbuffer<char> m_buffer;
 		unsigned m_bytes_played;
 	};
 
@@ -280,7 +281,7 @@ protected:
 	friend class RecordFileSample;
 	friend class Touchtones;
 	friend class Beep;
-	friend class UDPStreamingSample:
+	friend class UDPStream;
 
 	tSMEventId set_event(tSM_INT type);
 
@@ -328,7 +329,7 @@ public:
 		{ return new Beep(this, nBeeps); }
 
 	virtual Sample* createUDPStream(int port) 
-		{ return new UDPStreamingSample(this, ports); }
+		{ return new UDPStream(this, port); }
 
 	virtual void startEnergyDetector(unsigned qualTime) 
 		{ ProsodyChannel::startEnergyDetector(qualTime); }

@@ -13,6 +13,8 @@
 #include <iostream>
 #include <iomanip>
 #include <typeinfo.h>
+#include <winsock2.h>
+#include "socket.h"
 #include "mvswdrvr.h"
 #include "names.h"
 #include "acuphone.h"
@@ -821,30 +823,30 @@ int ProsodyChannel::FileSample::process(Media *phone)
 	return replay.status;
 }
 
-ProsodyChannel::UDPStreamingSample::UDPStreamingSample(ProsodyChannel *channel,
+ProsodyChannel::UDPStream::UDPStream(ProsodyChannel *channel,
 													   int port)
  :  m_bytes_played(0), m_port(port), m_socket(-1), m_prosody(channel)
 {
 }
 
-ProsodyChannel::UDPStreamingSample::~UDPStreamingSample()
+ProsodyChannel::UDPStream::~UDPStream()
 {
 	closesocket(m_socket);
 }
 
-unsigned ProsodyChannel::UDPStreamingSample::getLength() 
+unsigned ProsodyChannel::UDPStream::getLength() 
 { 
 	return m_bytes_played / 8; 
 }
 
-unsigned ProsodyChannel::UDPStreamingSample::start(Media *phone)
+unsigned ProsodyChannel::UDPStream::start(Media *phone)
 {
 	struct sockaddr_in addr;
 	int rc;
 	
-	addr.sin_family=PF_INET;
-	addr.sin_port=htons(m_port);
-    addr.sin_addr.s_addr=command->IP_ADDR_ANY;
+	addr.sin_family = PF_INET;
+	addr.sin_port = htons(m_port);
+    addr.sin_addr.s_addr = INADDR_ANY;
 
 	m_socket = socket(PF_INET, SOCK_DGRAM, 0);
 	if (m_socket == SOCKET_ERROR)
@@ -884,7 +886,7 @@ unsigned ProsodyChannel::UDPStreamingSample::start(Media *phone)
 	m_prosody->m_sending = this;
 }
 
-unsigned ProsodyChannel::UDPStreamingSample::startOutput()
+unsigned ProsodyChannel::UDPStream::startOutput(Media *phone)
 {
 	struct sm_replay_parms start;
 	memset(&start, 0, sizeof(start));
@@ -905,15 +907,13 @@ unsigned ProsodyChannel::UDPStreamingSample::startOutput()
 		m_state = active;
 	}
 
-	process(phone);
-
 	log(log_debug, "phone", phone->getName()) 
 		<< "udp streaming sample on port " << m_port << " started" << logend();
 
 	return m_position;
 }
 
-unsigned ProsodyChannel::UDPStreamingSample::submit(Media *phone)
+unsigned ProsodyChannel::UDPStream::submit(Media *phone)
 {	
 	char buffer[kSMMaxReplayDataBufferSize];
 
@@ -932,7 +932,7 @@ unsigned ProsodyChannel::UDPStreamingSample::submit(Media *phone)
 	return data.length;
 }
 
-bool ProsodyChannel::UDPStreamingSample::stop(Media *phone, unsigned status)
+bool ProsodyChannel::UDPStream::stop(Media *phone, unsigned status)
 {
 	struct sm_replay_abort_parms p;
 
@@ -967,7 +967,7 @@ bool ProsodyChannel::UDPStreamingSample::stop(Media *phone, unsigned status)
 }
 
 // fills prosody buffers if space available, notifies about completion if done
-int ProsodyChannel::UDPStreamingSample::process(Media *phone)
+int ProsodyChannel::UDPStream::process(Media *phone)
 {
 	struct sockaddr_in addr;
 	int addr_len = sizeof(addr);
@@ -994,7 +994,7 @@ int ProsodyChannel::UDPStreamingSample::process(Media *phone)
 	{
 		if (m_state == waiting)
 		{
-			startOutput();
+			startOutput(phone);
 		}
 
 		int rc = sm_replay_status(&replay);
