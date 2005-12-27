@@ -168,12 +168,6 @@ class Location(object):
             caller.enqueue(Play(P_Normal, 'there_are.wav', 'many.wav', 
                                 'people.wav', prefix='lars'))
 
-    def MLCA(self, event, user_data):
-        pass
-
-    def MLDP(self, event, user_data):
-        pass
-
     def DTMF(self, caller, dtmf):
         data = caller.user_data
         data.cancel('tm_orientation')
@@ -267,6 +261,17 @@ class Room(Location):
             data.tid_talk = caller.enqueue(
                 RecordBeep(P_Normal, str(caller) + '.wav', 10.0))
 
+    def MLCA(self, caller, event, user_data):
+        data = caller.user_data
+        tid = event['tid']
+        status = event['status']
+        if data.tid_talk == tid:
+            data.tid_talk = None
+            log.info('talk %d: status %s',  tid, status)
+            for c in self.callers:
+                if c != caller:
+                    c.enqueue(Play(P_Discard, str(caller) + '.wav'))
+        
 class ConferenceRoom(Location):
     def __init__(self, seq):
         super(ConferenceRoom, self).__init__()

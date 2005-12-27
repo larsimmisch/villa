@@ -205,11 +205,15 @@ ProsodyChannel::ProsodyChannel() : m_sending(0), m_receiving(0)
 	m_eventRead = set_event(kSMEventTypeReadData);
 	m_eventWrite = set_event(kSMEventTypeWriteData);
 	m_eventRecog = set_event(kSMEventTypeRecog);
+    m_eventUDP = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (!m_eventUDP)
+        throw APIError(__FILE__, __LINE__, "CreateEvent", GetLastError());
 
 	// and add them to the dispatcher
 	s_dispatcher.add(m_eventRead, this, onRead);
 	s_dispatcher.add(m_eventWrite, this, onWrite);
 	s_dispatcher.add(m_eventRecog, this, onRecog);
+	s_dispatcher.add(m_eventUDP, this, onUDP);
 
 	// cache channel info
 	m_info.channel = m_channel;
@@ -801,7 +805,7 @@ int ProsodyChannel::FileSample::process(Media *phone)
 			return replay.status;
 		case kSMReplayStatusUnderrun:
 			log(log_error, "phone", phone->getName()) << "underrun!" << logend();
-			break;
+            // fall through
 		case kSMReplayStatusHasCapacity:
 			if (!submit(phone))
 			{
@@ -823,9 +827,9 @@ int ProsodyChannel::FileSample::process(Media *phone)
 	return replay.status;
 }
 
-ProsodyChannel::UDPStream::UDPStream(ProsodyChannel *channel,
-													   int port)
- :  m_bytes_played(0), m_port(port), m_socket(-1), m_prosody(channel)
+ProsodyChannel::UDPStream::UDPStream(ProsodyChannel *channel, int port)
+ : m_bytes_played(0), m_port(port), m_socket(-1), m_prosody(channel),
+   m_buffer(16)
 {
 }
 
@@ -870,20 +874,20 @@ unsigned ProsodyChannel::UDPStream::start(Media *phone)
 						  GetLastError());
 	}
 
-	// associate the socket with our *write* event, because the channel is
-	// an output channel as seen from Prosody
-	rc = WSAEventSelect(m_socket, m_prosody->m_eventWrite, FD_READ);
+	rc = WSAEventSelect(m_socket, m_prosody->m_eventUDP, FD_READ);
 	if (rc < 0)
 	{
+        rc = GetLastError();
 		closesocket(m_socket);
-		throw SocketError(__FILE__, __LINE__, "WSAEventSelect", 
-						  GetLastError());
+		throw SocketError(__FILE__, __LINE__, "WSAEventSelect", rc);
 	}
 
 	omni_mutex_lock lock(m_prosody->m_mutex);
 
 	m_state = waiting;
 	m_prosody->m_sending = this;
+
+    return 0;
 }
 
 unsigned ProsodyChannel::UDPStream::startOutput(Media *phone)
@@ -915,13 +919,16 @@ unsigned ProsodyChannel::UDPStream::startOutput(Media *phone)
 
 unsigned ProsodyChannel::UDPStream::submit(Media *phone)
 {	
-	char buffer[kSMMaxReplayDataBufferSize];
-
 	struct sm_ts_data_parms data;
 
+    if (!m_buffer.size())
+        return 0;
+
+    vbuf &vb = m_buffer.front();
+
 	data.channel = m_prosody->m_channel;
-	data.length = m_storage->read(buffer, sizeof(buffer));
-	data.data = buffer;
+	data.length = vb.size;
+	data.data = vb.data;
 
 	int rc = sm_put_replay_data(&data);
 	if (rc)
@@ -967,10 +974,42 @@ bool ProsodyChannel::UDPStream::stop(Media *phone, unsigned status)
 }
 
 // fills prosody buffers if space available, notifies about completion if done
-int ProsodyChannel::UDPStream::process(Media *phone)
+int ProsodyChannel::UDPStream::udp(Media *phone)
 {
 	struct sockaddr_in addr;
 	int addr_len = sizeof(addr);
+
+    if (m_buffer.size() == 0)
+        m_buffer.push();
+
+    vbuf &vb = m_buffer.back();
+    for (;;)
+    {
+        if (vb.size >= VBUF_DATASIZE) 
+        {
+            m_buffer.push();
+            vb = m_buffer.back();
+        }
+
+	    int rc = recvfrom(m_socket, vb.data + vb.size, VBUF_DATASIZE - vb.size, 
+            0, (struct sockaddr*)&addr, &addr_len);
+	    if (rc < 0)
+	    {
+            if (GetLastError() == WSAEWOULDBLOCK)
+                break;
+
+      		throw SocketError(__FILE__, __LINE__, "recvfrom", 
+	    						  GetLastError());
+    	}
+        vb.size += rc;
+    }
+	
+    return 0;
+}
+
+// fills prosody buffers if space available, notifies about completion if done
+int ProsodyChannel::UDPStream::process(Media *phone)
+{
 	struct sm_replay_status_parms replay;
 	
 	// we need a local copy because the client might delete us
@@ -979,18 +1018,7 @@ int ProsodyChannel::UDPStream::process(Media *phone)
 
 	replay.channel = p->m_channel;
 
-	int rc = recvfrom(m_socket, dgram, sizeof(dgram), 0, 
-					  (struct sockaddr *)&addr, &addr_len);
-	if (rc < 0)
-	{
-		if (GetLastError() != WSAEWOULDBLOCK)
-		{
-			throw SocketError(__FILE__, __LINE__, "recvfrom", 
-							  GetLastError());
-		}
-	}
-	
-	while (m_buffer.size() >= kSMMaxReplayDataBufferSize)
+	while (true) //m_buffer.size() >= kSMMaxReplayDataBufferSize)
 	{
 		if (m_state == waiting)
 		{
@@ -1019,8 +1047,8 @@ int ProsodyChannel::UDPStream::process(Media *phone)
 		case kSMReplayStatusUnderrun:
 			log(log_warning, "phone", phone->getName()) 
 				<< "underrun!" << logend();
-			return replay.status;
-		case kSMReplayStatusHasCapacity:
+            // fall through
+        case kSMReplayStatusHasCapacity:
 			if (!submit(phone))
 			{
 				// Villa test
@@ -1100,7 +1128,7 @@ bool ProsodyChannel::RecordFileSample::stop(Media *phone, unsigned status)
 		throw ProsodyError(__FILE__, __LINE__, "sm_record_abort", rc);
 
 	log(log_debug, "phone", phone->getName()) 
-		<< "stopping recording " << m_name.c_str() << logend();
+		<< "stopping recording" << logend();
 
 	return false;
 }
@@ -1161,9 +1189,8 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 				p->m_receiving = 0;
 			}
 			
-			/* Retain status codes in the range of successful completions - 
-			   m_status may have been set in stop() */
-			if (m_status >= V3_WARNING_OFFSET)
+			/* m_status may have been set in stop() */
+			if (m_status != V3_STOPPED && m_status <= V3_WARNING_OFFSET)
 			{
 				rc = sm_record_how_terminated(&how);
 				if (rc)
@@ -1338,6 +1365,32 @@ void AculabMedia::onWrite(tSMEventId id)
 		else if (typeid(*m_sending) == typeid(ProsodyChannel::Beep))
 		{
 			dynamic_cast<Beep*>(m_sending)->process(this);
+		}
+	}
+	catch (const Exception& e)
+	{
+		log(log_error, "phone", getName()) << e << logend();
+	}
+}
+
+void AculabMedia::onUDP(tSMEventId id)
+{
+    {
+	    omni_mutex_lock l(m_mutex);
+
+	    if (!m_sending)
+	    {
+		    log(log_error, "phone", getName()) 
+			    << "got onWrite() event while no output active" << logend();
+		    return;
+	    }
+    }
+
+	try
+	{
+		if (typeid(*m_sending) == typeid(ProsodyChannel::UDPStream))
+		{
+			dynamic_cast<UDPStream*>(m_sending)->udp(this);
 		}
 	}
 	catch (const Exception& e)

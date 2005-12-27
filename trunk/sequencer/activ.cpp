@@ -154,7 +154,7 @@ bool SilenceAtom::setPos(unsigned pos)
 UDPAtom::UDPAtom(unsigned channel, Sequencer* sequencer, int port) 
 	: Atom(channel), m_port(port)
 { 
-	m_sample = sequencer->getMedia()->createUDPStreamingSample(port);
+	m_sample = sequencer->getMedia()->createUDPStream(port);
 }
 
 Molecule::Molecule(unsigned channel, unsigned aMode, int aPriority, 

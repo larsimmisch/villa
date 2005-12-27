@@ -26,7 +26,7 @@ class Call:
 
     def ACPT(self, event, user_data):
         d = event['device']
-        self.send('MLCA %s 0 2 1 play taste.wav none' % d)
+        self.send('MLCA %s 0 2 1 udp 10001 none' % d)
 
     def DISC(self, event, data):
         print "disconnected:", event['device']

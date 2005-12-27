@@ -236,7 +236,7 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 				(*server) >> port;
 
-				atom = new UDPAtom(channel, len);
+				atom = new UDPAtom(channel, this, port);
 			}
 			else if (type == "conf")
 			{

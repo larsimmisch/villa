@@ -302,7 +302,7 @@ class UDPAtom : public Atom
 public:
 
 	UDPAtom(unsigned channel, Sequencer* sequencer, int port);
-	virtual ~PlayAtom() { delete m_sample; }
+	virtual ~UDPAtom() { delete m_sample; }
 
 	virtual bool setPos(unsigned pos) { return m_sample->setPos(pos); }
 	virtual unsigned getLength()	{ return m_sample->getLength(); }

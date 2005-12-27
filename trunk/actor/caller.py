@@ -80,7 +80,8 @@ class Caller(object):
             self.world.enter(self)
         
     def MLCA(self, event, user_data):
-        pass
+        if self.location and hasattr(self.location, 'MLCA'):
+            self.location.MLCA(self, event, user_data)
 
     def DTMF(self, event):
         dtmf = event['data'][0]

@@ -18,7 +18,7 @@
 #include "smosintf.h"
 #include "smbesp.h"
 #include "switch.h"
-#include "ringbuffer.h"
+#include "voicebuffer.h"
 
 const char* prosody_error(int);
 
@@ -66,6 +66,7 @@ public:
 	virtual void onRead(tSMEventId id) = 0;
 	virtual void onWrite(tSMEventId id) = 0;
 	virtual void onRecog(tSMEventId id) = 0;
+	virtual void onUDP(tSMEventId id) = 0;
 };
 
 // pointer to ProsodyObserver member function. 
@@ -263,6 +264,7 @@ protected:
         virtual bool stop(Media *phone, unsigned status = V3_STOPPED);
 		virtual unsigned submit(Media *phone);
 		// fills prosody buffers if space available, notifies about completion if done
+		virtual int udp(Media *phone);
 		virtual int process(Media *phone);
 		virtual unsigned getLength();
 
@@ -273,7 +275,7 @@ protected:
 		ProsodyChannel *m_prosody;
 		SOCKET m_socket;
 		int m_port;
-		ringbuffer<char> m_buffer;
+		voicebuffer m_buffer;
 		unsigned m_bytes_played;
 	};
 
@@ -289,6 +291,7 @@ protected:
 	tSMEventId m_eventRead;
 	tSMEventId m_eventWrite;
 	tSMEventId m_eventRecog;
+    tSMEventId m_eventUDP;
 	int m_conferenceId;
 	struct sm_listen_for_parms m_listenFor;
 	struct sm_channel_info_parms m_info;
@@ -349,6 +352,7 @@ protected:
 	virtual void onRead(tSMEventId id);
 	virtual void onWrite(tSMEventId id);
 	virtual void onRecog(tSMEventId id);
+	virtual void onUDP(tSMEventId id);
 
 	AculabSwitch m_sw;
 	// only for getName()

@@ -1,4 +1,5 @@
 import logging
+import logging.handlers
 
 def defaultLogging(level = logging.DEBUG):
     l = logging.getLogger('')
@@ -8,4 +9,8 @@ def defaultLogging(level = logging.DEBUG):
     hdlr = logging.StreamHandler()
     hdlr.setFormatter(log_formatter)
     l.addHandler(hdlr)
+
+    rhdlr = logging.handlers.RotatingFileHandler('actor.log')
+    rhdlr.setFormatter(log_formatter)
+    l.addHandler(rhdlr)
     
