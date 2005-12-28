@@ -808,13 +808,7 @@ int ProsodyChannel::FileSample::process(Media *phone)
             // fall through
 		case kSMReplayStatusHasCapacity:
 			if (!submit(phone))
-			{
-				// Villa test
-				log(log_error, "phone", phone->getName()) 
-					<< "premature end of data" << logend();
-				stop(phone);
 				return replay.status;
-			}
 			break;
 		case kSMReplayStatusCompleteData:
 			return replay.status;
@@ -828,8 +822,8 @@ int ProsodyChannel::FileSample::process(Media *phone)
 }
 
 ProsodyChannel::UDPStream::UDPStream(ProsodyChannel *channel, int port)
- : m_bytes_played(0), m_port(port), m_socket(-1), m_prosody(channel),
-   m_buffer(16)
+ : m_bytes_played(0), m_port(port), m_socket(-1), m_prosody(channel), m_read(0), m_write(0)
+   //m_buffer(2)
 {
 }
 
@@ -914,27 +908,34 @@ unsigned ProsodyChannel::UDPStream::startOutput(Media *phone)
 	log(log_debug, "phone", phone->getName()) 
 		<< "udp streaming sample on port " << m_port << " started" << logend();
 
-	return m_position;
+	return submit(phone);
 }
 
 unsigned ProsodyChannel::UDPStream::submit(Media *phone)
 {	
 	struct sm_ts_data_parms data;
+	memset(&data, 0, sizeof(data));
 
-    if (!m_buffer.size())
-        return 0;
+    if (m_write - m_read >= kSMMaxReplayDataBufferSize)
+	{
+		data.channel = m_prosody->m_channel;
+		data.length = m_write - m_read;
+		if (data.length >= kSMMaxReplayDataBufferSize)
+			data.length = kSMMaxReplayDataBufferSize;
 
-    vbuf &vb = m_buffer.front();
+		data.data = m_buffer + m_read;
 
-	data.channel = m_prosody->m_channel;
-	data.length = vb.size;
-	data.data = vb.data;
+		int rc = sm_put_replay_data(&data);
+		if (rc)
+			throw ProsodyError(__FILE__, __LINE__, "sm_put_replay_data", rc);
 
-	int rc = sm_put_replay_data(&data);
-	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_put_replay_data", rc);
+		// shift the buffer left
+		memmove(m_buffer, m_buffer + data.length, data.length);
+		m_write -= data.length;
 
-	m_position += data.length / 8;
+		m_position += data.length / 8;
+	}
+
 
 	return data.length;
 }
@@ -979,31 +980,34 @@ int ProsodyChannel::UDPStream::udp(Media *phone)
 	struct sockaddr_in addr;
 	int addr_len = sizeof(addr);
 
-    if (m_buffer.size() == 0)
-        m_buffer.push();
+    int rc = recvfrom(m_socket, m_buffer + m_write, sizeof(m_buffer) - m_write, 
+           0, (struct sockaddr*)&addr, &addr_len);
 
-    vbuf &vb = m_buffer.back();
-    for (;;)
-    {
-        if (vb.size >= VBUF_DATASIZE) 
-        {
-            m_buffer.push();
-            vb = m_buffer.back();
-        }
+    if (rc < 0 && GetLastError() == WSAEMSGSIZE)
+	{
+		// Buffer overflow. Discard all but one buffer size for Aculab.
+		memmove(m_buffer, m_buffer + kSMMaxReplayDataBufferSize, kSMMaxReplayDataBufferSize);
+		m_read = 0;
+		m_write = kSMMaxReplayDataBufferSize;
 
-	    int rc = recvfrom(m_socket, vb.data + vb.size, VBUF_DATASIZE - vb.size, 
-            0, (struct sockaddr*)&addr, &addr_len);
-	    if (rc < 0)
-	    {
-            if (GetLastError() == WSAEWOULDBLOCK)
-                break;
+	    rc = recvfrom(m_socket, m_buffer + m_write, sizeof(m_buffer) - m_write, 
+					  0, (struct sockaddr*)&addr, &addr_len);
+	}
 
-      		throw SocketError(__FILE__, __LINE__, "recvfrom", 
-	    						  GetLastError());
-    	}
-        vb.size += rc;
+	if (rc < 0)
+	{
+		throw SocketError(__FILE__, __LINE__, "recvfrom", GetLastError());
     }
-	
+
+	m_write += rc;
+
+	if (m_write - m_read >= kSMMaxReplayDataBufferSize)
+	{
+		if (m_state == waiting)
+			startOutput(phone);
+		else
+			process(phone);
+	}
     return 0;
 }
 
@@ -1018,13 +1022,8 @@ int ProsodyChannel::UDPStream::process(Media *phone)
 
 	replay.channel = p->m_channel;
 
-	while (true) //m_buffer.size() >= kSMMaxReplayDataBufferSize)
+	while (m_write - m_read >= kSMMaxReplayDataBufferSize)
 	{
-		if (m_state == waiting)
-		{
-			startOutput(phone);
-		}
-
 		int rc = sm_replay_status(&replay);
 		if (rc)
 			throw ProsodyError(__FILE__, __LINE__, "sm_replay_status", rc);
@@ -1050,13 +1049,7 @@ int ProsodyChannel::UDPStream::process(Media *phone)
             // fall through
         case kSMReplayStatusHasCapacity:
 			if (!submit(phone))
-			{
-				// Villa test
-				log(log_error, "phone", phone->getName()) 
-					<< "premature end of data" << logend();
-				stop(phone);
 				return replay.status;
-			}
 			break;
 		case kSMReplayStatusCompleteData:
 			return replay.status;
@@ -1357,6 +1350,10 @@ void AculabMedia::onWrite(tSMEventId id)
 		if (typeid(*m_sending) == typeid(ProsodyChannel::Touchtones))
 		{
 			dynamic_cast<Touchtones*>(m_sending)->process(this);
+		}
+		else if (typeid(*m_sending) == typeid(ProsodyChannel::UDPStream))
+		{
+			dynamic_cast<UDPStream*>(m_sending)->process(this);
 		}
 		else if (typeid(*m_sending) == typeid(ProsodyChannel::FileSample))
 		{

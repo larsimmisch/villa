@@ -18,7 +18,6 @@
 #include "smosintf.h"
 #include "smbesp.h"
 #include "switch.h"
-#include "voicebuffer.h"
 
 const char* prosody_error(int);
 
@@ -275,7 +274,9 @@ protected:
 		ProsodyChannel *m_prosody;
 		SOCKET m_socket;
 		int m_port;
-		voicebuffer m_buffer;
+		char m_buffer[8000];
+		int m_read;
+		int m_write;
 		unsigned m_bytes_played;
 	};
 
