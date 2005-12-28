@@ -43,9 +43,9 @@ class Caller(object):
 
         return self.device
 
-    def enqueue(self, molecule):
+    def enqueue(self, molecule, tid_data = None):
         return self.send(self, 'MLCA %s %s', self.device,
-                         molecule.as_command())
+                         molecule.as_command(), tid_data = tid_data)
 
     def discard(self, from_policy, to_policy, channel = 'all',
                 immediately = True):

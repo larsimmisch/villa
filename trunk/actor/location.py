@@ -160,12 +160,15 @@ class Location(object):
         count = len(self.callers) - 1
         if count == 0:
             caller.enqueue(Play(P_Normal, 'you_are_alone.wav', prefix='lars'))
-        elif count in range(1, 9):
-            caller.enqueue(Play(P_Normal, 'there_are.wav',
+        elif count == 1:
+            caller.enqueue(Play(P_Normal, 'here_is_one_other.wav',
+                                prefix='lars'))            
+        elif count in range(2, 9):
+            caller.enqueue(Play(P_Normal, 'here_are.wav',
                                 '%d.wav' % (count), 'people.wav',
                                 prefix='lars'))
         else:
-            caller.enqueue(Play(P_Normal, 'there_are.wav', 'many.wav', 
+            caller.enqueue(Play(P_Normal, 'here_are.wav', 'many.wav', 
                                 'people.wav', prefix='lars'))
 
     def DTMF(self, caller, dtmf):
@@ -238,6 +241,11 @@ class Location(object):
 class Room(Location):
     def __init__(self):
         super(Room, self).__init__()
+        self.talk_id = 0
+
+    def gen_talk_id(self):
+        self.talk_id = self.talk_id + 1
+        return '%s_%d.wav' % (self.__class__.__name__, self.talk_id)
 
     def enter(self, caller):
         super(Room, self).enter(caller)
@@ -256,10 +264,11 @@ class Room(Location):
         data = caller.user_data
         if data.tid_talk:
             caller.stop(data.tid_talk)
-            data.tid_talk = None
         elif dtmf == '4':
+            talk = self.gen_talk_id()
             data.tid_talk = caller.enqueue(
-                RecordBeep(P_Normal, str(caller) + '.wav', 10.0))
+                RecordBeep(P_Normal, talk, 10.0, prefix='talk'),
+                tid_data = talk)
 
     def MLCA(self, caller, event, user_data):
         data = caller.user_data
@@ -267,10 +276,11 @@ class Room(Location):
         status = event['status']
         if data.tid_talk == tid:
             data.tid_talk = None
-            log.info('talk %d: status %s',  tid, status)
+            log.info('talk %s (%d): status %s',  user_data, tid, status)
             for c in self.callers:
                 if c != caller:
-                    c.enqueue(Play(P_Discard, str(caller) + '.wav'))
+                    c.enqueue(Play(P_Discard, str(caller) + '.wav',
+                              prefix='talk'))
         
 class ConferenceRoom(Location):
     def __init__(self, seq):

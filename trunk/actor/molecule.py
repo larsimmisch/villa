@@ -53,6 +53,14 @@ class DTMFAtom(Atom):
 
     def as_command(self):
         return 'dtmf %s %s' % (self.digits, self.notify)
+
+class UDPAtom(Atom):
+    def __init__(self, port):
+        Atom.__init__(self)
+        self.port = port
+
+    def as_command(self):
+        return 'udp %d %s' % (self.port, self.notify)
                           
 class ConferenceAtom(Atom):
     def __init__(self, conference, mode):
@@ -120,6 +128,11 @@ class Conference(Molecule):
     def __init__(self, policy, conference, mode):
         self.policy = policy
         self.append(ConferenceAtom(conference, mode))
+
+class UDP(Molecule):
+    def __init__(self, policy, port):
+        self.policy = policy
+        self.append(UDPAtom(port))
 
 # mode definitions
 mode_discard = 0x01
