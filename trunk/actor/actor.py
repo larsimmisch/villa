@@ -57,6 +57,9 @@ class B_SE(Room):
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
+    def move_invalid(self, caller): 
+        caller.enqueue(Play(P_Normal, 'wand.wav', prefix='bef'))
+
 class B_Lounge(ConferenceRoom):
     prefix = 'b_lounge'
     background = Play(P_Background, 'ith_chopin-55-1.wav',
@@ -103,7 +106,7 @@ class C_Saal1(ConferenceRoom):
     background = UDP(P_Background, 10001)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
-class EntryDialog:
+class DBEntryDialog:
     max_retries = 3
 
     def __init__(self, caller, world):
@@ -196,9 +199,35 @@ class EntryDialog:
         else:
             self.buffer = self.buffer + dtmf
 
+class EntryDialog:
+    '''Ask the caller for a name'''
+
+    def __init__(self, caller, world):
+        self.caller = caller
+        self.world = world
+        self.cli = self.caller.details.calling
+
+        self.tid = caller.enqueue(
+            Molecule(P_Transition,
+                     PlayAtom('wieheisstdu.wav', prefix='lars'),
+                     RecordBeep(P_Transition, 'name.wav', 10.0,
+                                prefix=os.path.join('user', cli))))
+
+    def MLCA(self, caller, event, user_data):
+        tid = event['tid']
+        status = event['status']
+        if self.tid_talk == tid:
+            data.tid_talk = None
+            log.info('talk %s (%d): status %s',  user_data, tid, status)
+            for c in self.callers.itervalues():
+                if c != caller:
+                    c.enqueue(Play(P_Discard, user_data,
+                              prefix='talk'))
+
 class World(object):
     def __init__(self):
-        self.callers = []
+        self.devices = []
+        self.callers = {}
 
     def start(self, seq):
 ##         self.db = adbapi.ConnectionPool('MySQLdb', host='localhost',
@@ -207,7 +236,9 @@ class World(object):
 
         for t in seq.trunks:
             for i in range(t.lines):
-                self.callers.append(Caller(seq, self, t.name))
+                c = Caller(seq, self, t.name)
+                self.devices.append(c)
+                c.send(c, 'LSTN %s %s' % (t.name, 'any'))
 
         self.a_hackcenter = A_Hackcenter()
         self.a_haecksen = A_Haecksen(seq)
@@ -264,10 +295,13 @@ class World(object):
         connect(self.b_nw, self.c_nw, Stairs(), 'northwest', 'northwest')
 
     def stop(self):
-        self.callers = []
+        self.devices = []
+        self.callers = {}
 
     def enter(self, caller):
         log.debug('%s entered', caller)
+
+        self.callers[caller.device] = caller
 
         caller.enqueue(Play(P_Transition, '4011_suonho_sweetchoff_iLLCommunications_suonho.wav'))
 
@@ -276,6 +310,8 @@ class World(object):
         self.entry.enter(caller)
 
     def leave(self, caller):
+        del self.callers[caller.device]
+        
         log.debug('%s left', caller)
 
     def run(self):

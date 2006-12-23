@@ -1,8 +1,10 @@
 import sys
+import os
 import copy
 import logging
 from sequencer import callLater
 from molecule import *
+import mail
 
 log = logging.getLogger('location')
 
@@ -76,7 +78,7 @@ class LocationData(object):
         setattr(self, tm, None)
         if t:
             t.cancel()
-
+            
 class Location(object):
 
     def __init__(self):
@@ -93,7 +95,7 @@ class Location(object):
             caller.user_data.tm_orientation = \
                 callLater(12.0, self.orientation_timer, caller)
 
-        log.debug('%s enter: %s', self.__class__.__name__, caller)
+        log.debug('%s enter: %s', caller, self.__class__.__name__)
         
         self.callers.append(caller)
 
@@ -108,7 +110,7 @@ class Location(object):
                 
         self.callers.remove(caller)
 
-        log.debug('%s left: %s', self.__class__.__name__, caller)
+        log.debug('%s left: %s', caller, self.__class__.__name__)
 
         d = caller.user_data
         caller.user_data = None
@@ -145,9 +147,6 @@ class Location(object):
     def move_timer(self, caller):
         caller.user_data.tm_move = None
         self.generic_invalid(caller)
-
-    def starhash(self, caller, key):
-        pass
 
     def starhash_invalid(self, caller):
         self.generic_invalid(caller)
@@ -207,14 +206,14 @@ class Location(object):
         elif data.tm_starhash:
             if dtmf == '#':
                 data.cancel('tm_starhash')
-                self.starhash(caller, bf_starhash)
+                self.starhash(caller, data.bf_starhash)
             elif dtmf == '*':
                 data.cancel('tm_starhash')
                 self.starhash_invalid(caller)
             else:
                 data.cancel('tm_starhash')
                 # inter digit timer for direct access
-                data.tm_starhash = callLater(2.0, self.starhash_timer)
+                data.tm_starhash = callLater(3.0, self.starhash_timer)
                 data.bf_starhash = data.bf_starhash + dtmf
 
             return True
@@ -257,6 +256,10 @@ class Room(Location):
         if hasattr(self, 'background'):
             caller.discard(P_Background, P_Normal)
 
+    def starhash(self, caller, key):
+        log.debug('%s starhash: %s', caller, key)
+        caller.startDialog(mail.MailDialog(key))
+
     def DTMF(self, caller, dtmf):
         if super(Room, self).DTMF(caller, dtmf):
             return True
@@ -279,7 +282,7 @@ class Room(Location):
             log.info('talk %s (%d): status %s',  user_data, tid, status)
             for c in self.callers:
                 if c != caller:
-                    c.enqueue(Play(P_Discard, str(caller) + '.wav',
+                    c.enqueue(Play(P_Discard, user_data,
                               prefix='talk'))
         
 class ConferenceRoom(Location):

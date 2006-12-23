@@ -810,9 +810,9 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 		{
 			m_interface->begin() << V3_OK << ' ' << m_clientSpec->m_id.c_str() 
 				<< " LSTN " << getName()
-				<< " '" << m_local.getAddress() << "' '"
-				<< m_configuration->getNumber() << "' '"
-				<< m_remote.getAddress() << "' "
+				<< ' ' << m_local.getAddress() << ' '
+				<< m_configuration->getNumber() << ' '
+				<< m_remote.getAddress() << ' '
 				<< server->getTimeslot().ts << end();
 		}
 	}

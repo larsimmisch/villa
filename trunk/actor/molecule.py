@@ -8,6 +8,10 @@ def set_root(root):
     global _root
     _root = root
 
+def get_root():
+    global _root
+    return _root
+
 class Atom(object):
     def __init__(self):
         """notify should be 'none', 'begin', 'end' or 'both'"""

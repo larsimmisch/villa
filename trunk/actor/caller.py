@@ -1,4 +1,5 @@
 #!/usr/bin/env caller
+import os
 import logging
 import sequencer
 
@@ -34,8 +35,8 @@ class Caller(object):
         self.sequencer = sequencer
         self.db = None
         self.dialog = None
+        self.details = None
         self.is_disconnected = False
-        self.send(self, 'LSTN %s %s' % (trunk, spec))
 
     def __repr__(self):
         if not self.device:
@@ -64,7 +65,11 @@ class Caller(object):
                                        kwargs.get('tid_data', None))
 
     def startDialog(self, dialog):
+        '''This is the equivalent of a modal dialog. It stops when the
+        dialog returns a value (not None) from DTMF or MLCA'''
         self.dialog = dialog
+        if not dialog.start(self):
+            self.dialog = None
         
     def LSTN(self, event, user_data):
         self.is_disconnected = False
@@ -80,6 +85,9 @@ class Caller(object):
             self.world.enter(self)
         
     def MLCA(self, event, user_data):
+        if self.dialog and hasattr(self.dialog, 'MLCA'):
+            if self.dialog.MLCA(self, event, user_data):
+                self.dialog = None
         if self.location and hasattr(self.location, 'MLCA'):
             self.location.MLCA(self, event, user_data)
 

@@ -75,6 +75,9 @@ class Sequencer(LineReceiver):
         if self.start:
             self.start(self)
 
+    def DISC(self, event, user_data):
+        pass
+    
     def send(self, sender, command, tid_data = None):
         # perform next transaction/command
         tid = self.transactions.create(sender, tid_data)
@@ -107,6 +110,8 @@ class Sequencer(LineReceiver):
         data = None
         
         tr = line.split(' ')
+        if not tr:
+            return
         # check if unsolicited event
         try:
             status = int(tr[0])
@@ -156,8 +161,12 @@ class Sequencer(LineReceiver):
                 log.error('Receiver %s does not implement: %s',
                           receiver, action)
                 return
-                
-            m(event)
+            try:
+                m(event)
+            except:
+                log.error('error in event handler', exc_info=1)
+                self.send(self, 'DISC %s' % device)
+                receiver.disconnected()
         else:
             receiver, user_data = self.transactions.remove(tid)
             event['tid'] = tid
@@ -170,7 +179,12 @@ class Sequencer(LineReceiver):
             if status >= 600:
                 log.error('Fatal sequencer error: %s', line)
             else:
-                m(event, user_data)
+                try:
+                    m(event, user_data)
+                except:
+                    log.error('error in handler', exc_info=1)
+                    self.send(self, 'DISC %s' % device)
+                    receiver.disconnected()
                                         
     def lineReceived(self, line):
         if not self.initialized:

@@ -1,4 +1,4 @@
 :start
-release\sequencer -l n:\actor\logfiles\lie\sequence.log
+release\sequencer -l sequence.log
 sleep 5
 goto start
