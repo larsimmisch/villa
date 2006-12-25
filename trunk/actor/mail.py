@@ -23,8 +23,15 @@ class Message(object):
 
     @classmethod
     def read(cls, f, id):
-        '''Read a message line from the vbox file. Pickling would have been
-        easier, but I like human readable files.'''
+        """Read a message line from the vbox file. Pickling would have been
+        easier, but I like human readable files.
+
+        Each message is a single line with:
+        sent(seconds since the epoch), sender, read(seconds since the epoch)
+        delimited by a single space.
+
+        sender and read may be 'None'.
+        """
 
         l = f.readline()
         if not l:
