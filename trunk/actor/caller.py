@@ -2,6 +2,7 @@
 import os
 import logging
 import sequencer
+from mail import *
 
 log = logging.getLogger('caller')
 
@@ -36,6 +37,7 @@ class Caller(object):
         self.db = None
         self.dialog = None
         self.details = None
+        self.mailbox = None
         self.is_disconnected = False
 
     def __repr__(self):
@@ -76,6 +78,8 @@ class Caller(object):
         self.device = event['device']
         d = event['data']
         self.details = CallDetails(d[0], d[2])
+        self.mailbox = Mailbox(self.details.calling)
+        self.mailbox.read()
         log.debug('Connect request: %s %s', self.device, self.details)
         self.send(self, 'ACPT %s' % self.device)
     
