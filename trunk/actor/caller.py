@@ -8,8 +8,8 @@ log = logging.getLogger('caller')
 
 class CallDetails(object):
     def __init__(self, called, calling):
-        self.called = called
-        self.calling = calling
+        self.called = called.strip("'")
+        self.calling = calling.strip("'")
 
     def __repr__(self):
         return 'called: %s, calling: %s' % (self.called, self.calling)
