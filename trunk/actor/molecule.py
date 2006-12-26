@@ -152,8 +152,9 @@ mode_dtmf_stop = 0x40
 # priority definitions
 pr_background = 0
 pr_normal = 1
-pr_transition = 2
-pr_urgent = 3
+pr_mail = 2
+pr_transition = 3
+pr_urgent = 4
 
 class Policy(object):
     def __init__(self, channel, priority, mode):
@@ -165,7 +166,7 @@ class Policy(object):
 P_Background = Policy(0, pr_background, mode_mute|mode_loop)
 P_Normal = Policy(0, pr_normal, mode_mute)
 P_Discard = Policy(0, pr_normal, mode_discard|mode_dtmf_stop)
-P_Mail = Policy(1, pr_normal, mode_discard|mode_dtmf_stop)
+P_Mail = Policy(0, pr_mail, mode_discard|mode_dtmf_stop)
 P_Transition = Policy(0, pr_transition, mode_dont_interrupt)
 P_Urgent = Policy(0, pr_urgent, mode_dont_interrupt)
 
