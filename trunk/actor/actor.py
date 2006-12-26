@@ -7,6 +7,7 @@ import sequencer
 import sequencer
 from location import *
 from molecule import *
+from mail import *
 from caller import Caller, DBData
 from twisted.enterprise import adbapi
 
@@ -87,6 +88,34 @@ class C_Office(Room):
     background = Play(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
+
+    def DTMF(self, caller, dtmf):
+        if super(C_Office, self).DTMF(caller, dtmf):
+            return True
+        
+        data = caller.user_data
+
+        if caller.mailbox is None:
+            caller.enqueue(Play(P_Discard,
+                                'duhastkeinepost.wav', prefix='lars'))
+            return True
+
+        if dtmf == '1':
+            m = caller.mailbox.previous()
+        elif dtmf == '2':
+            m = caller.mailbox.previous()
+        elif dtmf == '3':
+            m = caller.mailbox.next()
+
+        mol = Molecule(P_Discard)
+        mol.append(m.as_play_atom())
+        mol.append(PlayAtom('von.wav', prefix='lars'))
+        for c in m.sender:
+            m.append(PlayAtom('%s.wav' % c, prefix='lars'))
+            
+        mol.append(m.date_as_atom())
+                   
+        caller.enqueue(mol)
 
 class C_SW(Room):
     prefix = 'c_sw'

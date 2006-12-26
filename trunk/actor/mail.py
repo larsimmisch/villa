@@ -1,4 +1,7 @@
+#!/usr/bin/env python
+
 import time
+import datetime
 import logging
 import os
 import time
@@ -67,6 +70,23 @@ class Message(object):
         return RecordAtom('%d_%s.wav' % (self.sent, self.sender), 60,
                         prefix=mailbox_path(self.id))
 
+    def date_as_atom(msg):
+        d = datetime.date(time.time()) - datetime.date(self.sent)
+
+        s = ''
+        if d.days == 0:
+            s = 'heute'
+        elif d.days == 1:
+            s = 'gestern'
+        elif d.days == 2:
+            s = 'vorgestern'
+        elif d.days == 3:
+            s = 'vordreitagen'
+        else:
+            s = 'vornerhalbenewigkeit'
+
+        return PlayAtom('%s.wav', prefix='lars')
+
     def __cmp__(self, other):
         '''Sort by sent time.'''
         return self.sent.__cmp__(other.sent)
@@ -76,7 +96,7 @@ class Mailbox(object):
 
     def __init__(self, id):
         self.id = id
-        self.icurrent = 0
+        self.icurrent = None
         self.messages = []
 
     def read(self):
@@ -125,6 +145,9 @@ class Mailbox(object):
         if not self.messages:
             return None
 
+        if self.icurrent is None:
+            self.icurrent = 0
+
         return self.messages[self.icurrent]
 
     def next(self):
@@ -134,9 +157,12 @@ class Mailbox(object):
         if not self.messages:
             return None
 
-        self.icurrent = self.icurrent + 1
-        if self.icurrent >= len(self.messages):
+        if self.icurrent is None:
             self.icurrent = 0
+        else:
+            self.icurrent = self.icurrent + 1
+        if self.icurrent >= len(self.messages):
+            self.icurrent = None
             return None
         
         return self.messages[self.icurrent]
