@@ -70,7 +70,7 @@ class Message(object):
         return RecordAtom('%d_%s.wav' % (self.sent, self.sender), 60,
                         prefix=mailbox_path(self.id))
 
-    def date_as_atom(self, msg):
+    def date_as_atom(self):
         d = datetime.date.fromtimestamp(time.time()) - datetime.date.fromtimestamp(self.sent)
 
         s = ''
