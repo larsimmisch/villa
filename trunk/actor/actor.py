@@ -101,21 +101,21 @@ class C_Office(Room):
             return True
 
         if dtmf == '1':
-            m = caller.mailbox.previous()
+            msg = caller.mailbox.previous()
         elif dtmf == '2':
-            m = caller.mailbox.previous()
+            msg = caller.mailbox.current()
         elif dtmf == '3':
-            m = caller.mailbox.next()
+            msg = caller.mailbox.next()
 
-        mol = Molecule(P_Discard)
-        mol.append(m.as_play_atom())
-        mol.append(PlayAtom('von.wav', prefix='lars'))
+        m = Molecule(P_Discard)
+        m.append(msg.as_play_atom())
+        m.append(PlayAtom('von.wav', prefix='lars'))
         for c in m.sender:
             m.append(PlayAtom('%s.wav' % c, prefix='lars'))
             
-        mol.append(m.date_as_atom())
+        m.append(m.date_as_atom())
                    
-        caller.enqueue(mol)
+        caller.enqueue(m)
 
 class C_SW(Room):
     prefix = 'c_sw'
