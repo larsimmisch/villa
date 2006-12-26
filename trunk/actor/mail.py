@@ -71,7 +71,7 @@ class Message(object):
                         prefix=mailbox_path(self.id))
 
     def date_as_atom(msg):
-        d = datetime.date(time.time()) - datetime.date(self.sent)
+        d = datetime.date.fromtimestamp(time.time()) - datetime.date.fromtimestamp(self.sent)
 
         s = ''
         if d.days == 0:
