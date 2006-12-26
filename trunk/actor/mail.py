@@ -210,7 +210,8 @@ class MailDialog(object):
             for c in self.caller.world.callers.itervalues():
                 if c.details.calling == self.rcpt:
                     is_online = True
-                    log.debug('%s delivering immediately %s', c, self.name)
+                    log.debug('%s delivering immediately %s', c,
+                              self.message.sender)
                     m = Molecule(P_Mail)
                     m.append(PlayAtom('duhastpost.wav', prefix='lars'))
                     m.append(self.message.as_play_atom())
