@@ -51,6 +51,8 @@ class Message(object):
             sender = None
         t_sent = int(t_sent)
 
+        sender.strip()
+
         m = cls.__new__(cls)
         m.__init__(id, t_sent, sender, t_read)
         return m
