@@ -113,7 +113,7 @@ class C_Office(Room):
         for c in msg.sender:
             m.append(PlayAtom('%s.wav' % c, prefix='lars'))
             
-        m.append(m.date_as_atom())
+        m.append(msg.date_as_atom())
                    
         caller.enqueue(m)
 
