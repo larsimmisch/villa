@@ -60,7 +60,7 @@ class Message(object):
         f.write('%d %s %s\n' % (self.sent, self.sender, self.read))
         
     def mark_as_read(self):
-        self.read = time.time()
+        self.read = int(time.time())
 
     def as_play_atom(self):
         return PlayAtom('%d_%s.wav' % (self.sent, self.sender),
