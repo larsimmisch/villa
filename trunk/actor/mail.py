@@ -196,7 +196,7 @@ class MailDialog(object):
             m.append(PlayAtom('%s.wav' % c, prefix='lars'))
     
         m.append(BeepAtom(1))
-        m.append(m.as_record_atom())
+        m.append(self.message.as_record_atom())
         self.tid = caller.enqueue(m)
 
         return self.tid
