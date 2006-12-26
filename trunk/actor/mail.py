@@ -87,7 +87,7 @@ class Message(object):
         else:
             s = 'vornerhalbenewigkeit'
 
-        return PlayAtom('%s.wav', prefix='lars')
+        return PlayAtom('%s.wav' % s, prefix='lars')
 
     def __cmp__(self, other):
         '''Sort by sent time.'''
