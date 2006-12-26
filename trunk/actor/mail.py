@@ -189,7 +189,7 @@ class MailDialog(object):
             log.debug('%s creating dirs %s', caller, path)
             os.makedirs(path)
 
-        m = Molecule(P_Normal)
+        m = Molecule(P_Discard)
         m.append(PlayAtom('postfuer.wav', prefix='lars'))
         # No names yet, just numerical ids
         for c in self.rcpt:
@@ -229,7 +229,7 @@ class MailDialog(object):
 
         return False
 
-    def DTMF(self, event):
+    def DTMF(self, caller, dtmf):
         return False
 
 if __name__ == '__main__':
