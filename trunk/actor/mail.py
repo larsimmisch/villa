@@ -189,7 +189,7 @@ class MailDialog(object):
             log.debug('%s creating dirs %s', caller, path)
             os.makedirs(path)
 
-        m = Molecule(P_Discard)
+        m = Molecule(P_Mail)
         m.append(PlayAtom('postfuer.wav', prefix='lars'))
         # No names yet, just numerical ids
         for c in self.rcpt:
@@ -211,7 +211,7 @@ class MailDialog(object):
                 if c.details.calling == self.rcpt:
                     is_online = True
                     log.debug('%s delivering immediately %s', c, self.name)
-                    m = Molecule(P_Normal)
+                    m = Molecule(P_Mail)
                     m.append(PlayAtom('duhastpost.wav', prefix='lars'))
                     m.append(self.message.as_play_atom())
                     c.enqueue(m)
