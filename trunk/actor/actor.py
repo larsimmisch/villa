@@ -110,6 +110,7 @@ class C_Office(Room):
         m = Molecule(P_Discard)
         m.append(msg.as_play_atom())
         m.append(PlayAtom('von.wav', prefix='lars'))
+        log.debug('mail from %s', msg.sender)
         for c in msg.sender:
             m.append(PlayAtom('%s.wav' % c, prefix='lars'))
             
