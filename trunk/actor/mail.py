@@ -167,6 +167,22 @@ class Mailbox(object):
         
         return self.messages[self.icurrent]
         
+    def previous(self):
+        '''Decrement to the next message and return it.
+        If it was the first message, return None.'''
+        if not self.messages:
+            return None
+
+        if self.icurrent is None:
+            self.icurrent = len(self.messages)-1
+        else:
+            self.icurrent = self.icurrent -1
+        if self.icurrent ==  0:
+            self.icurrent = None
+            return None
+        
+        return self.messages[self.icurrent]
+        
 class MailDialog(object):
 
     def __init__(self, rcpt):
