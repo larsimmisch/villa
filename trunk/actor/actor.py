@@ -89,9 +89,8 @@ class C_Office(Room):
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
-    def DTMF(self, caller, dtmf):
-        if super(C_Office, self).DTMF(caller, dtmf):
-            return True
+    def browse(self, caller, dtmf):
+        '''Browse through the messages'''
         
         data = caller.user_data
 
@@ -99,7 +98,7 @@ class C_Office(Room):
             caller.enqueue(Play(P_Discard,
                                 'duhastkeinepost.wav', prefix='lars'))
             return True
-
+        
         if dtmf == '1':
             msg = caller.mailbox.previous()
         elif dtmf == '2':
@@ -107,16 +106,26 @@ class C_Office(Room):
         elif dtmf == '3':
             msg = caller.mailbox.next()
 
-        m = Molecule(P_Discard)
-        m.append(msg.as_play_atom())
-        m.append(PlayAtom('von.wav', prefix='lars'))
-        log.debug('mail from %s', msg.sender)
-        for c in msg.sender:
-            m.append(PlayAtom('%s.wav' % c, prefix='lars'))
-            
-        m.append(msg.date_as_atom())
-                   
-        caller.enqueue(m)
+        if msg:
+            caller.mailbox.play_current(caller)
+        else:
+            # wraparound, most likely. Beep for now.
+            self.generic_invalid(caller)
+
+        return True
+
+    def DTMF(self, caller, dtmf):
+        if super(C_Office, self).DTMF(caller, dtmf):
+            return True
+
+        if dtmf in ['1', '2', '3']:
+            return self.browse(caller, dtmf)
+
+        if dtmf == '8':
+            msg = caller.mailbox.current()
+            if message is None:
+                self.generic_invalid(caller)
+
 
 class C_SW(Room):
     prefix = 'c_sw'

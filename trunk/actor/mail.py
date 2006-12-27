@@ -9,8 +9,13 @@ from molecule import *
 
 log = logging.getLogger('mail')
 
-def mailbox_path(id):
-    return os.path.join(get_root(), 'user', id)
+def mailbox_path(id, create = False):
+    p = os.path.join(get_root(), 'user', id)
+
+    if create and not os.path.exists(p):
+        os.makedirs(p)
+
+    return p
 
 def mailbox_name(id):
     return os.path.join(get_root(), 'user', id, 'vbox')
@@ -18,22 +23,25 @@ def mailbox_name(id):
 class Message(object):
     '''A voicemail message'''
     
-    def __init__(self, id, sent, sender, read = None):
-        self.id = id
-        self.sender = sender
-        self.sent = sent
+    def __init__(self, to, from_, sent = None, read = None):
+        self.to = to
+        self.from_ = from_
+        if sent is None:
+            self.sent = int(time.time())
+        else:
+            self.sent = sent
         self.read = read
 
     @classmethod
-    def read(cls, f, id):
+    def read(cls, f, to):
         """Read a message line from the vbox file. Pickling would have been
         easier, but I like human readable files.
 
         Each message is a single line with:
-        sent(seconds since the epoch), sender, read(seconds since the epoch)
+        sent(seconds since the epoch), from, read(seconds since the epoch)
         delimited by a single space.
 
-        sender and read may be 'None'.
+        from and read may be 'None'.
         """
 
         l = f.readline()
@@ -41,39 +49,84 @@ class Message(object):
             return None
 
         # strip l before splitting
-        t_sent, sender, t_read = l.strip().split(' ')
+        t_sent, from_, t_read = l.strip().split(' ')
         
         if t_read == 'None':
             t_read = None
         else:
             t_read = int(t_read);
-        if sender == 'None':
-            sender = None
         t_sent = int(t_sent)
 
-        sender.strip()
+        from_.strip()
+        if from_ == 'None':
+            from_ = None
 
         m = cls.__new__(cls)
-        m.__init__(id, t_sent, sender, t_read)
+        m.__init__(to, from_, t_sent, t_read)
         return m
 
     def write(self, f):
         '''Write a message line to the vbox file.'''
-        f.write('%d %s %s\n' % (self.sent, self.sender, self.read))
+        f.write('%d %s %s\n' % (self.sent, self.from_, self.read))
+
+    def record(self, caller):
+        '''Record a message. Return the tid.'''
         
+        log.debug('%s recording mail for %s: %d', caller, self.to, self.sent)
+
+        # check if path exists and create if necessary
+        path = mailbox_path(self.to, True)
+
+        m = Molecule(P_Mail)
+        m.append(PlayAtom('postfuer.wav', prefix='lars'))
+        # No names yet, just numerical ids
+        for c in self.to:
+            m.append(PlayAtom('%s.wav' % c, prefix='lars'))
+    
+        m.append(BeepAtom(1))
+        m.append(self.as_record_atom())
+        
+        return caller.enqueue(m)
+
+    def play(self, caller):
+        '''Play a message. Return the tid.'''
+
+        log.debug('%s delivering mail from %s: %d', caller, self.from_,
+                  self.sent)
+
+        self.mark_as_read()
+
+        m = Molecule(P_Mail)
+        m.append(self.as_play_atom())
+        m.append(PlayAtom('von.wav', prefix='lars'))
+        if self.from_:
+            for c in self.from_:
+                m.append(PlayAtom('%s.wav' % c, prefix='lars'))
+            
+        m.append(self.date_as_atom())
+
+        return caller.enqueue(m)
+
     def mark_as_read(self):
         self.read = int(time.time())
 
-    def as_play_atom(self):
-        return PlayAtom('%d_%s.wav' % (self.sent, self.sender),
-                        prefix=mailbox_path(self.id))
+    def file_exists(self):
+        return os.path.exists(os.path.join(mailbox_path(self.to),
+                                           self.filename()))
+
+    def filename(self):
+        '''Return the filename (not the full path)'''
+        return '%d_%s.wav' % (self.sent, self.from_)
+    
+    def as_play_atom(self):    
+        return PlayAtom(self.filename(), prefix=mailbox_path(self.to))
 
     def as_record_atom(self):
-        return RecordAtom('%d_%s.wav' % (self.sent, self.sender), 60,
-                        prefix=mailbox_path(self.id))
+        return RecordAtom(self.filename, 60, prefix=mailbox_path(self.to))
 
     def date_as_atom(self):
-        d = datetime.date.fromtimestamp(time.time()) - datetime.date.fromtimestamp(self.sent)
+        d = datetime.date.fromtimestamp(time.time()) - \
+            datetime.date.fromtimestamp(self.sent)
 
         s = ''
         if d.days == 0:
@@ -96,14 +149,14 @@ class Message(object):
 class Mailbox(object):
     '''A mailbox'''
 
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, to):
+        self.to = to
         self.icurrent = None
         self.messages = []
 
     def read(self):
         '''Read a Mailbox'''
-        name = mailbox_name(self.id)
+        name = mailbox_name(self.to)
         if not os.path.exists(name):
             return
         
@@ -111,10 +164,10 @@ class Mailbox(object):
 
         self.messages = []
         
-        m = Message.read(f, self.id)
+        m = Message.read(f, self.to)
         while m:
             self.messages.append(m)
-            m = Message.read(f, self.id)
+            m = Message.read(f, self.to)
             
         self.messages.sort()
         f.close()
@@ -123,17 +176,15 @@ class Mailbox(object):
         '''Write a mailbox to disk'''
 
         # Create directories if needed
-        p = mailbox_path(self.id)
-        if not os.path.exists(p):
-            os.makedirs(p)
+        mailbox_path(self.to, True)
 
-        f = open(mailbox_name(self.id), 'w')
+        f = open(mailbox_name(self.to), 'w')
         for m in self.messages:
             m.write(f)
         f.close()
 
     def add(self, message):
-        '''Add a message to the mailbox'''
+        '''Add a message to the mailbox.'''
         self.messages.append(message)
         self.messages.sort()
 
@@ -142,6 +193,23 @@ class Mailbox(object):
 
         return message
 
+    def play_current(self, caller):
+        '''Play the current message. Delete the message if it does not exist.
+        Return tid if mesage exists.'''
+
+        if not self.icurrent:
+            return None
+        
+        m = self.messages[self.icurrent]
+        while m and not m.file_exists():
+            del self.messages[self.icurrent]
+            m = self.current()
+
+        if not m:
+            return None
+
+        return m.play(caller)
+    
     def current(self):
         '''Return the current message if there is any.'''
         if not self.messages:
@@ -187,36 +255,17 @@ class Mailbox(object):
         
 class MailDialog(object):
 
-    def __init__(self, rcpt):
-        self.rcpt = rcpt
+    def __init__(self, to):
+        self.to = to
         self.caller = None
         self.tid = None
         self.message = None
 
     def start(self, caller):
         self.caller = caller
-
-        t = int(time.time())
-        self.message = Message(self.rcpt, t, caller.details.calling)
-
-        log.debug('%s recording mail for %s: %d', caller, self.rcpt, t)
-
-        # check if path exists and create if necessary
-        path = mailbox_path(self.rcpt)
-        if not os.path.exists(path):
-            log.debug('%s creating dirs %s', caller, path)
-            os.makedirs(path)
-
-        m = Molecule(P_Mail)
-        m.append(PlayAtom('postfuer.wav', prefix='lars'))
-        # No names yet, just numerical ids
-        for c in self.rcpt:
-            m.append(PlayAtom('%s.wav' % c, prefix='lars'))
-    
-        m.append(BeepAtom(1))
-        m.append(self.message.as_record_atom())
-        self.tid = caller.enqueue(m)
-
+        self.message = Message(self.to, caller.details.calling)
+        self.tid = self.message.record(caller)
+        
         return self.tid
 
     def MLCA(self, caller, event, user_data):
@@ -226,23 +275,20 @@ class MailDialog(object):
             self.tid = None
             # if the caller is online, deliver immediately
             for c in self.caller.world.callers.itervalues():
-                if c.details.calling == self.rcpt:
+                if c.details.calling == self.to:
                     is_online = True
-                    log.debug('%s delivering immediately %s', c,
-                              self.message.sender)
-                    m = Molecule(P_Mail)
-                    m.append(PlayAtom('duhastpost.wav', prefix='lars'))
-                    m.append(self.message.as_play_atom())
-                    c.enqueue(m)
-                    if c.mailbox:
-                        self.message.mark_as_read()
-                        c.mailbox.add(self.message)
+                    if c.mailbox is None:
+                        c.mailbox = Mailbox(self.to)
+
+                    c.mailbox.add(self.message)
+                    self.message.play(c)
+                    break
 
             # Save the message if the caller wasn't online
             if not is_online:
-                mb = Mailbox(self.rcpt)
+                mb = Mailbox(self.to)
                 mb.add(self.message)
-
+                
             # we're done
             return True
 
@@ -264,9 +310,7 @@ if __name__ == '__main__':
         def testARead(self):
             'Test reading a mailbox file'
 
-            p = mailbox_path('42')
-            if not os.path.exists(p):
-                os.makedirs(p)
+            p = mailbox_path('42', True)
 
             f = open(mailbox_name('42'), 'w')
             t = int(time.time())
@@ -277,10 +321,10 @@ if __name__ == '__main__':
             mb = Mailbox('42')
             mb.read()
 
-            self.failUnless(mb.messages[0].sender == '23')
+            self.failUnless(mb.messages[0].from_ == '23')
             self.failUnless(mb.messages[0].sent == t)
             self.failUnless(mb.messages[0].read == None)
-            self.failUnless(mb.messages[1].sender == '24')
+            self.failUnless(mb.messages[1].from_ == '24')
             self.failUnless(mb.messages[1].sent == t + 1)
             self.failUnless(mb.messages[1].read == None)
 
@@ -290,9 +334,9 @@ if __name__ == '__main__':
             t = int(time.time())
 
             mb = Mailbox('42')
-            mb.add(Message('42', t, '23'))
+            mb.add(Message('42', '23', t))
 
-            self.failUnless(mb.messages[0].sender == '23')
+            self.failUnless(mb.messages[0].from_ == '23')
             self.failUnless(mb.messages[0].sent == t)
             self.failUnless(mb.messages[0].read == None)
 
@@ -302,15 +346,15 @@ if __name__ == '__main__':
             t = int(time.time())
 
             mb = Mailbox('42')
-            mb.add(Message('42', t, '23'))
-            mb.add(Message('42', t+1, '24'))
+            mb.add(Message('42', '23', t))
+            mb.add(Message('42', '24', t+1))
 
             mb.read()
 
-            self.failUnless(mb.messages[0].sender == '23')
+            self.failUnless(mb.messages[0].from_ == '23')
             self.failUnless(mb.messages[0].sent == t)
             self.failUnless(mb.messages[0].read == None)
-            self.failUnless(mb.messages[1].sender == '24')
+            self.failUnless(mb.messages[1].from_ == '24')
             self.failUnless(mb.messages[1].sent == t + 1)
             self.failUnless(mb.messages[1].read == None)
 
@@ -320,11 +364,11 @@ if __name__ == '__main__':
             t = int(time.time())
 
             mb = Mailbox('42')
-            mb.add(Message('42', t, '23'))
+            mb.add(Message('42', '23', t))
 
             m = mb.current()
 
-            self.failUnless(m.sender == '23')
+            self.failUnless(m.from_ == '23')
             self.failUnless(m.sent == t)
             self.failUnless(m.read == None)
              
@@ -334,7 +378,7 @@ if __name__ == '__main__':
             t = int(time.time())
 
             mb = Mailbox('42')
-            mb.add(Message('42', t, '23'))
+            mb.add(Message('42', '23', t))
 
             m = mb.current()
             m = mb.next()
@@ -347,7 +391,7 @@ if __name__ == '__main__':
             t = int(time.time())
 
             mb = Mailbox('42')
-            mb.add(Message('42', t, '23'))
+            mb.add(Message('42', '23', t))
 
             m = mb.current()
             m = mb.next()
@@ -356,21 +400,28 @@ if __name__ == '__main__':
 
             m = mb.current()
 
-            self.failUnless(m.sender == '23')
+            self.failUnless(m.from_ == '23')
             self.failUnless(m.sent == t)
             self.failUnless(m.read == None)
 
         def testHMessageMolecule(self):
             'Test that the message can output itself as a play atom'
 
-            t = int(time.time())
-
-            m = Message('42', t, '23')
+            m = Message('42', '23')
             s = m.as_play_atom().as_command()
 
-            n = os.path.join(mailbox_path('42'), '%d_23.wav' % t)
+            n = os.path.join(mailbox_path('42'), m.filename())
             
             self.failUnless(s == ('play %s none' % n))
+
+        def testIMessageExists(self):
+            'Test file_exists'
+
+            m = Message('42', '23')
+            f = open(os.path.join(mailbox_path('42'), m.filename()), 'w')
+            f.close()
+            
+            self.failUnless(m.file_exists())
 
     unittest.main()
     
