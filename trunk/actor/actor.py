@@ -83,16 +83,50 @@ class C_NW(Room):
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
-class C_Office(Room):
-    prefix = 'c_office'
+class C_NE(Room):
+    prefix = 'c_ne'
     background = Play(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
+
+class C_SW(Room):
+    prefix = 'c_sw'
+    background = Play(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav',
+                      prefix=prefix)
+    orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
+
+class C_SE(Room):
+    prefix = 'c_se'
+    background = Play(P_Background,
+                      'marcoraaphorst_-_Blowing_Snow.wav',
+                      prefix=prefix)
+    orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
+
+class C_Office(Room):
+    prefix = 'c_office'
+    background = Play(P_Background, 'gong.wav',
+                      prefix=prefix)
+    orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
+    help = Play(P_Discard, 'help.wav', prefix=prefix)
 
     def enter(self, caller):
         super(C_Office, self).enter(caller)
         if caller.mailbox:
             caller.mailbox.reset()
+
+        if caller.mailbox and caller.mailbox.messages:
+            count = len(caller.mailbox.messages)
+            if count = 1:
+                caller.enqueue(Play(P_Normal, 'duhasteinenachricht.wav',
+                                    prefix='lars'))
+            elif count in range(2, 9):
+                caller.enqueue(Play(P_Normal, 'duhast.wav',
+                                    '%d.wav' % (count), 'nachrichten.wav',
+                                    prefix='lars'))
+            else:
+                caller.enqueue(Play(P_Normal, 'duhast.wav',
+                                    'many.wav', 'nachrichten.wav',
+                                    prefix='lars'))
 
     def browse(self, caller, dtmf):
         '''Browse through the messages'''
@@ -139,19 +173,6 @@ class C_Office(Room):
             else:
                 self.generic_invalid(caller)
                 
-class C_SW(Room):
-    prefix = 'c_sw'
-    background = Play(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav',
-                      prefix=prefix)
-    orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
-
-class C_SE(Room):
-    prefix = 'c_se'
-    background = Play(P_Background,
-                      'marcoraaphorst_-_Blowing_Snow.wav',
-                      prefix=prefix)
-    orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
-
 class C_Saal1(ConferenceRoom):
     prefix = 'c_saal1'
     background = UDP(P_Background, 10001)
@@ -304,8 +325,9 @@ class World(object):
 
         self.c_se = C_SE()
         self.c_nw = C_NW()
-        self.c_ne = C_Office()
+        self.c_ne = C_NE()
         self.c_sw = C_SW()
+        self.c_office = C_Office()
         self.c_saal1 = C_Saal1(seq)
         
         self.entry = self.b_se
@@ -337,6 +359,7 @@ class World(object):
         connect(self.c_sw, self.c_saal1, Door(), 'northeast')
         connect(self.c_nw, self.c_saal1, Door(), 'southeast')
         connect(self.c_ne, self.c_saal1, Door(), 'southwest')
+        connect(self.c_sw, self.c_office, Door(), 'west')
 
         # Stairs
         connect(self.b_ne, self.a_hackcenter, Stairs(),
