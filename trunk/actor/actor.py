@@ -114,9 +114,12 @@ class C_Office(Room):
         if caller.mailbox:
             caller.mailbox.reset()
 
-        if caller.mailbox and caller.mailbox.messages:
+        if caller.mailbox:
             count = len(caller.mailbox.messages)
-            if count = 1:
+            if count == 0:
+                caller.enqueue(Play(P_Normal, 'duhastkeinepost.wav',
+                                    prefix='lars'))
+            elif count == 1:
                 caller.enqueue(Play(P_Normal, 'duhasteinenachricht.wav',
                                     prefix='lars'))
             elif count in range(2, 9):
