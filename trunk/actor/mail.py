@@ -203,7 +203,7 @@ class Mailbox(object):
 
     def play_current(self, caller):
         '''Play the current message. Delete the message if it does not exist.
-        Return tid of the play job if message exists.'''
+        Return tid of the playing of the first existing message.'''
 
         if not self.messages or self.icurrent is None:
             log.warning('%s no messages or no current message', caller)
@@ -228,7 +228,12 @@ class Mailbox(object):
         return tid
 
     def delete_current(self, caller):
-        '''Delete the current message.'''
+        '''Delete the current message.
+
+        There is a known race condition: If a playing message is deleted,
+        the file may be in use while we try to remove it. This will leak files,
+        but we ignore it for now.
+        '''
 
         if self.icurrent is None:
             return None
