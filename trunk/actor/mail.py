@@ -70,7 +70,8 @@ class Message(object):
         f.write('%d %s %s\n' % (self.sent, self.from_, self.read))
 
     def record(self, caller):
-        '''Record a message. Return the tid.'''
+        '''Record a message. Return the tid.
+        Use MailDialog.start() unless you know what you are doing.'''
         
         log.debug('%s recording mail for %s: %d', caller, self.to, self.sent)
 
@@ -88,8 +89,9 @@ class Message(object):
         
         return caller.enqueue(m)
 
-    def play(self, caller):
-        '''Play a message. Return the tid.'''
+    def play(self, caller, announce = False):
+        '''Play a message and return the tid.
+        Use Mailbox.play_current() unless you know what you are doing.'''
 
         log.debug('%s delivering mail from %s: %d', caller, self.from_,
                   self.sent)
@@ -97,6 +99,9 @@ class Message(object):
         self.mark_as_read()
 
         m = Molecule(P_Mail)
+        if announce:
+            m.append(PlayAtom('duhastpost.wav', prefix='lars'))
+            
         m.append(self.as_play_atom())
         m.append(PlayAtom('von.wav', prefix='lars'))
         if self.from_:
@@ -110,19 +115,22 @@ class Message(object):
     def mark_as_read(self):
         self.read = int(time.time())
 
-    def file_exists(self):
-        return os.path.exists(os.path.join(mailbox_path(self.to),
-                                           self.filename()))
-
+    def pathname(self):
+        '''Return the path to the message file.'''
+        return os.path.join(mailbox_path(self.to), self.filename())
+    
     def filename(self):
         '''Return the filename (not the full path)'''
         return '%d_%s.wav' % (self.sent, self.from_)
-    
+
+    def file_exists(self):
+        return os.path.exists(self.pathname())
+
     def as_play_atom(self):    
-        return PlayAtom(self.filename(), prefix=mailbox_path(self.to))
+        return PlayAtom(self.pathname())
 
     def as_record_atom(self):
-        return RecordAtom(self.filename, 60, prefix=mailbox_path(self.to))
+        return RecordAtom(self.pathname(), 60)
 
     def date_as_atom(self):
         d = datetime.date.fromtimestamp(time.time()) - \
@@ -144,7 +152,7 @@ class Message(object):
 
     def __cmp__(self, other):
         '''Sort by sent time.'''
-        return self.sent.__cmp__(other.sent)
+        return other.sent - self.sent
 
 class Mailbox(object):
     '''A mailbox'''
@@ -195,20 +203,53 @@ class Mailbox(object):
 
     def play_current(self, caller):
         '''Play the current message. Delete the message if it does not exist.
-        Return tid if mesage exists.'''
+        Return tid of the play job if message exists.'''
 
-        if not self.icurrent:
+        if not self.messages or self.icurrent is None:
+            log.warning('%s no messages or no current message', caller)
             return None
         
         m = self.messages[self.icurrent]
         while m and not m.file_exists():
+            log.warning('%s message file %s does not exit', caller,
+                        m.filename())
             del self.messages[self.icurrent]
             m = self.current()
 
         if not m:
+            log.warning('%s no message left', caller)
             return None
 
-        return m.play(caller)
+        tid = m.play(caller)
+
+        # message was marked as read. Flush mailbox.
+        self.write()
+
+        return tid
+
+    def delete_current(self, caller):
+        '''Delete the current message.'''
+
+        if self.icurrent is None:
+            return None
+
+        m = self.messages[self.icurrent]        
+        log.debug('Deleting message %d %s', self.icurrent, m.filename())
+
+        del self.messages[self.icurrent]
+
+        # write to disk immediately
+        self.write()
+        
+        try:
+            os.remove(m.pathname())
+        except:
+            log.error('Error removing message %s', m.filename(), exc_info=1)
+
+        return m
+
+    def reset(self):
+        self.icurrent = None
     
     def current(self):
         '''Return the current message if there is any.'''
@@ -281,7 +322,8 @@ class MailDialog(object):
                         c.mailbox = Mailbox(self.to)
 
                     c.mailbox.add(self.message)
-                    self.message.play(c)
+                    # play with announcement
+                    self.message.play(c, True)
                     break
 
             # Save the message if the caller wasn't online

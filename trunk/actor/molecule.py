@@ -167,7 +167,7 @@ P_Background = Policy(0, pr_background, mode_mute|mode_loop)
 P_Normal = Policy(0, pr_normal, mode_mute)
 P_Discard = Policy(0, pr_normal, mode_discard|mode_dtmf_stop)
 P_Mail = Policy(0, pr_mail, mode_discard|mode_dtmf_stop)
-P_Transition = Policy(0, pr_transition, mode_dont_interrupt)
+P_Transition = Policy(0, pr_transition, mode_dont_interrupt|mode_dtmf_stop)
 P_Urgent = Policy(0, pr_urgent, mode_dont_interrupt)
 
 if __name__ == '__main__':

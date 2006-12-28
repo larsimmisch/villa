@@ -89,16 +89,19 @@ class C_Office(Room):
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
+    def enter(self, caller):
+        super(C_Office, self).enter(caller)
+        if caller.mailbox:
+            caller.mailbox.reset()
+
     def browse(self, caller, dtmf):
         '''Browse through the messages'''
         
-        data = caller.user_data
-
-        if caller.mailbox is None:
+        if caller.mailbox is None or not caller.mailbox.messages:
             caller.enqueue(Play(P_Discard,
                                 'duhastkeinepost.wav', prefix='lars'))
             return True
-        
+
         if dtmf == '1':
             msg = caller.mailbox.previous()
         elif dtmf == '2':
@@ -107,6 +110,7 @@ class C_Office(Room):
             msg = caller.mailbox.next()
 
         if msg:
+            log.debug('browsing - message: %s', msg.filename())
             caller.mailbox.play_current(caller)
         else:
             # wraparound, most likely. Beep for now.
@@ -121,12 +125,20 @@ class C_Office(Room):
         if dtmf in ['1', '2', '3']:
             return self.browse(caller, dtmf)
 
-        if dtmf == '8':
-            msg = caller.mailbox.current()
-            if message is None:
+        if dtmf == '4':
+            # reply
+            inmsg = caller.mailbox.current()
+            if inmsg is None or inmsg.from_ is None:
                 self.generic_invalid(caller)
-
-
+                return True
+            caller.startDialog(MailDialog(inmsg.from_))
+        elif dtmf == '9':
+            if caller.mailbox.delete_current(caller):
+                # Play crumpling paper sound
+                caller.enqueue(Play(P_Discard, 'crinkle.wav', prefix='lars'))
+            else:
+                self.generic_invalid(caller)
+                
 class C_SW(Room):
     prefix = 'c_sw'
     background = Play(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav',
