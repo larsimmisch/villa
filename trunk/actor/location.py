@@ -155,6 +155,17 @@ class Location(object):
         caller.user_data.tm_starhash = None
         self.generic_invalid(caller)
 
+    def starhash(self, caller, key):
+        try:
+            d = caller.world.shortcuts[key]
+        except AttributeError:
+            return False
+        except KeyError:
+            return False
+
+        self.move(caller, Teleporter(d))
+        return True
+
     def announce_others(self, caller):
         count = len(self.callers) - 1
         if count == 0:
@@ -257,8 +268,9 @@ class Room(Location):
             caller.discard(P_Background, P_Normal)
 
     def starhash(self, caller, key):
-        log.debug('%s starhash: %s', caller, key)
-        caller.startDialog(mail.MailDialog(key))
+        if not super(Room, self).starhash(caller, key):
+            log.debug('%s starhash: %s', caller, key)
+            caller.startDialog(mail.MailDialog(key))
 
     def DTMF(self, caller, dtmf):
         if super(Room, self).DTMF(caller, dtmf):
@@ -337,26 +349,24 @@ class Transition(object):
         self.m_out = m_out
         
 class Door(Transition):
-    def __init__(self):
-        self.m_in = Play(P_Transition,
-                         'RBH_Household_front_door_open.wav')
-
-        self.m_out = Play(P_Transition,
-                          'RBH_Household_front_door_close.wav')
-
-        self.m_trans = Play(P_Transition,
-                            'RBH_Household_front_door_open.wav',
-                            'RBH_Household_front_door_close.wav')
+    m_in = Play(P_Transition, 'RBH_Household_front_door_open.wav')
+    m_out = Play(P_Transition, 'RBH_Household_front_door_close.wav')
+    m_trans = Play(P_Transition,
+                   'RBH_Household_front_door_open.wav',
+                   'RBH_Household_front_door_close.wav')
 
 class Stairs(Transition):
-    def __init__(self):
-        self.m_in = Play(P_Transition,
-                         'RBH_Household_front_door_open.wav')
+    m_in = Play(P_Transition, 'RBH_Household_front_door_open.wav')
+    m_out = Play(P_Transition, 'RBH_Household_front_door_close.wav')
+    m_trans = Play(P_Transition, 'treppe.wav')
 
-        self.m_out = Play(P_Transition,
-                          'RBH_Household_front_door_close.wav')
+class Teleporter(Transition):
+    m_in = Play(P_Transition, 'RBH_Household_front_door_open.wav')
+    m_out = Play(P_Transition, 'RBH_Household_front_door_close.wav')
+    m_trans = Play(P_Transition, 'zap.wav')
 
-        self.m_trans = Play(P_Transition, 'treppe.wav')
+    def __init__(self, dest):
+        self.dest = dest
 
 _mirror = { 'north': 'south',
             'northeast': 'southwest',

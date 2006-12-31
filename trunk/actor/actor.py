@@ -18,41 +18,48 @@ set_root('d:\\work\\sources\\voice3\\trunk\\actor\\congress')
 
 class A_Hackcenter(Room):
     prefix = 'a_hackcenter'
+    shortcut = '02'
     background = Play(P_Background, 'hepepe_-_Bingo_Baby_Babe.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class A_Haecksen(ConferenceRoom):
     prefix = 'a_haecksen'
+    shortcut = '01'
     background = Play(P_Background, 'party.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class A_Saal4(ConferenceRoom):
     prefix = 'a_saal4'
+    shortcut = '03'
     background = UDP(P_Background, 10004)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class B_NW(Room):
     prefix = 'b_nw'
+    shortcut = '13'
     background = Play(P_Background, 'nimmo_-_la_salle_verte.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class B_NE(Room):
     prefix = 'b_ne'
+    shortcut = '12'
     background = Play(P_Background, 'lethal_laurence_-_Sliding_Cavern_(Deep_Green_Mix).wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class B_SW(Room):
     prefix = 'b_sw'
+    shortcut = '14'
     background = Play(P_Background, 'nimmo_-_pedacito.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class B_SE(Room):
     prefix = 'b_se'
+    shortcut = '11'
     background = Play(P_Background,
                       'weirdpolymer_-_Still_People.wav',
                       prefix=prefix)
@@ -63,40 +70,47 @@ class B_SE(Room):
 
 class B_Lounge(ConferenceRoom):
     prefix = 'b_lounge'
+    shortcut = '10'
     background = Play(P_Background, 'ith_chopin-55-1.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class B_Saal2(ConferenceRoom):
     prefix = 'b_saal2'
+    shortcut = '15'
     background = UDP(P_Background, 10002)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class B_Saal3(ConferenceRoom):
     prefix = 'b_saal3'
+    shortcut = '16'
     background = UDP(P_Background, 10003)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class C_NW(Room):
     prefix = 'c_nw'
+    shortcut = '23'
     background = Play(P_Background, 'cdk_-_one_moment_(cdk_play_it_cool_mix).wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class C_NE(Room):
     prefix = 'c_ne'
+    shortcut = '22'
     background = Play(P_Background, 'asteria_-_Quant_la_doulce_jouvencelle_medieval_chanson.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class C_SW(Room):
     prefix = 'c_sw'
+    shortcut = '24'
     background = Play(P_Background, 'cdk_-_the_haunting_-_(cdk_analog_ambience_mix).wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
 class C_SE(Room):
     prefix = 'c_se'
+    shortcut = '21'
     background = Play(P_Background,
                       'marcoraaphorst_-_Blowing_Snow.wav',
                       prefix=prefix)
@@ -104,6 +118,7 @@ class C_SE(Room):
 
 class C_Office(Room):
     prefix = 'c_office'
+    shortcut = '25'
     background = Play(P_Background, 'gong.wav',
                       prefix=prefix)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
@@ -178,6 +193,7 @@ class C_Office(Room):
                 
 class C_Saal1(ConferenceRoom):
     prefix = 'c_saal1'
+    shortcut = '20'
     background = UDP(P_Background, 10001)
     orientation = Play(P_Discard, 'orientation.wav', prefix=prefix)
 
@@ -303,12 +319,21 @@ class World(object):
     def __init__(self):
         self.devices = []
         self.callers = {}
+        self.shortcuts = {}
 
+    def update_shortcuts(self):
+        '''Update the shortcut dictionary'''
+        # This is a bit crude as it ignores the class dict
+        for d in self.__dict__:
+            if isinstance(d, Location) and hasattr(d, 'shortcut'):
+                self.shortcuts[d.shortcut] = d
+            
     def start(self, seq):
 ##         self.db = adbapi.ConnectionPool('MySQLdb', host='localhost',
 ##                                         user='actor', passwd='HerrMeister',
 ##                                         db='actor')
 
+        # listen on all devices
         for t in seq.trunks:
             for i in range(t.lines):
                 c = Caller(seq, self, t.name)
@@ -371,16 +396,21 @@ class World(object):
         connect(self.b_sw, self.c_sw, Stairs(), 'southwest', 'southwest')
         connect(self.b_nw, self.c_nw, Stairs(), 'northwest', 'northwest')
 
+        self.update_shortcuts()
+
     def stop(self):
         self.devices = []
         self.callers = {}
+        self.shortcuts = {}
 
     def enter(self, caller):
         log.debug('%s entered', caller)
 
         self.callers[caller.device] = caller
 
-        caller.enqueue(Play(P_Transition, '4011_suonho_sweetchoff_iLLCommunications_suonho.wav'))
+        caller.enqueue(
+            Play(P_Transition,
+                 '4011_suonho_sweetchoff_iLLCommunications_suonho.wav'))
 
         # caller.startDialog(EntryDialog(caller, self))
 
@@ -395,5 +425,8 @@ class World(object):
         sequencer.run(start = self.start, stop = self.stop)
 
 if __name__ == '__main__':
-    world = World()
-    world.run()
+    if len(sys.argv) > 1 and sys.argv[1] == '-t':
+        pass
+    else:
+        world = World()
+        world.run()
