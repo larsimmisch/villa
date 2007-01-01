@@ -324,9 +324,11 @@ class World(object):
     def update_shortcuts(self):
         '''Update the shortcut dictionary'''
         # This is a bit crude as it ignores the class dict
-        for d in self.__dict__:
-            if isinstance(d, Location) and hasattr(d, 'shortcut'):
-                self.shortcuts[d.shortcut] = d
+        for d, v in self.__dict__.iteritems():
+            s = getattr(v, 'shortcut', None)
+            if s:
+                log.debug('%s has shortcut %s', d, s)
+                self.shortcuts[s] = v
             
     def start(self, seq):
 ##         self.db = adbapi.ConnectionPool('MySQLdb', host='localhost',

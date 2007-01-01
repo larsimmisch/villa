@@ -53,14 +53,14 @@ if __name__ == '__main__':
                         level=logging.DEBUG)
     log = logging.getLogger()
 
-    streams = [('http://bytebooster.ulm.ccc.de:8000/saal1.ogm', 10001),
-               ('http://bytebooster.ulm.ccc.de:8000/saal2.ogm', 10002),
-               ('http://bytebooster.ulm.ccc.de:8000/saal3.ogm', 10003),
-               ('http://bytebooster.ulm.ccc.de:8000/saal4.ogm', 10004)]
+    streams = [('http://audio.ulm.ccc.de:8000/saal1.ogg', 10001),
+               ('http://audio.ulm.ccc.de:8000/saal2.ogg', 10002),
+               ('http://audio.ulm.ccc.de:8000/saal3.ogg', 10003),
+               ('http://audio.ulm.ccc.de:8000/saal4.ogg', 10004)]
                
     for s in streams[1:]:
-        t = threading.Thread(target=recode, name='Saal%d' % (s[1] - 1000),
-                         args=(s[0], s[1]))
+        t = threading.Thread(target=recode, name='Saal%d' % (s[1] - 10000),
+                             args=(s[0], s[1]))
         t.setDaemon(True)
         t.start()
 
