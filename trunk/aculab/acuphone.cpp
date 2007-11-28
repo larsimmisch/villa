@@ -174,14 +174,14 @@ void* ProsodyEventDispatcher::DispatcherThread::run_undetached(void *arg)
 
 ProsodyChannel::ProsodyChannel() : m_sending(0), m_receiving(0)
 {
-	struct sm_channel_alloc_parms alloc;
+	struct sm_channel_alloc_placed_parms alloc;
 	memset(&alloc, 0, sizeof(alloc));
 
-	alloc.type		  = kSMChannelTypeFullDuplex;
+	alloc.type = kSMChannelTypeFullDuplex;
 	
-	int rc = sm_channel_alloc(&alloc);
+	int rc = sm_channel_alloc_placed(&alloc);
 	if (rc)
-		throw ProsodyError(__FILE__, __LINE__, "sm_channel_alloc", rc);
+		throw ProsodyError(__FILE__, __LINE__, "sm_channel_alloc_placed", rc);
 
 	m_channel = alloc.channel;
 	
@@ -190,7 +190,7 @@ ProsodyChannel::ProsodyChannel() : m_sending(0), m_receiving(0)
 	m_listenFor.channel = m_channel;
 	m_listenFor.enable_pulse_digit_recognition = 0;
 	m_listenFor.tone_detection_mode = kSMToneLenDetectionMinDuration64; // signal event at end of tone, to avoid recording the tone
-	m_listenFor.active_tone_set_id = 0;	// use given (i.e. DTMF/FAX) tone set
+	m_listenFor.active_tone_set_id = 0;	// use given (i.e. DTMF) tone set
 	m_listenFor.map_tones_to_digits = kSMDTMFToneSetDigitMapping;
 	m_listenFor.enable_cptone_recognition = 0;
 	m_listenFor.enable_grunt_detection = 0;

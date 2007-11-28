@@ -605,6 +605,12 @@ void AculabTrunk::onIncomingCallDetected()
 		return;
 	}
 
+	rc = call_incoming_ringing(m_handle);
+	if (rc)
+	{
+		log(log_error, "trunk", getName()) << "call_incoming_ringing failed: " << rc << logend();
+	}
+
 	remote.setAddress(details.originating_addr);
 	local.setAddress(details.destination_addr);
 	local.setService(details.stream);

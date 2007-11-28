@@ -39,10 +39,6 @@
 /*                                                            */
 /*------------------------------------------------------------*/
 
-#ifdef _ACUSWITCHDLL
-#include "acusxlib.h"
-#endif
-
 #define SW_IOCTL_CODES
 #include "mvswdrvr.h"
 

@@ -39,10 +39,6 @@
 /*                                                            */
 /*------------------------------------------------------------*/
 
-#ifdef _ACUSWITCHDLL
-#include "acusxlib.h"
-#endif
-
 #include "mvswdrvr.h"
 
 #include <stdio.h>
@@ -59,6 +55,10 @@
 int    swopendev   ( void );
 HANDLE swopen      ( char * );
 int    swioctl     ( int, SWIOCTLU *, HANDLE, int );
+
+#ifdef _ACUSWITCHDLL
+ACUDLL
+#endif
 void   swclose     ( void );
 
 /*---------------------------------------------*/

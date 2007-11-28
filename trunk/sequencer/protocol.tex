@@ -1,0 +1,175 @@
+\documentclass[10pt, a4paper, parskip]{scrartcl}
+\usepackage[latin1]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{svn}
+\usepackage{pslatex}
+\usepackage[obeyspaces]{url}    % Das Paket Hyperref überschreibt \url,
+    \let\urlurl=\url            % also wird es hier gesichert. (\urlurl
+                                % ist url's Version von \url.)
+\usepackage{hyperref}           % Muss wegen schwarzer Magie als
+                                % letztes Paket erscheinen.
+
+\parskip=4pt plus 2pt           % Die Option parskip sorgt für Absätze ohne
+                                % Einrückung, aber sehr großem
+                                % Abstand. Das wird hier korrigiert.
+
+\setcounter{secnumdepth}{1}     % Sections erhalten Nummern, feinere
+                                % Unterteilungen aber nicht.
+
+\let\code=\urlurl            % Codesegmente werden wie URLs formatiert
+\def\url#1{\href{#1}{\urlurl{#1}}}
+
+%% Formattab: eine Tabelle zum Beschreiben von Datenformaten
+\let\scf=\sectfont              % Fettdruck wie in den Überschriften.
+\newenvironment{commandtab}[1]%
+{\noindent
+  \begin{tabular*}{\linewidth}{@{\extracolsep\fill}llp{0.5\linewidth}}
+    \multicolumn2c{\scf#1}\\ \addlinespace[0.2ex]
+    \scf Name &\scf Description\\
+  }%
+{\end{tabular*}
+\medskip}
+
+\hyphenation{ur-met sen-der}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  pdftitle={The Villa Protocol}}
+
+\begin{document}
+
+\SVN $LastChangedDate: 2005-08-28 22:45:17 +0200 (Sun, 28 Aug 2005) $
+\SVN $LastChangedRevision: 18 $
+
+\author{Lars Immisch}
+\title{The Villa Protocol}
+\date{\SVNDate\thanks{Revision \SVNLastChangedRevision}}
+\maketitle
+
+\begin{abstract}
+  \noindent
+  The \emph{Villa} is a Telephone-based multi-user dungeon.
+  This document describes the \emph{Villa protocol} that is spoken between the 
+  game logic and an audio renderer. The protocol is a simple, text oriented 
+  protocol on top of TCP, inspired by IMAP. It provides sophisticated 
+  operations for the realtime manipulation of audio playlists and basic call 
+  control.
+\end{abstract}
+
+\section{Overview}
+\label{sec:overview}
+
+The protocol has eight command verbs:
+
+\begin{itemize}
+\item \verb+LSTN+ (listen)
+\item \verb+DISC+ (disconnect)
+\item \verb+ACPT+ (accept)
+\item \verb+MLCA+ (molecule add)
+\item \verb+MLCD+ (molecule discard)
+\item \verb+MLDP+ (molecule discard by priority)
+\item \verb+CNFO+ (conference open)
+\item \verb+CNFC+ (conference close)
+\end{itemize}
+
+And four event verbs:
+
+\begin{itemize}
+\item \verb+DTMF+ (DTMF detected)
+\item \verb+RDIS+ (Remote disconnect)
+\item \verb+ABEG+ (Atom beginning to run)
+\item \verb+AEND+ (Atom ending)
+\end{itemize}
+
+A message is either a request, a completion or an event.
+
+\subsection{Basic structure of a request}
+
+The basic structure of a request is:
+
+\emph{tid device verb arguments}
+
+\emph{tid} is a transaction id. Most often, it will be a number, but it can 
+also be alphanumerical. The string \verb+-1+ is reserved and must not be used
+(it is used for unsolicited events).
+
+Transactions IDs are used to correlate a completion to a request.
+
+\emph{device} is a name picked by the rendering engine. It uniquely identifies 
+a channel, normally a telephone line and associated speech processing 
+capabilities.
+
+\emph{verb} is one of the command verbs above.
+
+\emph{arguments} depends on \emph{verb} and is a list of arguments to the
+request, separated by whitespace.
+
+A simple example of a request is:
+\begin{verbatim}
+0 GLOBAL LSTN any any
+\end{verbatim}
+
+This instructs the audio renderer to wait for an incoming call on any trunk 
+and any number.
+
+When a call comes in, the audio renderer will respond with:
+
+\begin{verbatim}
+0 ETS300[0:3] LSTN 
+\end{verbatim}
+
+
+\section{Molecules}
+
+
+\begin{thebibliography}{S.200}  % Die Breite dieses Parameters bestimmt,
+                                % wie weit Folgezeilen eines
+                                % Bibliographieeintrags eingerückt werden.
+  \rightskip=0pt plus 4em       % Etwas Dehnbarkeit am rechten Rand
+                                % wegen der langen URLs; \raggedright
+                                % wäre zu nachgiebig.
+  
+\bibitem[ECTF]{ectf-specs} ECTF -- Specifications, Published Documents
+  Online,
+  \url{http://www.comptia.org/sections/ectf/specifications.aspx}.
+
+\bibitem[M.100]{m100} 
+  M.100, ECTF Administration services API,
+  \url{http://www.comptia.org/sections/ectf/Documents/m100r1-0.pdf}.
+
+\bibitem[Reactor pattern]{reactor}
+  The Reactor pattern,
+  \url{http://www.cs.wustl.edu/~schmidt/PDF/reactor-siemens.pdf}.
+  
+\bibitem[RFC 2373]{rfc2373} RFC 2373 -- IP Version 6 Addressing
+  Architecture, \url{http://www.faqs.org/rfcs/rfc2373.html}.
+
+\bibitem[RFC 2396]{rfc2396} RFC 2396 -- Uniform Resource Identifiers
+  (URI): Generic Syntax, \url{http://www.faqs.org/rfcs/rfc2396.html}.
+
+\bibitem[S.100]{s100}
+  S.100, ECTF Media Services API,
+  \url{http://www.comptia.org/sections/ectf/Documents/s100r2.zip}.
+  
+\bibitem[S.100r2v4]{s100r2v4} S.100 Media Services, Volume 4:
+  Framework, revision 2.0. Located at \cite{ectf-specs}.
+  
+\bibitem[S.200]{s200}
+  S.200, ECTF Media Services Protocol Specification,
+  \url{http://www.comptia.org/sections/ectf/Documents/s200r0-1.pdf}.
+  
+\bibitem[S.300v1r1]{s300v1r1} ECTF Media Services SPI Specification,
+  Volume 1: Overview, revision 1.0. Located at \cite{ectf-specs}.
+
+\bibitem[S.300]{s300}
+  S.300, ECTF Service Provider Interface Specification,
+  \url{http://ibp.de/ECTF/S.300/html/}.
+  
+\bibitem[S.410]{s410r2} S.410 JTAPI Media Revision 2. Located at
+  \cite{ectf-specs}.
+
+\end{thebibliography}
+\end{document}

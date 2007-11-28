@@ -16,12 +16,17 @@
 /* Change History                                             */
 /*                                                            */
 /*                                                            */
-/* rev:5.8.0    11/10/2001  labelled for 5.8.0 Release        */
-/*              07/09/2001  labelled for 5.7.4B12 beta release*/
-/*              16/08/2001  labelled for 5.7.4B7 beta release */
-/*              09/07/2001  labelled for 5.7.3 Release        */
-/*              13/06/2001  labelled for 5.7.2 Release        */
-/*              27/02/2001  add changes to handle MC3         */
+/* rev:5.10.0    07/03/2003 Updated for 5.10.0 Release        */
+/*               20/02/2003 Updated for 5.10.0B10 Beta        */
+/*               28/01/2003 Updated for 5.10.0B5 Beta         */
+/*               23/01/2003 Updated for 5.10.0B4 Beta         */
+/*               10/07/2002 Labelled for 5.9.1 Release        */
+/*               11/10/2001 Labelled for 5.8.0 Release        */
+/*               07/09/2001 Labelled for 5.7.4B12 Beta Release*/
+/*               16/08/2001 Labelled for 5.7.4B7 Beta Release */
+/*               09/07/2001 Labelled for 5.7.3 Release        */
+/*               13/06/2001 Labelled for 5.7.2 Release        */
+/*               27/02/2001 Add changes to handle MC3         */
 /*                                                            */
 /*                                                            */
 /*------------------------------------------------------------*/
@@ -33,6 +38,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <stdlib.h>
 
 
 #define FALSE  0
@@ -50,16 +56,15 @@ extern int verbose;
 
 static int timeslot_valid ( int, int );
 static int get_info       ( void );
-int network_side   ( int  );
-static void prev5clkinit  ( int  );
+static int network_side   ( int  );
 static void v5clkinit     ( int  );
 static int  Scbusmode     ( void );
 
+ACUDLL void   port_init   ( int );
+ACUDLL int    set_idle    ( int );
+ACUDLL int    set_sigsys  ( int );
 
-ACUDLL void   port_init          ( int );
-ACUDLL int    set_idle           ( int );
-ACUDLL int    set_sigsys         ( int );
-
+int is_voip_card          ( int );
 
 
 typedef struct ncfg {
@@ -72,101 +77,100 @@ typedef struct ncfg {
 
 /* E1 ISDN Primary Rate */
 
-NCFG ncfg[] = { S_1TR6,       "S_1TR6",      "1TR6",    "1TR6_USR.RAM",
-                S_1TR6NET,    "S_1TR6NET",   "1TR6NET", "1TR6_NET.RAM",
-                S_AUSTEL,     "S_AUSTEL",    "AUSTEL",  "AUST_USR.RAM",
-                S_AUSTNET,    "S_AUSTNET",   "AUSTNET", "AUST_NET.RAM",
-                S_ETS300,     "S_ETS300",    "ETS300",  "ETS_USR.RAM",
-                S_ETSNET,     "S_ETSNET",    "ETSNET",  "ETS_NET.RAM",
-                S_ETS300_T1,  "S_ETS300_T1", "ETS300 T1","ETSTSUPU.RAM",
-                S_ETSNET_T1,  "S_ETSNET_T1", "ETSNET T1","ETSTSUPN.RAM",
-                S_SWETS300,   "S_SWETS300",  "SWED300", "SWED_USR.RAM",
-                S_SWETSNET,   "S_SWETSNET",  "SWEDNET", "SWED_NET.RAM",
-                S_VN3,        "S_VN3",       "VN3",     "VN3_USR.RAM",
-                S_VN3NET,     "S_VN3NET",    "VN3NET",  "VN3_NET.RAM",
-                S_TNA_NZ,     "S_TNA_NZ",    "TNA_NZ",  "TNA_USR.RAM",
-                S_TNANET,     "S_TNANET",    "TNA_NET", "TNA_NET.RAM",
-                S_FETEX_150,  "S_FETEX_150", "FETX150", "FETX_USR.RAM",
-                S_FETEXNET,   "S_FETEXNET",  "FETXNET", "FETX_NET.RAM",
-                S_ATT,        "S_ATT",       "AT&T",    "ATT_EUSR.RAM",
-                S_ATTNET,     "S_ATTNET",    "AT&TNET", "ATT_ENET.RAM",
-                S_ATT_T1,     "S_ATT_T1",    "ATT1",    "ATT_TUSR.RAM",
-                S_ATTNET_T1,  "S_ATTNET_T1", "ATT1NET", "ATT_TNET.RAM",
-                S_DASS,       "S_DASS",      "DASS2",   "DASS_USR.RAM",
-                S_DASSNET,    "S_DASSNET",   "DASSNET", "DASS_NET.RAM",
-                S_DPNSS,      "S_DPNSS",     "DPNSS",   "M1DPNSS.RAM",
-                S_QSIG,       "S_QSIG",      "QSIG",    "QSIG.RAM",
+NCFG ncfg[] = { { S_1TR6,       "S_1TR6",      "1TR6",    "1TR6_USR.RAM" },
+                { S_1TR6NET,    "S_1TR6NET",   "1TR6NET", "1TR6_NET.RAM" },
+                { S_AUSTEL,     "S_AUSTEL",    "AUSTEL",  "AUST_USR.RAM" },
+                { S_AUSTNET,    "S_AUSTNET",   "AUSTNET", "AUST_NET.RAM" },
+                { S_ETS300,     "S_ETS300",    "ETS300",  "ETS_USR.RAM" },
+                { S_ETSNET,     "S_ETSNET",    "ETSNET",  "ETS_NET.RAM" },
+                { S_ETS300_T1,  "S_ETS300_T1", "ETS300 T1","ETSTSUPU.RAM" },
+                { S_ETSNET_T1,  "S_ETSNET_T1", "ETSNET T1","ETSTSUPN.RAM" },
+                { S_SWETS300,   "S_SWETS300",  "SWED300", "SWED_USR.RAM" },
+                { S_SWETSNET,   "S_SWETSNET",  "SWEDNET", "SWED_NET.RAM" },
+                { S_VN3,        "S_VN3",       "VN3",     "VN3_USR.RAM" },
+                { S_VN3NET,     "S_VN3NET",    "VN3NET",  "VN3_NET.RAM" },
+                { S_TNA_NZ,     "S_TNA_NZ",    "TNA_NZ",  "TNA_USR.RAM" },
+                { S_TNANET,     "S_TNANET",    "TNA_NET", "TNA_NET.RAM" },
+                { S_FETEX_150,  "S_FETEX_150", "FETX150", "FETX_USR.RAM" },
+                { S_FETEXNET,   "S_FETEXNET",  "FETXNET", "FETX_NET.RAM" },
+                { S_ATT,        "S_ATT",       "AT&T",    "ATT_EUSR.RAM" },
+                { S_ATTNET,     "S_ATTNET",    "AT&TNET", "ATT_ENET.RAM" },
+                { S_ATT_T1,     "S_ATT_T1",    "ATT1",    "ATT_TUSR.RAM" },
+                { S_ATTNET_T1,  "S_ATTNET_T1", "ATT1NET", "ATT_TNET.RAM" },
+                { S_DASS,       "S_DASS",      "DASS2",   "DASS_USR.RAM" },
+                { S_DASSNET,    "S_DASSNET",   "DASSNET", "DASS_NET.RAM" },
+                { S_DPNSS,      "S_DPNSS",     "DPNSS",   "M1DPNSS.RAM" },
+                { S_QSIG,       "S_QSIG",      "QSIG",    "QSIG.RAM" },
 
                 /* CAS signalling Systems */
 
-                S_CAS,        "S_CAS",       "R2B2P",   "M1R2P2B.RAM",
-                S_CAS,        "S_CAS",       "CAS",     "M1R2P2B.RAM",
-                S_CAS,        "S_CAS",       "BTCU",    "M1BTCU.RAM",
-                S_CAS,        "S_CAS",       "BTCN",    "M1BTCN.RAM",
-                S_CAS,        "S_CAS",       "PTVU",    "M1PTVU.RAM",
-                S_CAS,        "S_CAS",       "PTVN",    "M1PTVN.RAM",
-                S_CAS,        "S_CAS",       "PD1D",    "M1PD1D.RAM",
-                S_CAS,        "S_CAS",       "PD1U",    "M1PD1U.RAM",
-                S_CAS,        "S_CAS",       "PD1N",    "M1PD1N.RAM",
-                S_CAS,        "S_CAS",       "R2L",     "M1R2L.RAM",
-                S_CAS,        "S_CAS",       "P8",      "M1P8.RAM",
-                S_CAS,        "S_CAS",       "EM",      "M1EM.RAM",
-                S_CAS,        "S_CAS",       "BEZEQ",   "M1BEZEQ.RAM",
+                { S_CAS,        "S_CAS",       "R2B2P",   "M1R2P2B.RAM" },
+                { S_CAS,        "S_CAS",       "CAS",     "M1R2P2B.RAM" },
+                { S_CAS,        "S_CAS",       "BTCU",    "M1BTCU.RAM" },
+                { S_CAS,        "S_CAS",       "BTCN",    "M1BTCN.RAM" },
+                { S_CAS,        "S_CAS",       "PTVU",    "M1PTVU.RAM" },
+                { S_CAS,        "S_CAS",       "PTVN",    "M1PTVN.RAM" },
+                { S_CAS,        "S_CAS",       "PD1D",    "M1PD1D.RAM" },
+                { S_CAS,        "S_CAS",       "PD1U",    "M1PD1U.RAM" },
+                { S_CAS,        "S_CAS",       "PD1N",    "M1PD1N.RAM" },
+                { S_CAS,        "S_CAS",       "R2L",     "M1R2L.RAM" },
+                { S_CAS,        "S_CAS",       "P8",      "M1P8.RAM" },
+                { S_CAS,        "S_CAS",       "EM",      "M1EM.RAM" },
+                { S_CAS,        "S_CAS",       "BEZEQ",   "M1BEZEQ.RAM" },
 
                 /* tone signalling system */
 
-                S_CAS_TONE,   "S_CAS_TONE",  "R2T",     "M1R2T.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "R2T1",    "M1R2T1.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "ALSU",    "M1ALSUT.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "ALSN",    "M1ALSNT.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "BELGU",   "M1BELGU.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "BELGN",   "M1BELGN.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "EFRAT",   "M1EFRAT.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "EEMA",    "M1EEMA.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "PD1",     "M1PD1.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "PD1DD",   "M1PD1DD.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "PD1UD",   "M1PD1UD.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "PD1ND",   "M1PD1ND.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "BTMC",    "M1BTMC.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "OTE2",    "M1OTE2.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "FMFS",    "M1FMFS.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "SMFS",    "M1SMFS.RAM",
-                S_CAS_TONE,   "S_CAS_TONE",  "I701",    "M1I701.RAM",
+                { S_CAS_TONE,   "S_CAS_TONE",  "R2T",     "M1R2T.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "R2T1",    "M1R2T1.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "ALSU",    "M1ALSUT.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "ALSN",    "M1ALSNT.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "BELGU",   "M1BELGU.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "BELGN",   "M1BELGN.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "EFRAT",   "M1EFRAT.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "EEMA",    "M1EEMA.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "PD1",     "M1PD1.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "PD1DD",   "M1PD1DD.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "PD1UD",   "M1PD1UD.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "PD1ND",   "M1PD1ND.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "BTMC",    "M1BTMC.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "OTE2",    "M1OTE2.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "FMFS",    "M1FMFS.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "SMFS",    "M1SMFS.RAM" },
+                { S_CAS_TONE,   "S_CAS_TONE",  "I701",    "M1I701.RAM" },
 
-                S_SS5_TONE,   "S_SS5_TONE",  "SS5",     "M1SS5.RAM",
+                { S_SS5_TONE,   "S_SS5_TONE",  "SS5",     "M1SS5.RAM" },
 
                 /* T1 - ISDN Signalling Systems */
 
-                S_IDAP,       "S_IDAP",      "IDAP",    "IDAP_USR.RAM",
-                S_IDAPNET,    "S_IDAPNET",   "IDAPNET", "IDAP_NET.RAM",
-                S_NI2,        "S_NI2",       "NI2",     "NI2_USR.RAM",
-                S_NI2NET,     "S_NI2NET",    "NI2NET",  "NI2_NET.RAM",
+                { S_IDAP,       "S_IDAP",      "IDAP",    "IDAP_USR.RAM" },
+                { S_IDAPNET,    "S_IDAPNET",   "IDAPNET", "IDAP_NET.RAM" },
+                { S_NI2,        "S_NI2",       "NI2",     "NI2_USR.RAM" },
+                { S_NI2NET,     "S_NI2NET",    "NI2NET",  "NI2_NET.RAM" },
 
-                S_INS,        "S_INS",       "INS",     "INS_USR.RAM",
-                S_INSNET,     "S_INSNET",    "INSNET",  "INS_NET.RAM",
+                { S_INS,        "S_INS",       "INS",     "INS_USR.RAM" },
+                { S_INSNET,     "S_INSNET",    "INSNET",  "INS_NET.RAM" },
 
                 /* T1 - CAS tone signalling */
 
-                S_T1CAS_TONE, "S_T1CAS_TONE","F12",     "T1RB_USR.RAM",
+                { S_T1CAS_TONE, "S_T1CAS_TONE","F12",     "T1RB_USR.RAM" },
 
                 /* Basic Rate Signalling Systems */
-
-                BR_ETS300,    "BR_ETS300",   "BETS300", "ETS_BUSR.RAM",
-                BR_ETSNET,    "BR_ETSNET",   "BETSNET", "ETS_BNET.RAM",
-                BR_NI1,       "BR_NI1",      "BNI1",    "NI1_BUSR.RAM",
-                BR_NI1NET,    "BR_NI1NET",   "BNI1NET", "NI1_BNET.RAM",
-                BR_ATT,       "BR_ATT",      "BATT",    "ATT_BUSR.RAM",
-                BR_ATTNET,    "BR_ATTNET",   "BATTNET", "ATT_BNET.RAM",
-                BR_INS,       "BR_INS",      "BINS",    "INS_BUSR.RAM",
-                BR_INSNET,    "BR_INSNET",   "BINSNET", "INS_BNET.RAM",
+ 
+                { BR_ETS300,    "BR_ETS300",   "BETS300", "ETS_BUSR.RAM" },
+                { BR_ETSNET,    "BR_ETSNET",   "BETSNET", "ETS_BNET.RAM" },
+                { BR_NI1,       "BR_NI1",      "BNI1",    "NI1_BUSR.RAM" },
+                { BR_NI1NET,    "BR_NI1NET",   "BNI1NET", "NI1_BNET.RAM" },
+                { BR_ATT,       "BR_ATT",      "BATT",    "ATT_BUSR.RAM" },
+                { BR_ATTNET,    "BR_ATTNET",   "BATTNET", "ATT_BNET.RAM" },
+                { BR_INS,       "BR_INS",      "BINS",    "INS_BUSR.RAM" },
+                { BR_INSNET,    "BR_INSNET",   "BINSNET", "INS_BNET.RAM" },
 
                 /* SS7 signalling */
-                S_ISUP,       "S_ISUP",      "ISUP",    "ISUP.RAM",
+                { S_ISUP,       "S_ISUP",      "ISUP",    "ISUP.RAM" },
 
                 /* end of table */
 
-                0,            "",            "",        ""  };      /* end of table */
-
+                { 0,            "",            "",        "" }  };      /* end of table */
 
 
 static struct siginfo_xparms info[MAXPORT];
@@ -328,6 +332,8 @@ ACUDLL int ACU_WINAPI system_init ( void )
    int                         nports;
    struct init_xparms          init_xparms;
 
+   memset(&init_xparms, 0, sizeof(init_xparms));
+
    init_xparms.ournum[0]    = '\0';
    init_xparms.responsetime = -1;
 
@@ -369,7 +375,7 @@ ACUDLL int ACU_WINAPI system_init ( void )
 /*                                       */
 /* returns TRUE if network side          */
 /*                                       */
-int network_side ( int portnum )
+static int network_side ( int portnum )
    {
    switch ( call_type ( portnum ))      /* check for network end */
       {
@@ -1315,6 +1321,11 @@ ACUDLL char * ACU_WINAPI error_2_string( int error )
        case ERR_BOARD_VERSION:
           error_string="ERR_BOARD_VERSION - Incorrect VoIP firmware version found";
        break;
+
+       case ERR_DNLD_CRCERRORS:
+          error_string="ERR_DNLD_CRCERRORS - CRC error detected in board firmware during download";
+       break;
+
        /************************/
        /* Switch Driver Errors */
        /************************/
@@ -1364,6 +1375,37 @@ ACUDLL char * ACU_WINAPI error_2_string( int error )
     return error_string;
 
 }
+
+
+/*--------- is_voip_card --------------*/
+/* determine if the card at this switch*/
+/* index is a voip card. Ifso return 1,*/
+/* else 0, if error -1                 */
+/*                                       */
+int is_voip_card ( int swdrvr )
+   {
+   int  result;
+   struct swcard_info_parms cardinfop;
+
+   memset( &cardinfop, 0, sizeof( struct swcard_info_parms ) );
+
+   result = sw_card_info( swdrvr, &cardinfop );
+
+   /* test for error */
+   if( result < 0 )
+      {
+      return -1;
+      }
+
+   if( SW_VOIP_PCI_H323_GATEWAY_CARD == cardinfop.card_type )
+      {
+      return 1;
+      }
+
+   return 0;
+   }
+/*---------------------------------------*/
+
 
 /*---------------------------------------*/
 /*-------------- end of file ------------*/

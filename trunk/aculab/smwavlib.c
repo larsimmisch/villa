@@ -912,6 +912,36 @@ static int wav_dump_header( struct wav_info* wavInfo, tSMWVFD fp, int markAsUnkn
 		return WAV_FILE_WRITE_ERROR;
     }
 
+	riff_size = ((header_size+4) + wavInfo->data_size - 8);
+
+	if (seekOctets(fp,0,-1,0) != 0)
+	{
+        return WAV_WAVEFORMAT_SEEK_ERROR;
+    }
+
+    fourcc = FOURCC_RIFF;
+
+    rc = putUT32(fourcc,fp);          /* FOURCC_RIFF */
+ 
+	if (rc != 0)
+	{
+       return WAV_FILE_WRITE_ERROR;
+    }
+
+    rc = putUT32(riff_size,fp);       /* size of RIFF chunk */
+
+    if (rc != 0)
+	{
+       return WAV_FILE_WRITE_ERROR;
+    }
+
+	rc = seekOctets(fp,0,1,0);
+
+    if (rc != 0)
+	{
+       return WAV_FILE_WRITE_ERROR;
+    }
+
     return 0;
 }
 

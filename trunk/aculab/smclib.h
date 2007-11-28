@@ -26,7 +26,7 @@
 
 #define CONF_MAX_PARTY 60
 
-typedef struct sm_conference *tSMConference;
+typedef void *tSMConference;
 
 typedef struct sm_conference_add_party_parms {
     tSMConference conf;

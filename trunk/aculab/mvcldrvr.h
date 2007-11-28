@@ -15,11 +15,10 @@
 /*                                                            */
 /* Change History                                             */
 /*                                                            */
-/* rev: 5.8.0   11/10/2001 Updated for 5.8.0 Release          */
+/* rev: 5.10.0      07/03/2003 Updated for 5.10.0 Release     */
 /*                                                            */
 /*                                                            */
 /*------------------------------------------------------------*/
-
 
 #ifndef _MVCLDRVR_
 #define _MVCLDRVR_
@@ -104,7 +103,7 @@ typedef struct{
 #include <inttypes.h>
 
 #ifndef _BUFP_
-    typedef char  * BUFP;                   /* obsolete (pre-V5) */
+    typedef int32_t  BUFP;                   /* obsolete (pre-V5, v5.90) */
 #define _BUFP_
 #endif
 
@@ -119,12 +118,12 @@ typedef struct{
 #endif
 
 #ifndef _ACU_INT_
-    typedef int32_t   ACU_INT;              /* signed 16 bit   */
+    typedef int32_t   ACU_INT;              /* signed 32 bit   */
 #define _ACU_INT_
 #endif
 
 #ifndef _ACU_UINT_
-    typedef uint32_t ACU_UINT;              /* unsigned 16 bit */
+    typedef uint32_t ACU_UINT;              /* unsigned 32 bit */
 #define _ACU_UINT_
 #endif
 
@@ -233,7 +232,14 @@ typedef struct{
 
 #endif
 
-
+/*-------------------------------------------------------*/
+/*                                                       */
+/* Pipe names                                            */
+/*                                                       */
+/*-------------------------------------------------------*/
+#define H323_PIPE "AcuVoIP"
+#define SIP_PIPE "AcuSIP"
+#define BOARD_CONTROL_PIPE "AcuBoard"
 
 /*-------------------------------------------------------*/
 /*                                                       */
@@ -276,7 +282,7 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 /*---- API library version information -----*/
 /*- do not change these values -*/
 #define SIGNATUREA      0x04087026
-#define ACU_API_VERSION 0x0000000b
+#define ACU_API_VERSION 0x00000010
 #define SIGNATUREB      0x20099303
 /*- do not change these values -*/
 
@@ -304,8 +310,9 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 #define MAXKEYPAD   34                 /* maximum length of keypad information */
 
 #define MAXUUI_INFO 128                /* maximum length of User To User information */
-#define MAXFACILITY_INFO 128           /* maximum length of Facility information */
+#define MAXFACILITY_INFO 255           /* maximum length of Facility information */
 #define MAXRAWDATA 260                 /* maximum length of raw data information */
+#define MAXOID 32                      /* maximum length of an object object identifier */
 
 #define MAX_FEAT_MSG       5           /* dpnss enhanced only: Max Msg for DPNSS feature Info          */
 #define MAXNSI             50          /* dpnss enhanced only: maximum number of DPNSS NSI characters  */
@@ -321,6 +328,27 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 #define INCOMING  1       /* incoming call */
 #define OUTGOING  2       /* outgoing call */
 
+#define ACU_PREC_TOS_DEFAULT          0   /* IP TOS definitions */ 
+#define ACU_PREC_TOS_HIGH_RELIABILITY 1
+#define ACU_PREC_TOS_HIGH_THROUGHPUT  2
+#define ACU_PREC_TOS_LOW_DELAY        4
+
+#define ACU_PREC_NETWORK_CONTROL      7   /* Precedence */
+#define ACU_PREC_INTERNET_CONTROL     6
+#define ACU_PREC_CRITIC_ECP           5
+#define ACU_PREC_FLASH_OVERRIDE       4
+#define ACU_PREC_FLASH                3
+#define ACU_PREC_IMMEDIATE            2 
+#define ACU_PREC_PRIORITY             1
+#define ACU_PREC_ROUTINE              0
+
+#define ACU_DSCP_DEFAULT              0   /* DSCP definitions */
+#define ACU_DSCP_LOW_DELAY            4
+#define ACU_DSCP_HIGH_THROUGHPUT      2 
+#define ACU_DSCP_HIGH_RELIABILITY     1
+
+#define def_tos def_rtp_tos
+
 #define XFERSIZE 0x2000   /* download data transfer size */
 
 
@@ -332,7 +360,6 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 #define CHARGE_INFO   1     /* call charge valid    */
 #define CHARGE_METER  2     /* meter pulse valid    */
 #define CHARGEMAX    34     /* maximum number of call charging digits */
-
 
 /*---------- service octet defintions ---------*/
 /* and additional information octet definitions*/
@@ -381,33 +408,45 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 /*---------------------------------------------*/
 
 
+
 /*-------------- VoIP specific information --------------*/
 /*-------------------------------------------------------*/
 
 /* maximum number of codecs in system */
 #define MAXCODECS   3
 
-/* VoIP administration channel message types */
-#define  GRQ        1
-#define  GCF        2
-#define  GRJ        3
+/* VoIP administration channel message types. Must be the same */
+/* as the TLS_RAS_* equivalents defined in the service code.   */
+#define  GRQ        10
+#define  GCF        11
+#define  GRJ        12
 
-#define  RRQ        4
-#define  RCF        5
-#define  RRJ        6
+#define  RRQ        13
+#define  RCF        14
+#define  RRJ        15
 
-#define  URQ        7
-#define  UCF        8
-#define  URJ        9
+#define  URQ        16
+#define  UCF        17
+#define  URJ        18
 
-#define  LRQ       10
-#define  LCF       11
-#define  LRJ       12
+#define  LRQ        19
+#define  LCF        20
+#define  LRJ        21
 
 /* Do not use 0 for codec type! */
 #define G711  1
 #define G723  2
 #define G729A 3
+#define G729        4
+#define G711_ULAW64K        5
+#define G711_ALAW64K        6
+#define G723_VAD_OFF        7
+#define G729_VAD_OFF        8
+#define G729A_VAD_OFF        9
+#define G723_VAD_ON                10
+#define G729_VAD_ON                11
+#define G729A_VAD_ON        12
+#define NOT_INITIALISED        13
 
 #define VAD_DEFAULT 0
 #define VAD_OFF     1
@@ -416,6 +455,52 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 #define TDM_ALAW    1
 #define TDM_ULAW    2
 
+/* echo cancellation and echo suppression values */
+#define EC_OFF       1
+#define EC_G165      2
+#define EC_G165_NLP  3
+
+#define ES_OFF       0
+#define ES_12DB     12
+
+/* The following VoIP specific values are duplicates of those defined */
+/* in the service code.  Note that they must always be equal */
+#define TLS_MSG_GENERIC_TLS              15   /* Generic TLS msg                         */
+#define ADMIN_CHAN_RAS_MSG               20   /* Admin channel/RAS message               */
+#define APPLICATION_TERMINATED           22   /* Used to signal application termination  */
+#define MAX_VOIP_BOARDS                  10
+#define IP_ADDRESS_SIZE                  32
+
+/*---------------------------------------*/
+/*  SIP                                  */
+/*---------------------------------------*/
+
+#define MAXSIPWARNING                    64   /* maximum length that we 
+                                                 accept for a SIP warning */
+#define MAXSIPRESPONSEEXPLANATION        128  /* maximum length of non-200
+                                                 final response explanation */
+#define MAXSIPREGCALLID                  16   /* maximum length of a SIP 
+                                                 registration call ID */
+#define MAXPROXYADDRESS                  65   /* maximum length of a SIP 
+                                                 proxy address */
+                                                 
+#define SIPLISTENADDRESS                 16   /* size of the listen IP address */                                                 
+
+/* sip url */
+#define MAXSIPURL                        128  /* maximum length of a SIP URL address */
+#define SIPURLTYPEUSERHOST               0    /* e.g. virgil@tracey.island.com or virgil@100.101.103.104 */
+#define SIPURLTYPEPHONENO                1    /* e.g. +123456789@tracey.island.com */
+
+/* tel url */
+#define MAXTELURL                        128  /* maximum length of a TEL URL address */
+
+/* sip schemes */
+#define URLSCHEMESIP                     1    
+#define URLSCHEMETEL                     2    
+
+/* SIP transport types */
+#define ACUSIPUDP                        0
+#define ACUSIPTCP                        1
 
 /*---------------------------------------*/
 /*  Signalling Protocol Identifiers      */
@@ -481,6 +566,7 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 
 #define  S_H323         48
 
+#define  S_SIP          49
 
 /*---------------------------------------*/
 /*  Basic Rate Identifiers               */
@@ -541,6 +627,12 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 #define PM4_FOUR_PORT_E1_MONITOR    11  /* high impedance, passive monitor */
 #define PM4_TWO_PORT_T1_MONITOR     12  /* high impedance, passive monitor */
 #define PM4_FOUR_PORT_T1_MONITOR    13  /* high impedance, passive monitor */
+#define UPM_ONE_PORT_E1T1           17	/* UPM */
+#define UPM_TWO_PORT_E1T1           18
+#define UPM_FOUR_PORT_E1T1          20
+#define UPM_TWO_PORT_E1T1_MONITOR   26
+#define UPM_FOUR_PORT_E1T1_MONITOR  28
+
 
 
 /*---------------------------------------*/
@@ -669,6 +761,11 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 
 #define CALL_SIGNAL_APIEVENT        _IOWR( 'm', 97, MSGBLK )
 #define CALL_CODEC_CONFIG           _IOWR( 'm', 98, MSGBLK )
+
+#define CALL_MTP                    _IOWR( 'm', 99, MSGBLK )
+
+#define CALL_SEND_RAS_MSG           _IOWR( 'm', 150, MSGBLK )
+#define CALL_GET_RAS_MSG            _IOWR( 'm', 151, MSGBLK )
 
 /*--------------------------*/
 /* Enhanced DPNSS functions */
@@ -816,6 +913,11 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 #define CALL_SIGNAL_APIEVENT        97
 #define CALL_CODEC_CONFIG           98
 
+#define CALL_MTP                    99
+
+#define CALL_SEND_RAS_MSG           150
+#define CALL_GET_RAS_MSG            151
+
 /*--------------------------*/
 /* Enhanced DPNSS functions */
 /*--------------------------*/
@@ -848,6 +950,16 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 #define GROOMER_WDINIT              203
 #define GROOMER_WDREFRESH           204
 
+/*------------------------------------*/
+/* SIP/H323 (i.e VoIP) Features       */
+/*------------------------------------*/
+
+#define FIRST_VOIP_FEATURE          300
+#define VOIP_NEW_REGISTRATION       301
+#define VOIP_DELETE_REGISTRATION    302
+#define VOIP_FETCH_REGISTRATION     303
+#define VOIP_QUERY_OPTIONS	    304
+
 #endif
 
 
@@ -877,6 +989,16 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 #define CNF_NET_MASK      0x001f       /* for aculab use only*/
 
 
+/*------------------------------------------------------*/
+/* Timeslot options for call_openout, call_enquiry,     */
+/* call_feature_openout, call_openin, call_details.     */
+/*------------------------------------------------------*/
+
+#define ANY_TS          -1              /* any timeslot */
+#define VIRTUAL_TS      -2              /* virtual call (no timeslot) */
+#define USE_SLOTMAP     -3              /* timeslot(s) specified in slotmap */
+
+
 /*-------------------------------------*/
 /* VoIP Signal Command/Events          */
 /*-------------------------------------*/
@@ -889,6 +1011,7 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 
 #define ACU_SIGEVNT_EXITFROMCLOSE         0x2001
 #define ACU_SIGEVNT_EXITFROMCLEAR         0x2002
+#define ACU_SIGEVNT_REPORTOPENCOUNT       0x2003
 
 #define ACU_VOIP_INACTIVE                 0
 #define ACU_VOIP_ACTIVE                   1
@@ -936,117 +1059,137 @@ int mvcl_ev_wait ( tMVEventId *eventId );
 /* DPNSS Feature MSG Types      */
 /*------------------------------*/
 
-#define  NO_MSG                 0 		/* DPNSS Enhanced Only */
-#define  ACKNOWLEDGE            40		/* DPNSS Enhanced Only */
-#define  REJECT                 41		/* DPNSS Enhanced Only */
-#define  STATE_OF_DEST_FREE     42		/* DPNSS Enhanced Only */
-#define  STATE_OF_DEST_BUSY     43		/* DPNSS Enhanced Only */
-#define  STATE_OF_DEST_REQ      44		/* DPNSS Enhanced Only */
+#define  NO_MSG                 0               /* DPNSS Enhanced Only */
+#define  ACKNOWLEDGE            40              /* DPNSS Enhanced Only */
+#define  REJECT                 41              /* DPNSS Enhanced Only */
+#define  STATE_OF_DEST_FREE     42              /* DPNSS Enhanced Only */
+#define  STATE_OF_DEST_BUSY     43              /* DPNSS Enhanced Only */
+#define  STATE_OF_DEST_REQ      44              /* DPNSS Enhanced Only */
+#define  EXTENSION_STATUS_CALL	45				/* DPNSS Enhanced Only */
 
 /*--- DPNSS Call types : Virtual/Real ---*/
 
-#define REAL                    0		/* DPNSS Enhanced Only */
-#define VIRTUAL                 1		/* DPNSS Enhanced Only */
+#define REAL                    0               /* DPNSS Enhanced Only */
+#define VIRTUAL                 1               /* DPNSS Enhanced Only */
 
 
 /*-------------------------------------*/
 /* Call Diversion messages             */
 /*-------------------------------------*/
 
-#define  DIVERT_IMMEDIATE       1 		/* DPNSS Enhanced Only */
-#define  DIVERT_BUSY            2 		/* DPNSS Enhanced Only */
-#define  DIVERT_NO_REPLY        3 		/* DPNSS Enhanced Only */
-#define  DIVERTING_IMM          4 		/* DPNSS Enhanced Only */
-#define  DIVERTING_BSY          5 		/* Generic */
-#define  DIVERTING_RNR          6 		/* Generic */
-#define  DIVERTED_IMM           7 		/* DPNSS Enhanced Only */
-#define  DIVERTED_BSY           8 		/* DPNSS Enhanced Only */
-#define  DIVERTED_RNR           9 		/* DPNSS Enhanced Only */
-#define  DIV_VALIDATION        10		/* DPNSS Enhanced Only */
+#define  DIVERT_IMMEDIATE          1            /* DPNSS Enhanced Only */
+#define  DIVERT_BUSY               2            /* DPNSS Enhanced Only */
+#define  DIVERT_NO_REPLY           3            /* DPNSS Enhanced Only */
+#define  DIVERTING_IMM             4            /* DPNSS Enhanced Only */
+#define  DIVERTING_BSY             5            /* Generic */
+#define  DIVERTING_RNR             6            /* Generic */
+#define  DIVERTED_IMM              7            /* DPNSS Enhanced Only */
+#define  DIVERTED_BSY              8            /* DPNSS Enhanced Only */
+#define  DIVERTED_RNR              9            /* DPNSS Enhanced Only */
+#define  DIV_VALIDATION           10            /* DPNSS Enhanced Only */
 
-#define  DIV_BYPASS            11       /* DPNSS Enhanced Only */
-#define  DIVERTING_UNKNOWN     12  		/* Generic */
-#define  DIVERTING_UNCONDITIONAL    13  /* Generic */
-#define  DIVERTING_CD          14       /* Generic */
-#define  DEFLECTION_RINGING    15       /* Generic */
-#define  DEFLECTION_IMM        16       /* Generic */
+#define  DIV_BYPASS               11            /* DPNSS Enhanced Only */
+#define  DIVERTING_UNKNOWN        12            /* Generic */
+#define  DIVERTING_UNCONDITIONAL  13            /* Generic */
+#define  DIVERTING_CD             14            /* Generic */
+#define  DEFLECTION_RINGING       15            /* Generic */
+#define  DEFLECTION_IMM           16            /* Generic */
 
 
 /*-------------------------------------*/
 /* Call Hold messages                  */
 /*-------------------------------------*/
 
-#define  HOLD_CALL             20		/* DPNSS Enhanced Only */
-#define  HOLD_ACK              21		/* DPNSS Enhanced Only */
-#define  HOLD_REJECT           22		/* DPNSS Enhanced Only */
+#define  HOLD_CALL             20               /* DPNSS Enhanced Only */
+#define  HOLD_ACK              21               /* DPNSS Enhanced Only */
+#define  HOLD_REJECT           22               /* DPNSS Enhanced Only */
 #define  HOLD_NOT_SUPPORTED    23               /* DPNSS Enhanced Only */
-#define  RECONNECT_CALL        24 		/* DPNSS Enhanced Only */
+#define  RECONNECT_CALL        24               /* DPNSS Enhanced Only */
 
 
 /*-------------------------------------*/
 /* DPNSS Enquiry Call messages         */
 /*-------------------------------------*/
 
-#define ENQUIRY                30 		/* DPNSS Enhanced Only */
+#define ENQUIRY                30               /* DPNSS Enhanced Only */
 
 /*-------------------------------------*/
 /* DPNSS Call Transfer messages        */
 /*-------------------------------------*/
 
-#define TRANSFER_O             31		/* DPNSS Enhanced Only */
-#define TRANSFER_T             32		/* DPNSS Enhanced Only */
-#define TRANSFERRED            33		/* DPNSS Enhanced Only */
-#define TRANSFERRED_INFO       34		/* DPNSS Enhanced Only */
+#define TRANSFER_O             31               /* DPNSS Enhanced Only */
+#define TRANSFER_T             32               /* DPNSS Enhanced Only */
+#define TRANSFERRED            33               /* DPNSS Enhanced Only */
+#define TRANSFERRED_INFO       34               /* DPNSS Enhanced Only */
 
 /*-------------------------------------*/
 /* DPNSS Mitel Call Charging           */
 /*-------------------------------------*/
 
-#define CHARGE_REQUEST         50  		/* DPNSS Enhanced Only */
-#define CHARGE_UNITS_USED      51  		/* DPNSS Enhanced Only */
-#define CHARGE_ACTIVATE        52  		/* DPNSS Enhanced Only */
+#define CHARGE_REQUEST         50               /* DPNSS Enhanced Only */
+#define CHARGE_UNITS_USED      51               /* DPNSS Enhanced Only */
+#define CHARGE_ACTIVATE        52               /* DPNSS Enhanced Only */
 
-#define CHARGE_ACCOUNT_REQUEST 53		/* DPNSS Enhanced Only */
-#define CHARGE_ACCOUNT_CODE    54		/* DPNSS Enhanced Only */
+#define CHARGE_ACCOUNT_REQUEST 53               /* DPNSS Enhanced Only */
+#define CHARGE_ACCOUNT_CODE    54               /* DPNSS Enhanced Only */
 
 
 /*-------------------------------------*/
 /* DPNSS Conference                    */
 /*-------------------------------------*/
 
-#define ADD_ON_VALIDATION      60 		/* DPNSS Enhanced Only */
-#define ADD_ON_ACK             61 		/* DPNSS Enhanced Only */
-#define ADDED_ON               62		/* DPNSS Enhanced Only */
-#define ADD_ON_REJECT          63		/* DPNSS Enhanced Only */
-#define ADD_ON_NOT_SUPPORTED   64		/* DPNSS Enhanced Only */
-#define ADD_ON_CLEARDOWN       65		/* DPNSS Enhanced Only */
-#define TWO_PARTY_O            66		/* DPNSS Enhanced Only */
-#define TWO_PARTY_T            67		/* DPNSS Enhanced Only */
+#define ADD_ON_VALIDATION      60               /* DPNSS Enhanced Only */
+#define ADD_ON_ACK             61               /* DPNSS Enhanced Only */
+#define ADDED_ON               62               /* DPNSS Enhanced Only */
+#define ADD_ON_REJECT          63               /* DPNSS Enhanced Only */
+#define ADD_ON_NOT_SUPPORTED   64               /* DPNSS Enhanced Only */
+#define ADD_ON_CLEARDOWN       65               /* DPNSS Enhanced Only */
+#define TWO_PARTY_O            66               /* DPNSS Enhanced Only */
+#define TWO_PARTY_T            67               /* DPNSS Enhanced Only */
 
 
 /*-------------------------------------*/
 /* Executive Intrusion                 */
 /*-------------------------------------*/
 
-#define INTRUSION_REQUEST      70		/* DPNSS Enhanced Only */
-#define PV_INTRUSION           71		/* DPNSS Enhanced Only */
-#define INTRUSION_ACK          72		/* DPNSS Enhanced Only */
-#define INTRUDING              73		/* DPNSS Enhanced Only */
-#define IPL_REQUEST            74		/* DPNSS Enhanced Only */
-#define IPL_RESPONSE           75		/* DPNSS Enhanced Only */
-#define INTRUSION_WITHDRAW     76		/* DPNSS Enhanced Only */
-#define WITHDRAW_ACK           77		/* DPNSS Enhanced Only */
-#define WITHDRAW_NOT_SUPPORTED 78		/* DPNSS Enhanced Only */
+#define INTRUSION_REQUEST      70               /* DPNSS Enhanced Only */
+#define PV_INTRUSION           71               /* DPNSS Enhanced Only */
+#define INTRUSION_ACK          72               /* DPNSS Enhanced Only */
+#define INTRUDING              73               /* DPNSS Enhanced Only */
+#define IPL_REQUEST            74               /* DPNSS Enhanced Only */
+#define IPL_RESPONSE           75               /* DPNSS Enhanced Only */
+#define INTRUSION_WITHDRAW     76               /* DPNSS Enhanced Only */
+#define WITHDRAW_ACK           77               /* DPNSS Enhanced Only */
+#define WITHDRAW_NOT_SUPPORTED 78               /* DPNSS Enhanced Only */
 
 
 /*-------------------------------------*/
 /* DPNSS Call Back Messaging           */
 /*-------------------------------------*/
 
-#define CALL_BACK_MESSAGE_REQ  80		/* DPNSS Enhanced Only */
-#define CALL_BACK_MESSAGE_CAN  81		/* DPNSS Enhanced Only */
-#define DPNSS_RAW              82		/* DPNSS Enhanced Only */
+#define CALL_BACK_MESSAGE_REQ  80               /* DPNSS Enhanced Only */
+#define CALL_BACK_MESSAGE_CAN  81               /* DPNSS Enhanced Only */
+#define DPNSS_RAW              82               /* DPNSS Enhanced Only */
 
+/*-------------------------------------*/
+/* DPNSS Call Back When Free           */
+/*-------------------------------------*/
+
+#define CBWF_REQUEST                    90
+#define CBWF_CANCEL                     91
+#define CBWF_FREE_NOTIFY                92
+#define RING_OUT                        93
+#define CALL_BACK_COMPLETE              94
+#define CBWF_CALL_SETUP_IMMEDIATE       95
+#define CBWF_CALL_SETUP_DELAYED         96
+
+/*-------------------------------------*/
+/* DPNSS Night Service Diversion       */
+/*-------------------------------------*/
+
+#define NIGHT_SERVICE_DIVERT			97
+#define NIGHT_SERVICE_DIVERTING			98
+#define NIGHT_SERVICE_DIVERTED			99
 
 /*---------------------------------*/
 /* DPNSS layer 2 states / commands */
@@ -1132,13 +1275,13 @@ spare                          0x00000200
 spare                          0x00400000
 spare                          0x00800000
  */
-#define CS_DPNS_TRANSIT        0x01000000		 /* DPNSS Enhanced Only */
-#define CS_DPNS_IN_TRANSIT     0x02000000		 /* DPNSS Enhanced Only */
-#define CS_DPNS_HOLDING        0x04000000		 /* DPNSS Enhanced Only */
-#define CS_DPNS_HELD           0x08000000		 /* DPNSS Enhanced Only */
-#define CS_DPNS_CONFERENCE     0x10000000		 /* DPNSS Enhanced Only */
-#define CS_DPNS_INTRUDING      0x20000000		 /* DPNSS Enhanced Only */
-#define EV_DPNS_IN_TRANSIT     0x40000000        /* DPNSS Enhanced Only */
+#define CS_DPNS_TRANSIT        0x01000000                /* DPNSS Enhanced Only */
+#define CS_DPNS_IN_TRANSIT     0x02000000                /* DPNSS Enhanced Only */
+#define CS_DPNS_HOLDING        0x04000000                /* DPNSS Enhanced Only */
+#define CS_DPNS_HELD           0x08000000                /* DPNSS Enhanced Only */
+#define CS_DPNS_CONFERENCE     0x10000000                /* DPNSS Enhanced Only */
+#define CS_DPNS_INTRUDING      0x20000000                /* DPNSS Enhanced Only */
+#define EV_DPNS_IN_TRANSIT     0x40000000                /* DPNSS Enhanced Only */
 
 
 
@@ -1187,7 +1330,8 @@ spare                          0x00800000
 #define EV_EXT_HOLD_REQUEST         0x00000020
 #define EV_EXT_RECONNECT_REQUEST    0x00000040
 #define EV_EXT_TRANSFER_INFORMATION 0x00000080
-
+#define EV_EXT_NON_STANDARD_DATA    0x00000100
+#define EV_EXT_DIVERSION            0x00000200
 
 /*-------------------------------------*/
 /* Feature Indications                 */
@@ -1203,11 +1347,13 @@ spare                          0x00800000
 #define FEATURE_VIRTUAL         0x00000080
 #define FEATURE_HOLD_RECONNECT  0x00000100
 #define FEATURE_TRANSFER        0x00000200
+#define FEATURE_MLPP			0x00001000
 /* Some firmwares give access to information elements not directly
  * supported through the API. Seeing this flag set indicates that
  * this information is present.
  */
 #define FEATURE_RAW_DATA        0x00000400
+#define FEATURE_NON_STANDARD    0x00000800
 
 /*-------------------------------------*/
 /* DPNSS layer 2 states                */
@@ -1371,6 +1517,8 @@ spare                          0x00800000
 #define ERR_BOARD_UNLOADED ( -46 )  /* The board has not been downloaded              */
 #define ERR_BOARD_VERSION  ( -47 )  /* Board software incompatible with host software */
 
+#define ERR_DNLD_CRCERRORS ( -48 )  /* CRC error detected in board firmware during download */
+
 /*--------------------------------*/
 /* clearing cause FROM the driver */
 /*--------------------------------*/
@@ -1487,6 +1635,35 @@ spare                          0x00800000
 
 #define UUI_CONTROL_CCM_DATA            (1<<0)
 
+
+/* MLPP Precedence levels */
+#define MLPP_Prec_level_flashOverride	0
+#define MLPP_Prec_level_flash			1
+#define MLPP_Prec_level_immediate		2
+#define MLPP_Prec_level_priority		3
+#define MLPP_Prec_level_routine			4
+
+/* MLPP Look ahead For Busy Indicators */
+#define MLPP_LFB_Indictn_lfbAllowed		0
+#define MLPP_LFB_Indictn_lfbNotAllowed	1
+#define MLPP_LFB_Indictn_pathReservd	2
+
+/* MLPP Status Request field */
+#define MLPP_StatusRequest_successCalledUserMLPPSubscriber		1
+#define MLPP_StatusRequest_successCalledUserNotMLPPSubscriber	2
+#define MLPP_StatusRequest_failureCaseA							3
+#define MLPP_StatusRequest_failureCaseB							4
+
+/* MLPP Error field */
+#define	MLPP_Error_userNotSubscribed			0
+#define MLPP_Error_rejectedByNetwork			1
+#define MLPP_Error_unauthorizedPrecedenceLevel	44
+
+/* MLPP Preempt field */
+#define	MLPP_preempt_circuitReservedForReuse	1
+#define	MLPP_preempt_circuitNotReservedForReuse	2
+
+
 /* Settings for 'control' fields */
 /* Info is sent immediately */
 #define CONTROL_DEFAULT                 0
@@ -1521,16 +1698,41 @@ spare                          0x00800000
 #define RECONNECT_ACKNOWLEDGE_CMD         3
 #define RECONNECT_REJECT_CMD              4
 
-/* Operation Types - See FEATURE_TRANSFER_STRUCT */
-/* EuroISDN                                      */
+/*	These error codes are to be used when rejecting
+	a transfer message  See Appendix K of the call 
+	control guide for more information	*/
+#define FE_NOT_SUBSCRIBED					0
+#define FE_NOT_AVAILABLE					3
+#define FE_INVALID_CALL_STATE				7
+#define FE_SS_INTERACTION_NOT_ALLOWED		10
+#define FE_LINKID_NOT_ASSIGNED_BY_NETWORK	21	
+
+/*	This error code is to be used when rejecting
+	a link ID request message  See Appendix K of 
+	the call control guide for more information	*/
+#define FE_RESOURCE_UNAVAILABLE				11
+
+/* Operation Values - See FEATURE_TRANSFER_XPARMS or DIVERSION_XPARMS */
+/* EuroISDN or QSIG                              */
+/* Values for ETS300 call transfer */
 #define OP_EXPLICIT_ECT_EXECUTE           1
 #define OP_ECT_LINK_ID_REQUEST            4
 #define OP_ECT_EXECUTE                    7
+/* Values for QSIG call diversion */
+#define OP_CALL_REROUTE_REQ               20
+#define OP_DIVERTING_LEG_INFO2            21
+/* Operation value for mlpp */
+#define OP_MLPP_CALL_REQUEST			  25
+#define OP_MLPP_CALL_PREEMPT			  26
 
-/* Operation Values */
+/* Operation Types */
 #define INVOKE                            1
 #define RETURN_RESULT                     2
 #define RETURN_ERROR                      3
+
+/* Non standard data id types */
+#define NON_STANDARD_ID_TYPE_H221         1
+#define NON_STANDARD_ID_TYPE_OBJECT       2
 
 /*-------------------------------------*/
 /* unpublished private structures      */
@@ -1553,7 +1755,7 @@ typedef struct api_register {
 /* Flag definitions for associate net interface */
 #define ACUC_ASSOC_LOCAL	(1<<0)
 #define ACUC_RANDOM_SELECT	(1<<1)
-#define ACUC_ASSOC_OFF_CARD	(1<<2)
+#define ACUC_ASSOC_OFF_CARD        (1<<2)
 
 typedef struct handle_2_port_xparms {
   API_REGISTER api_reg;
@@ -1606,6 +1808,14 @@ typedef struct acuc_assoc_net_xparms {
            ACU_ULONG  base_cic;   /* Base Circuit ID code */
            ACU_INT    selection_method;
            ACU_INT    ni;         /* Network indicator */
+           ACU_ULONG  apc1;        /* APC of first quasi-route */
+           ACU_ULONG  apc1pri;     /* Priority of above */
+           ACU_ULONG  apc2;        /* APC of second quasi-route */
+           ACU_ULONG  apc2pri;     /* Priority of above */
+           ACU_ULONG  apc3;        /* APC of third quasi-route */
+           ACU_ULONG  apc3pri;     /* Priority of above */
+           ACU_ULONG  apc4;        /* APC of fourth quasi-route */
+           ACU_ULONG  apc4pri;     /* Priority of above */
            } ACU_PACK_DIRECTIVE sig_isup ;
       } unique_xparms ;
 
@@ -1622,28 +1832,59 @@ typedef struct acuc_maintenance_xparms {
   ACU_INT      reserved ;
   ACU_INT      type;      /* Protocol-specific qualifier to cmd */
   ACU_ULONG    ts_mask;   /* Mask for group-oriented calls */
+  union
+    {
+    struct
+       {
+       ACU_ULONG  dpc ;
+       ACU_INT    action ;
+       ACU_INT    module ;
+       ACU_INT    option ;
+       ACU_UCHAR  generic[20] ;  /* Up to 20 bytes of free format generic parameters */
+       } ACU_PACK_DIRECTIVE sig_isup ;
+    } unique_xparms ;
 } ACU_PACK_DIRECTIVE ACUC_MAINTENANCE_XPARMS ;
 
 
-/* Generic Commands valid for acuc_maintenance_xparms */
+/* Commands valid for acuc_maintenance_xparms */
 #define ACUC_MAINT_TS_BLOCK        0x0001
 #define ACUC_MAINT_TS_UNBLOCK      0x0002
 #define ACUC_MAINT_PORT_BLOCK      0x0101
 #define ACUC_MAINT_PORT_UNBLOCK    0x0102
 #define ACUC_MAINT_PORT_RESET      0x0202
 
+#define ACUC_MAINT_NET_2_DPC       0x0300
+#define ACUC_MAINT_FW_GENERIC      0x1000
+
+/* Actions/modules/objects for SS7 generic maintenance commands */
+/* - Not used by customer applications, used internally within the library */
+
+/* Module definitions */
+#define ACUC_MAINT_IF_MTP1         0x11        
+#define ACUC_MAINT_MTP2            0x01
+#define ACUC_MAINT_IF_MTP3         0x02
+#define ACUC_MAINT_IF_ISUP         0x03
+
+/* Action Type */
+#define ACUC_MAINT_SETOPT          0x09
+#define ACUC_MAINT_GETOPT          0x0a
+
+/* MTP1 - specific objects */
+#define	ACUC_MAINT_75_OHM	   0x01
+
+/* MTP3 - specific objects */
+
+#define ACUC_MAINT_MTP3_STP		  0x02 /* MUST be the same as #define mvcldrvr.h */
+#define ACUC_MAINT_MTP3_TFC		  0x03 /* MUST be the same as #define mvcldrvr.h */
+#define ACUC_MAINT_MTP3_SP_STATUS         0x10 /* MUST be the same as #define mvcldrvr.h */
+#define ACUC_MAINT_MTP3_ROUTE_STATUS      0x11 /* MUST be the same as #define mvcldrvr.h */
+#define ACUC_MAINT_MTP3_RESOLVE_ROUTESET  0x12 /* MUST be the same as #define mvcldrvr.h */
+#define ACUC_MAINT_MTP3_LINK_STATUS       0x13 /* MUST be the same as #define mvcldrvr.h */
+#define ACUC_MAINT_MTP3_RESOLVE_LINKSET   0x14 /* MUST be the same as #define mvcldrvr.h */
+
 /* Generic flag settings valid for acuc_maintenance_xparms */
 #define ACUC_MAINT_SYNC            0x80  /* Command is to execute synchronously */
-
-/*
- * VoIP specific data structures for Aculab use only
- */
-
-struct acu_vcc_thread_id {
-  ACU_UINT  id;
-  ACU_UINT  handle;
-};
-typedef struct acu_vcc_thread_id ACU_VCC_THREAD_ID;
+#define ACUC_MAINT_TLS             0x40  /* Cmd dealt with by TLS (not fw) */
 
 
 typedef struct tsinfo_xparms {
@@ -1663,13 +1904,6 @@ typedef struct {
                ACU_INT      net;
                ACU_INT      ch;
                ACU_INT      io;
-               union
-                  {
-                  struct
-                     {
-                     ACU_VCC_THREAD_ID calling_thread;
-                     } sig_h323;
-                  } ACU_PACK_DIRECTIVE unique_xparms;
                } ACU_PACK_DIRECTIVE LEQ;
 
 
@@ -1699,13 +1933,6 @@ typedef struct sfmw_xparms {
                            ACU_INT      ss_line;
                            ACU_INT      ss_vers;
                            char         confstr[CONFSTRSIZE];       /* V5 version */
-                           union
-                              {
-                              struct
-                                 {
-                                 ACU_VCC_THREAD_ID calling_thread;
-                                 } sig_h323;
-                           } ACU_PACK_DIRECTIVE unique_xparms;
 } ACU_PACK_DIRECTIVE  SFMW_XPARMS;
 
 
@@ -1864,20 +2091,123 @@ typedef struct uniquex_isup   {
 /*--------------------------------------------------------*/
 
 typedef struct uniquex_h323 {
-                            ACU_VCC_THREAD_ID  calling_thread;
+                            ACU_UINT           pipe_number;
                             ACU_ULONG          destination_addr; /* only used for IP address not E164 */
                             ACU_ULONG          originating_addr; /* as above                          */
                             ACU_INT            request_admission;
                             ACU_INT            tdm_encoding;
                             ACU_INT            encode_gain;
                             ACU_INT            decode_gain;
+                            ACU_INT            echo_cancellation;
+                            ACU_INT            echo_suppression;
+                            ACU_INT            echo_span;
                             ACU_INT            voice_activity_det;
                             ACU_INT            codecs[MAXCODECS];
                             ACU_CHAR           display[MAXDISPLAY];
                             ACU_ULONG          gk_addr;
                             ACU_INT            endpoint_identifier_length;
                             ACU_USHORT         endpoint_identifier[128];
+                            ACU_INT            virtual_call;
+                            ACU_UINT           packet_length;
+                            ACU_UINT           rtp_tos;
+                            ACU_UINT           rtcp_tos;
 } ACU_PACK_DIRECTIVE UNIQUEX_H323;
+
+/*--------------------------------------------------------*/
+/* VOIP-SIP Unique Structure                              */
+/*--------------------------------------------------------*/
+
+typedef struct sip_url {
+                       ACU_CHAR        address[MAXSIPURL];
+                       ACU_INT         address_type;
+} ACU_PACK_DIRECTIVE SIP_URL;
+
+typedef struct tel_url {
+                       ACU_CHAR        address[MAXTELURL];
+} ACU_PACK_DIRECTIVE TEL_URL;
+
+/* Generic url union */
+typedef union genurl {
+                     SIP_URL           sip_url;
+                     TEL_URL           tel_url;
+} ACU_PACK_DIRECTIVE GENURLU;
+
+/* Generic SIP ADDRESS */
+typedef struct sip_address {
+                           union genurl       url;
+                           ACU_INT            scheme;
+                           ACU_INT            port;
+                           ACU_CHAR           display_name[MAXDISPLAY];
+} ACU_PACK_DIRECTIVE SIP_ADDRESS;
+
+typedef struct uniquex_sip {
+                           SIP_ADDRESS        destination_addr;
+                           SIP_ADDRESS        originating_addr;
+                           ACU_INT            transport_type;
+                           ACU_INT            tdm_encoding;
+                           ACU_INT            encode_gain;
+                           ACU_INT            decode_gain;
+                           ACU_INT            echo_cancellation;
+                           ACU_INT            echo_suppression;
+                           ACU_INT            echo_span;
+                           ACU_INT            voice_activity_det;
+                           ACU_INT            codecs[MAXCODECS];
+                           ACU_UINT           packet_length;
+                           ACU_UINT           rtp_tos;
+                           ACU_UINT           rtcp_tos;
+} ACU_PACK_DIRECTIVE UNIQUEX_SIP;
+
+/* Structures required for the SIP REGISTER message */
+typedef struct sip_register {
+                            ACU_CHAR registrar_address[MAXSIPURL];
+                            ACU_INT registrar_port;
+                            ACU_CHAR being_registered_aor[MAXSIPURL];
+                            ACU_CHAR responsible_for_registration[MAXSIPURL];
+                            ACU_CHAR callid[MAXSIPREGCALLID];
+                            ACU_INT transport_type;
+} ACU_PACK_DIRECTIVE SIP_REGISTER;
+
+typedef struct sip_add_registration {
+                                    struct sip_register sip_reg;
+                                    SIP_ADDRESS contact;
+                                    ACU_UINT expiry_time;
+} ACU_PACK_DIRECTIVE SIP_ADD_REGISTRATION;
+
+typedef struct sip_remove_registration {
+                                       struct sip_register  sip_reg;
+                                       SIP_ADDRESS          contact;
+                                       ACU_UINT             bool_remove_all;
+} ACU_PACK_DIRECTIVE SIP_REMOVE_REGISTRATION;
+
+typedef struct sip_query_registration {
+                                      struct sip_register  sip_reg;
+                                      SIP_ADDRESS          contact;
+                                      ACU_UINT             bool_remove_all;
+} ACU_PACK_DIRECTIVE SIP_QUERY_REGISTRATION;
+
+/* structure for passing SIP/h323 registration parameters to service */
+typedef struct register_xparms {
+                               API_REGISTER    api_reg;
+                               ACU_INT         net; /* in order that the API knows whether to send to SIP or H323 */
+                               union {
+                                     SIP_ADD_REGISTRATION      sip_add_reg;
+                                     SIP_REMOVE_REGISTRATION   sip_remove_reg;
+                                     SIP_QUERY_REGISTRATION    sip_query_reg;
+                                     /* H.323 registration structures maybe added here */
+                               } unique_xparms;
+} ACU_PACK_DIRECTIVE REGISTER_XPARMS;
+
+/* structure for defining the SIP Proxy details (e.g. Local Outgoing Proxy) */
+typedef struct proxy_details {
+                             ACU_CHAR    address[MAXPROXYADDRESS];        /* address of the proxy (no default) */
+                             ACU_INT     port;                            /* port to use (0=default 5060) */
+                             ACU_INT     transport_type;                  /* transport protocol to use (0=default UDP) */
+} ACU_PACK_DIRECTIVE SIP_PROXY_DETAILS;
+
+
+typedef struct uniquex_dummy {
+	ACU_CHAR	dummy[0x400];
+} ACU_PACK_DIRECTIVE UNIQUEX_DUMMY;
 
 
 /*--------------------------------------------------------*/
@@ -1892,6 +2222,8 @@ typedef union uniquex {
        UNIQUEX_Q931      sig_q931;
        UNIQUEX_ISUP      sig_isup;
        UNIQUEX_H323      sig_h323;
+       UNIQUEX_SIP       sig_sip;
+       UNIQUEX_DUMMY     sig_dummy;
 } ACU_PACK_DIRECTIVE  UNIQUEXU;
 
 /* open for outgoing structure */
@@ -1937,13 +2269,6 @@ typedef struct init_xparms {
                            char         ournum[MAXNUM];
                            ACU_LONG     responsetime;
                            char         board_ip_address[32];
-                           union
-                              {
-                              struct
-                                 {
-                                 ACU_VCC_THREAD_ID calling_thread;
-                                 } sig_h323;
-                           } ACU_PACK_DIRECTIVE unique_xparms;
 } ACU_PACK_DIRECTIVE  INIT_XPARMS;
 
 
@@ -1954,13 +2279,6 @@ typedef struct siginfo_xparms {
                               ACU_INT      nnets;
                               ACU_LONG     validvector;
                               char         sigsys[MAXSIGSYS];
-                              union
-                                 {
-                                 struct
-                                    {
-                                    ACU_VCC_THREAD_ID calling_thread;
-                                    } sig_h323;
-                                 } ACU_PACK_DIRECTIVE unique_xparms;
 } ACU_PACK_DIRECTIVE  SIGINFO_XPARMS;
 
 
@@ -1981,13 +2299,6 @@ typedef struct sysinfo_xparms {
                               ACU_CHAR     serialnumber[MAXSERIALNO];
                               ACU_CHAR     hw_version[MAXHWVERSION];
                               ACU_INT      boardtype;
-                              union
-                                 {
-                                 struct
-                                    {
-                                    ACU_VCC_THREAD_ID calling_thread;
-                                    } sig_h323;
-                              } ACU_PACK_DIRECTIVE unique_xparms;
 } ACU_PACK_DIRECTIVE  SYSINFO_XPARMS;
 
 
@@ -1998,13 +2309,7 @@ typedef struct set_sysinfo_xparms {
                               ACU_INT      net;
                               char board_ip_address[16];
                               int board_number;
-                              union
-                                 {
-                                 struct
-                                    {
-                                    ACU_VCC_THREAD_ID calling_thread;
-                                    } sig_h323;
-                                 } ACU_PACK_DIRECTIVE unique_xparms;
+                              int v1bmi_card_num;
 } ACU_PACK_DIRECTIVE SET_SYSINFO_XPARMS;
 
 
@@ -2038,13 +2343,6 @@ typedef struct state_xparms {
                             ACU_LONG     state;
                             ACU_LONG     timeout;
                             ACU_LONG     extended_state;
-                            union
-                               {
-                               struct
-                                  {
-                                  ACU_VCC_THREAD_ID calling_thread;
-                                  } sig_h323;
-                            } ACU_PACK_DIRECTIVE unique_xparms;
                             ACU_ACT      app_context_token;
 } ACU_PACK_DIRECTIVE  STATE_XPARMS;
 
@@ -2057,12 +2355,29 @@ typedef struct get_charge_xparms {
                                  ACU_INT      type;
                                  char         charge[CHARGEMAX];
                                  ACU_UINT     meter;
+                                 union
+                                    {
+                                    struct
+                                       {
+                                       ACU_UINT  tariff_type ;
+                                       } sig_isup;
+                                    } ACU_PACK_DIRECTIVE unique_xparms;
+
 }  ACU_PACK_DIRECTIVE GET_CHARGE_XPARMS;
 
 typedef struct put_charge_xparms {
                                  API_REGISTER api_reg;
                                  ACU_INT      handle;
                                  char         charge[CHARGEMAX];
+                                 ACU_UINT     meter;
+                                 union
+                                    {
+                                    struct
+                                       {
+                                       ACU_UINT  tariff_type ;
+                                       } sig_isup;
+                                    } ACU_PACK_DIRECTIVE unique_xparms;
+
 } ACU_PACK_DIRECTIVE PUT_CHARGE_XPARMS;
 
 /* disconnect cause structure */
@@ -2080,13 +2395,6 @@ typedef struct transfer_xparms {
                                API_REGISTER api_reg;
                                ACU_INT      handlea;
                                ACU_INT      handlec;
-                               union
-                                  {
-                                  struct
-                                     {
-                                     ACU_VCC_THREAD_ID calling_thread;
-                                     } sig_h323;
-                                  } ACU_PACK_DIRECTIVE unique_xparms;
 } ACU_PACK_DIRECTIVE TRANSFER_XPARMS;
 
 /* command string to the MVIP */
@@ -2142,7 +2450,6 @@ typedef struct progress_xparms {
                                       } sig_isup;
                                    struct
                                       {
-                                      ACU_VCC_THREAD_ID     calling_thread;
                                       DISPLAY               display;
                                       } sig_h323;
                                    }  ACU_PACK_DIRECTIVE unique_xparms;
@@ -2184,10 +2491,6 @@ typedef struct setup_ack_xparms {
                                       PROGRESS_INDICATOR    progress_indicator;
                                       DISPLAY               display;
                                       } sig_q931;
-                                   struct
-                                      {
-                                      ACU_VCC_THREAD_ID calling_thread;
-                                      } sig_h323;
                                    } ACU_PACK_DIRECTIVE unique_xparms;
                                } ACU_PACK_DIRECTIVE SETUP_ACK_XPARMS;
 
@@ -2200,6 +2503,7 @@ typedef struct notify_xparms {
                                  struct
                                     {
                                     NOTIFY_INDICATOR        notify_indicator;
+                                    DISPLAY                 display;
                                     } sig_q931;
                                  } ACU_PACK_DIRECTIVE unique_xparms;
                              } ACU_PACK_DIRECTIVE NOTIFY_XPARMS;
@@ -2220,7 +2524,6 @@ typedef struct keypad_xparms {
                                     } sig_q931;
                                  struct
                                     {
-                                    ACU_VCC_THREAD_ID calling_thread;
                                     KEYPAD            keypad;
                                     } sig_h323;
                                  } ACU_PACK_DIRECTIVE unique_xparms;
@@ -2267,8 +2570,13 @@ typedef struct disconnect_xparms {
                                     struct
                                        {
                                        ACU_INT             raw;
-                                       ACU_VCC_THREAD_ID   calling_thread;
                                        } sig_h323;
+                                    struct
+                                       {
+                                       ACU_INT             raw;
+                                       ACU_CHAR            warning[MAXSIPWARNING]; 
+                                       ACU_CHAR            response_explanation[MAXSIPRESPONSEEXPLANATION];
+                                       } sig_sip;
                                     } ACU_PACK_DIRECTIVE unique_xparms;
                                  } ACU_PACK_DIRECTIVE DISCONNECT_XPARMS;
 
@@ -2302,6 +2610,7 @@ typedef struct accept_xparms {
                                    ACU_UCHAR               charge_ind;
                                    } sig_isup;
                                    UNIQUEX_H323            sig_h323;
+                                   UNIQUEX_SIP	           sig_sip;
                                 } ACU_PACK_DIRECTIVE unique_xparms;
                              } ACU_PACK_DIRECTIVE ACCEPT_XPARMS;
 
@@ -2333,13 +2642,6 @@ typedef struct incoming_ringing_xparms {
 typedef struct hold_xparms {
                            API_REGISTER api_reg;
                            ACU_INT      handle;
-                           union
-                               {
-                               struct
-                                   {
-                                   ACU_VCC_THREAD_ID calling_thread;
-                                   } sig_h323;
-                               } ACU_PACK_DIRECTIVE unique_xparms;
                            } ACU_PACK_DIRECTIVE HOLD_XPARMS;
 
 typedef struct voip_files_xparms {
@@ -2418,6 +2720,88 @@ typedef struct ts_blocking_xparms {
                            ACU_INT      flags ;
 } ACU_PACK_DIRECTIVE TS_BLOCKING_XPARMS ;
 
+/* Maintenance I/F - get MTP status of an SS7 Sig Pt */ 
+typedef struct mtp3_sp_status_xparms
+{
+                           API_REGISTER       api_reg ;
+                           ACU_INT            net ; 
+                           ACU_ULONG          dpc ;
+                           ACU_UCHAR          acc_status ;
+                           ACU_UCHAR          con_status ;
+} MTP3_SP_STATUS_XPARMS;
+
+/* Maintenance I/F - Resolve link(s) from linkset */
+typedef struct mtp3_resolve_linkset_xparms
+{
+                           API_REGISTER       api_reg ;
+                           ACU_INT            net ;
+                           ACU_ULONG          dpc ;
+                           ACU_UCHAR          sys_flags ;
+                           ACU_UCHAR          slc  ;
+} MTP3_RESOLVE_LINKSET_XPARMS ;
+
+/* Maintenance I/F - Resolve route(s) from routeset */
+typedef struct mtp3_resolve_routeset_xparms
+{
+                           API_REGISTER       api_reg ;
+                           ACU_INT            net ;
+                           ACU_ULONG          dpc ;
+                           ACU_UCHAR          sys_flags ;
+                           ACU_LONG           apc  ;
+} MTP3_RESOLVE_ROUTESET_XPARMS ;
+
+
+/* Maintenance I/F - Resolve link status */
+typedef struct mtp3_link_status_xparms {
+                           API_REGISTER       api_reg ;
+                           ACU_INT            net ;
+                           ACU_ULONG          dpc ;
+                           ACU_UCHAR          slc  ;
+                           ACU_UINT           lk_flags ;
+}  MTP3_LINK_STATUS_XPARMS ;
+  
+/* Maintenance I/F - Resolve route status */
+typedef struct mtp3_route_status_xparms {
+                           API_REGISTER       api_reg ;
+                           ACU_INT            net ;
+                           ACU_ULONG          dpc ;
+                           ACU_LONG           apc  ;
+                           ACU_UINT           rt_state ;
+                           ACU_UCHAR          rt_priority ;
+}  MTP3_ROUTE_STATUS_XPARMS ;
+
+/* Maintenance I/F - Resolve DPC from net */
+typedef struct isup_net_2_dpc_xparms {
+                           API_REGISTER       api_reg ;
+                           ACU_INT            net ;
+                           ACU_ULONG          dpc ;
+} ISUP_NET_2_DPC_XPARMS ;
+
+  
+/* Flags for resolve routeset... */
+#define ACUC_MAINT_ROUTE_MORE      0x02
+
+/* Flags for resolve linkset... */
+#define ACUC_MAINT_LINK_MORE       0x02
+
+/* Flags for link status */
+#define ACUC_MAINT_LINK_AVAILABLE        0x01
+#define ACUC_MAINT_LINK_LOCAL_INHIBITED  0x02
+#define ACUC_MAINT_LINK_REMOTE_INHIBITED 0x04
+#define ACUC_MAINT_LINK_LOCAL_BLOCKED    0x08
+#define ACUC_MAINT_LINK_REMOTE_BLOCKED   0x10
+
+/* Values for route status */
+#define ACUC_MAINT_ROUTE_AVAILABLE       0x01
+#define ACUC_MAINT_ROUTE_PROHIBITED      0x02
+#define ACUC_MAINT_ROUTE_RESTRICTED      0x03
+
+/* Values for SP status */
+#define ACUC_MAINT_SP_INACCESSIBLE       0x00
+#define ACUC_MAINT_SP_ACCESSIBLE         0x01
+
+/* Values for congestion status */
+#define ACUC_MAINT_SP_CONGESTED          0x01    /* TFC received within last 5 seconds */
 
 
 /*----------------------------------------------*/
@@ -2539,6 +2923,7 @@ typedef struct dpns_out_xparms {
                               char            originating_addr[MAXNUM];
                               union  uniquex  unique_xparms;
                               FEATURE_XPARMS  feature_info;
+                              ACU_ACT         app_context_token;
                               } ACU_PACK_DIRECTIVE DPNS_OUT_XPARMS;
 
 
@@ -2589,6 +2974,7 @@ typedef struct dpns_detail_xparms {
                            char           redirected_addr[MAXNUM];
                            union  uniquex unique_xparms;
                            FEATURE_XPARMS feature_info;
+                           ACU_ACT        app_context_token;
                            } ACU_PACK_DIRECTIVE DPNS_DETAIL_XPARMS;
 
 
@@ -2606,6 +2992,7 @@ typedef struct dpns_set_transit_xparms {
                                        API_REGISTER api_reg;
                                        ACU_INT      handle;
                                        } ACU_PACK_DIRECTIVE DPNS_SET_TRANSIT_XPARMS;
+
 
 
 typedef struct dpns_cause_xparms {
@@ -2679,15 +3066,17 @@ typedef struct diversion_xparms {
                   ACU_UCHAR      diverting_from_plan;
                   ACU_UCHAR      diverting_from_presentation;
                   ACU_UCHAR      diverting_from_screening;
-                  ACU_UCHAR      diverting_indicator ;           /* supported only by ISUP drivers */
-                  ACU_UCHAR      original_diverting_reason ;     /* supported only by ISUP drivers */
+                  ACU_UCHAR      diverting_indicator;            /* supported only by ISUP drivers */
+                  ACU_UCHAR      original_diverting_reason;      /* supported only by ISUP and QSIG drivers */
                   ACU_UCHAR      diverting_to_type;              /* supported only by ISUP drivers */
                   ACU_UCHAR      diverting_to_plan;              /* supported only by ISUP drivers */
                   ACU_UCHAR      diverting_to_int_nw_indicator;  /* supported only by ISUP drivers */
                   ACU_UCHAR      original_called_type;           /* supported only by ISUP drivers */
                   ACU_UCHAR      original_called_plan;           /* supported only by ISUP drivers */
-                  ACU_UCHAR      original_called_presentation;   /* supported only by ISUP drivers */
-
+                  ACU_UCHAR      original_called_presentation;   /* supported only by ISUP and QSIG drivers */
+                  ACU_INT        operation;                      /* supported only by QSIG */
+                  ACU_INT        operation_type;                 /* supported only by QSIG */
+                  ACU_INT        error;                          /* supported only by QSIG */
               } ACU_PACK_DIRECTIVE DIVERSION_XPARMS;
 
 typedef struct feature_hold_xparms {
@@ -2722,8 +3111,32 @@ typedef struct feature_transfer_xparms {
                               } ets;
                           } specific;
                       } sig_q931;
+                      struct
+                      {
+                          ACU_INT        failure_code;
+                          ACU_INT        voice_activity_det;
+                          ACU_INT        codecs[MAXCODECS];
+                      } sig_sip;
                   }ACU_PACK_DIRECTIVE  unique_xparms;
               } ACU_PACK_DIRECTIVE FEATURE_TRANSFER_XPARMS;
+
+typedef struct non_standard_data_xparms {
+                  ACU_INT   control;
+                  ACU_INT   id_type;
+                  ACU_INT   length;
+                  ACU_UCHAR data[MAXRAWDATA];
+                  union {
+                      struct {
+                          ACU_USHORT cc;
+                          ACU_USHORT ext;
+                          ACU_USHORT code;
+                      } h221_id;
+                      struct {
+                          ACU_INT length;
+                          ACU_ULONG id[MAXOID];
+                      } object_id;
+                 } id;
+           } ACU_PACK_DIRECTIVE NON_STANDARD_DATA_XPARMS;
 
 typedef struct raw_data_struct {
                   ACU_INT        length;
@@ -2732,13 +3145,34 @@ typedef struct raw_data_struct {
            } ACU_PACK_DIRECTIVE RAW_DATA_STRUCT;
 
 
+typedef struct mlpp_xparms {
+                           char     control;
+                           ACU_INT  operation;
+                           ACU_INT  operation_type;
+                           ACU_INT  error;
+                           ACU_INT  Prec_level;
+                           ACU_INT  LFB_Indictn;
+                           char     MLPP_Svc_Domn[5];
+                           ACU_INT  StatusRequest;
+                           ACU_INT Preempt; 
+                           } ACU_PACK_DIRECTIVE MLPP_XPARMS;
+
+typedef struct dummy_xparms {
+                            ACU_CHAR  dummy[0x200];
+} ACU_PACK_DIRECTIVE DUMMY_XPARMS;
+
+
+
 typedef union feature_union {
-                  UUI_XPARMS              uui;
-                  FACILITY_XPARMS         facility;
-                  DIVERSION_XPARMS        diversion;
-                  FEATURE_HOLD_XPARMS     hold;
-                  FEATURE_TRANSFER_XPARMS transfer;
-                  RAW_DATA_STRUCT         raw_data;
+                  UUI_XPARMS               uui;
+                  FACILITY_XPARMS          facility;
+                  DIVERSION_XPARMS         diversion;
+                  FEATURE_HOLD_XPARMS      hold;
+                  FEATURE_TRANSFER_XPARMS  transfer;
+                  NON_STANDARD_DATA_XPARMS non_standard;
+                  RAW_DATA_STRUCT          raw_data;
+                  MLPP_XPARMS              mlpp;
+                  DUMMY_XPARMS             dummy;
               } ACU_PACK_DIRECTIVE FEATURE_UNION;
 
 
@@ -2765,6 +3199,7 @@ typedef struct feature_out_xparms {
                     union         uniquex unique_xparms;
                     FEATURE_UNION feature;
                     ACU_INT       message_control;
+                    ACU_ACT       app_context_token;
             } ACU_PACK_DIRECTIVE FEATURE_OUT_XPARMS;
 
 
@@ -2855,13 +3290,6 @@ typedef struct dsp_xparms {
                           API_REGISTER api_reg;
                           ACU_INT      net;
                           ACU_INT      config;
-                          union
-                              {
-                              struct
-                                  {
-                                  ACU_VCC_THREAD_ID calling_thread;
-                                  } sig_h323;
-                              } ACU_PACK_DIRECTIVE unique_xparms;
                           } ACU_PACK_DIRECTIVE DSP_XPARMS;
 
 /* VoIP codec configuration info */
@@ -2873,7 +3301,6 @@ typedef struct codec_xparms {
                                {
                                struct
                                   {
-                                  ACU_VCC_THREAD_ID calling_thread;
                                   ACU_INT codecs[MAXCODECS];
                                   } sig_h323;
                                } ACU_PACK_DIRECTIVE unique_xparms;
@@ -2888,52 +3315,58 @@ typedef struct set_configuration_xparms {
                                         ACU_ULONG       ip_address3;
                                         ACU_INT         def_encode_gain;
                                         ACU_INT         def_decode_gain;
-                                        ACU_UCHAR       def_tos;
+                                        ACU_UINT        def_rtp_tos;
+                                        ACU_UINT        def_rtcp_tos;
                                         ACU_UINT        def_jitter;
                                         ACU_UINT        max_jitter;
                                         ACU_UINT        max_jitter_buffer;
-                                        union
-                                           {
-                                           struct
-                                              {
-                                              ACU_VCC_THREAD_ID calling_thread;
-                                              } sig_h323;
-                                           } ACU_PACK_DIRECTIVE unique_xparms;
+                                        union {
+                                              struct {
+                                                     SIP_PROXY_DETAILS local_outgoing_proxy;
+                                                     char listening_nic_address[SIPLISTENADDRESS] ;
+                                                     ACU_INT transport;
+                                                     ACU_UINT port;
+                                                     
+                                                     } sig_sip;
+                                              } ACU_PACK_DIRECTIVE unique_xparms;
                                         } SET_CONFIGURATION_XPARMS;
 
-  typedef struct get_configuration_xparms{
-                                         API_REGISTER   api_reg;
-                                         ACU_INT        net;
-                                         char          *board_ip_address;           /* stores the ip address for the board */
-                                         ACU_INT        itf;
-                                         ACU_ULONG      ip_address1;
-                                         ACU_ULONG      ip_address2;
-                                         ACU_ULONG      ip_address3;
-                                         ACU_INT        version_major;
-                                         ACU_INT        version_minor;
-                                         ACU_INT        hardware_type;
-                                         ACU_INT        devices_fitted;
-                                         ACU_INT        psos_bf;
-                                         ACU_INT        VoIP;
-                                         ACU_INT        SS7;
-                                         ACU_INT        PSOS_ef;
-                                         ACU_INT        allowed_G711;
-                                         ACU_INT        allowed_G723_1;
-                                         ACU_INT        allowed_G729A;
-                                         ACU_UCHAR      dsp_serial_number[17];
-                                         ACU_UCHAR      AC_number[17];
-                                         ACU_UCHAR      def_tos;
-                                         ACU_UINT       def_jitter;
-                                         ACU_UINT       max_jitter;
-                                         ACU_UINT       max_jitter_buffer;
-                                         union
-                                            {
-                                            struct
-                                               {
-                                               ACU_VCC_THREAD_ID calling_thread;
-                                               } sig_h323;
-                                            } ACU_PACK_DIRECTIVE unique_xparms;
-                                         } GET_CONFIGURATION_XPARMS;
+
+typedef struct get_configuration_xparms{
+                                       API_REGISTER   api_reg;
+                                       ACU_INT        net;
+                                       char          *board_ip_address;           /* stores the ip address for the board */
+                                       ACU_INT        itf;
+                                       ACU_ULONG      ip_address1;
+                                       ACU_ULONG      ip_address2;
+                                       ACU_ULONG      ip_address3;
+                                       ACU_INT        version_major;
+                                       ACU_INT        version_minor;
+                                       ACU_INT        hardware_type;
+                                       ACU_INT        devices_fitted;
+                                       ACU_INT        psos_bf;
+                                       ACU_INT        VoIP;
+                                       ACU_INT        SS7;
+                                       ACU_INT        PSOS_ef;
+                                       ACU_INT        allowed_G711;
+                                       ACU_INT        allowed_G723_1;
+                                       ACU_INT        allowed_G729A;
+                                       ACU_UCHAR      dsp_serial_number[17];
+                                       ACU_UCHAR      AC_number[17];
+                                       ACU_UINT       def_rtp_tos;
+                                       ACU_UINT       def_rtcp_tos;
+                                       ACU_UINT       def_jitter;
+                                       ACU_UINT       max_jitter;
+                                       ACU_UINT       max_jitter_buffer;
+                                       union {
+                                             struct {
+                                                    SIP_PROXY_DETAILS local_outgoing_proxy;
+                                                    char listening_nic_address[SIPLISTENADDRESS];
+                                                    ACU_INT transport;
+                                                    ACU_UINT port;
+                                                    } sig_sip;
+                                             } ACU_PACK_DIRECTIVE unique_xparms;
+                                       } GET_CONFIGURATION_XPARMS;
 
 typedef struct voip_get_stats_xparms {
                                      API_REGISTER       api_reg;
@@ -2946,13 +3379,6 @@ typedef struct voip_get_stats_xparms {
                                      ACU_INT            ipformaterrors;
                                      ACU_INT            ipaddrerrors;
                                      ACU_INT            ipoutnoroutes;
-                                     union
-                                         {
-                                         struct
-                                            {
-                                            ACU_VCC_THREAD_ID calling_thread;
-                                            } sig_h323;
-                                         } ACU_PACK_DIRECTIVE unique_xparms;
                                      } VOIP_GET_STATS_XPARMS;
 
 typedef struct channel_stats_xparms {
@@ -2961,13 +3387,6 @@ typedef struct channel_stats_xparms {
                                     char        *board_ip_address ;    /* stores the ip address for the board */
                                     ACU_INT      timeslot;
                                     ACU_INT      stream;
-                                    union
-                                       {
-                                       struct
-                                          {
-                                          ACU_VCC_THREAD_ID calling_thread;
-                                          } sig_h323;
-                                       } ACU_PACK_DIRECTIVE unique_xparms;
                                     } CHANNEL_STATS_XPARMS;
 
 typedef struct set_debug_xparms {
@@ -2976,13 +3395,6 @@ typedef struct set_debug_xparms {
                                 char        *board_ip_address ;           /* stores the ip address for the board */
                                 ACU_INT      level;
                                 ACU_INT      output;
-                                union
-                                   {
-                                   struct
-                                      {
-                                      ACU_VCC_THREAD_ID calling_thread;
-                                      } sig_h323;
-                                   } ACU_PACK_DIRECTIVE unique_xparms;
                                 } SET_DEBUG_XPARMS;
 
 /*-----------------------------------------*/
@@ -3009,14 +3421,12 @@ typedef struct  {
 
 typedef struct voip_admin_in_xparms {
                                     API_REGISTER        api_reg;
-                                    ACU_VCC_THREAD_ID   calling_thread;
                                     voip_admin_msg     *admin_msg;
                                     ACU_INT             valid;
                                     } VOIP_ADMIN_IN_XPARMS;
 
 typedef struct voip_admin_out_xparms {
                                      API_REGISTER       api_reg;
-                                     ACU_VCC_THREAD_ID  calling_thread;
                                      voip_admin_msg    *admin_msg;
                                      } VOIP_ADMIN_OUT_XPARMS;
 
@@ -3173,6 +3583,7 @@ typedef union ioctlu {
              SET_DEBUG_XPARMS            set_debug_xparms;
              ACU_INT                     command_error;
              SET_SYSINFO_XPARMS          set_sysinfo_xparms;
+             REGISTER_XPARMS             voip_register_xparms;
              } IOCTLU;
 
 /*-----------------------------*/
@@ -3317,7 +3728,9 @@ ACUDLL int            call_decode_devts         ( struct endec_xparms * );
 ACUDLL int            call_ncards               ( void );
 ACUDLL int            call_expose_fd            ( int );
 
-ACUDLL void init_api_reg             ( struct api_register *, ACU_LONG );
+ACUDLL void           init_api_reg              ( struct api_register *, ACU_LONG );
+ACUDLL ACU_UINT ACU_WINAPI call_generate_iptos  ( unsigned int , unsigned int );
+ACUDLL ACU_UINT ACU_WINAPI call_generate_dscp   ( unsigned int );
 
 
 
@@ -3326,7 +3739,6 @@ ACUDLL void init_api_reg             ( struct api_register *, ACU_LONG );
 /*-----------------------------------*/
 
 ACUDLL int ACU_WINAPI dpns_incoming_ringing ( struct dpns_incoming_ring_xparms * );
-ACUDLL int ACU_WINAPI dpns_call_details     ( struct dpns_detail_xparms * );
 ACUDLL int ACU_WINAPI dpns_call_accept      ( struct dpns_call_accept_xparms * );
 ACUDLL int ACU_WINAPI dpns_openout          ( struct dpns_out_xparms * );
 ACUDLL int ACU_WINAPI dpns_send_overlap     ( struct dpns_overlap_xparms * );
@@ -3355,13 +3767,27 @@ ACUDLL int ACU_WINAPI call_get_connectionless ( struct  feature_detail_xparms * 
 
 /*--------------------------------------*/
 /* Maintenance-oriented prototypes      */
-/* - only available for ISUP at present.*/
+/* - only available for SS7  at present.*/
 /*--------------------------------------*/
 ACUDLL int ACU_WINAPI call_maint_ts_block  ( struct ts_blocking_xparms * );
 ACUDLL int ACU_WINAPI call_maint_ts_unblock  ( struct ts_blocking_xparms * );
 ACUDLL int ACU_WINAPI call_maint_port_block  ( struct port_blocking_xparms * );
 ACUDLL int ACU_WINAPI call_maint_port_unblock  ( struct port_blocking_xparms * );
 ACUDLL int ACU_WINAPI call_maint_port_reset  ( struct port_reset_xparms * );
+
+ACUDLL int ACU_WINAPI call_maint_mtp3_get_sp_status (struct mtp3_sp_status_xparms *) ;
+ACUDLL int ACU_WINAPI call_maint_mtp3_resolve_routeset(struct mtp3_resolve_routeset_xparms *) ;
+ACUDLL int ACU_WINAPI call_maint_mtp3_resolve_linkset(struct mtp3_resolve_linkset_xparms *) ;
+ACUDLL int ACU_WINAPI call_maint_mtp3_get_link_status(struct mtp3_link_status_xparms *) ;
+ACUDLL int ACU_WINAPI call_maint_mtp3_get_route_status(struct mtp3_route_status_xparms *) ;
+ACUDLL int ACU_WINAPI call_maint_isup_net_2_dpc(struct isup_net_2_dpc_xparms *) ;
+
+/*-----------------------------------*/
+/* SIP/h323 register functions       */
+/*-----------------------------------*/
+ACUDLL int ACU_WINAPI call_register_system ( struct register_xparms * );
+ACUDLL int ACU_WINAPI call_unregister_system ( struct register_xparms * );
+ACUDLL int ACU_WINAPI call_query_register_system ( struct register_xparms * );
 
 /*-----------------------------------*/
 /* Aculab Internal Testing Functions */
@@ -3383,7 +3809,6 @@ ACUDLL int  ACU_WINAPI system_init ( void );       /* initialise switch and call
 ACUDLL void ACU_WINAPI swap_clock  ( int  );       /* change clock sources between cards       */
 ACUDLL int             chknet_port ( int );        /* returns a signalling system dependent value */
 ACUDLL int             chknet      ( char * );     /* returns a signalling system dependent value */
-ACUDLL void            init_api_reg ( struct api_register *, ACU_LONG );
 
 ACUDLL char * ACU_WINAPI port_2_filename  ( int ); /* select firmware file name to be downloaded */
 ACUDLL char * ACU_WINAPI sigtype_2_string ( int ); /* convert a signalling system type to a printable string */

@@ -608,8 +608,9 @@ unsigned Sequencer::DISC(InterfaceConnection *server, const std::string &id)
 	if (m_id.size())
 	{
 		unlock();
- 		server->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-			<< " DISC protocol violation" << end();
+
+		server->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
+			<< " state violation (DISC): " << m_id << " still pending"<< end();
 
 		return V3_ERROR_PROTOCOL_VIOLATION;
 	}
@@ -689,7 +690,7 @@ unsigned Sequencer::BGRC(const std::string &id)
 		if (m_interface)
 		{
  			m_interface->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-				<< " BGRC " << getName() << end();
+				<< " state violation (BGRC): " << m_id << " still pending"<< end();
 		}
 
 		return V3_ERROR_PROTOCOL_VIOLATION;
@@ -983,7 +984,7 @@ unsigned Sequencer::ACPT(InterfaceConnection *server, const std::string &id)
 		if (server)
 		{
  			server->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-				<< " protocol violation" << end();
+				<< " state violation (ACPT): " << m_id << " still pending"<< end();
 		}
 
 		return V3_ERROR_PROTOCOL_VIOLATION;
@@ -1298,7 +1299,10 @@ bool Sequencer::data(InterfaceConnection* server, const std::string &command,
 
 void usage()
 {
-	std::cerr << "usage: " << std::endl << "sequence -[dl]" << std::endl;
+	std::cerr << "usage: " << std::endl << "sequence [options]" << std::endl;
+	std::cerr << "    -f <file> downloads prosody firmware <file>" << std::endl;
+	std::cerr << "    -d <level> selects debug level" << std::endl;
+	std::cerr << "    -l <logfile> writes logs to <logfile>" << std::endl;
 
 	exit(1);
 }

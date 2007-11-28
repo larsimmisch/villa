@@ -45,7 +45,11 @@
 #include <winerror.h>
 
 
+typedef BOOL (WINAPI* LPProcessIdToSessionId)(DWORD,DWORD*);
+
 tSMDevHandle smdControlDevHandle = INVALID_HANDLE_VALUE;
+static HMODULE kernel32lib = NULL;
+static LPProcessIdToSessionId fpProcessIdToSessionId = NULL;
 
 
 /*
@@ -80,7 +84,11 @@ static tSMDevHandle smdopen( char * smdevnp )
 
 static void rootName( char* root, int isEventRootName )
 {
-	OSVERSIONINFO osvi;
+	OSVERSIONINFO	osvi;
+	DWORD			sessId;
+	BOOLEAN			isTSSession;
+
+	isTSSession = FALSE;
 
 	ZeroMemory(&osvi,sizeof(OSVERSIONINFO));
 
@@ -89,6 +97,21 @@ static void rootName( char* root, int isEventRootName )
 	GetVersionEx (&osvi);
 
 	if ( osvi.dwMajorVersion > 4 )
+	{
+		if (fpProcessIdToSessionId != NULL)
+		{
+			if ((*fpProcessIdToSessionId)(GetCurrentProcessId(),&sessId))
+			{
+				if (sessId != 0)
+				{
+					isTSSession = TRUE;
+				}
+
+			}
+		}
+	}
+
+	if (isTSSession)
 	{
 		if (isEventRootName)
 		{
@@ -130,6 +153,13 @@ tSMDevHandle smd_open_ctl_dev( void )
 
 	if (!(isGoodDevice = (smdControlDevHandle != INVALID_HANDLE_VALUE)))
    	{
+		kernel32lib = LoadLibrary("kernel32.dll");
+
+		if (kernel32lib != NULL)
+		{
+			fpProcessIdToSessionId = (LPProcessIdToSessionId)GetProcAddress(kernel32lib,"ProcessIdToSessionId");
+		}
+
 		rootName(&controlDeviceName[0],0);
 
 		strcpy(&controlDeviceName[strlen(&controlDeviceName[0])],kSMDNTDevControlName);
@@ -156,6 +186,13 @@ void smd_close_ctl_dev( void )
 		CloseHandle((HANDLE) smdControlDevHandle);
 
 		smdControlDevHandle = INVALID_HANDLE_VALUE;
+
+		if (kernel32lib != NULL)
+		{
+			FreeLibrary(kernel32lib);  
+
+			kernel32lib = NULL;
+		}
 	}
 }
 

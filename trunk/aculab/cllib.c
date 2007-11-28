@@ -16,32 +16,12 @@
 /*                                                            */
 /* Change History                                             */
 /*                                                            */
-/* rev:  5.8.0    17/10/2001  Libs for V5.8.0                 */
+/* rev: 5.10.0    07/03/2003 Updated for 5.10.0 Release       */
 /*                                                            */
 /*                                                            */
 /*------------------------------------------------------------*/
 
 #include "mvcldrvr.h"
-
-
-#ifdef ACU_VOIP_CC
-/*--- VoIP specific ---*/
-#include "common.h"
-#include "vcc_os_threads.h"
-#include "generic_tls.h"
-#include "h323_thread.h"
-#include "admin_channel.h"
-#include "tls_ras_thread_c_if.h"
-#include "tls_conn_mgr_c_if.h"
-#include "tls_h323.h"                 /* required for tls_h323_init */
-#include "call_record.h"              /* call record function declarations */
-#include "tls_rcm.h"                  /* required for tls_rcm_init */
-#include "pipe_client.h"
-#include "v1bmi.h"
-#include "cc_log.h"
-/*----------------------*/
-#endif
-
 
 #include <string.h>
 #include <ctype.h>
@@ -50,14 +30,17 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#ifdef ACU_VOIP_CC
-int first_voip_card;                   /* card number of first voip card */
-bool call_driver_installed=TRUE;       /* identifies existance of call driver code */
+#ifndef TRUE
+#define TRUE 1
 #endif
 
-#define FALSE  0
-#define TRUE   1
+#ifndef FALSE
+#define FALSE 0
+#endif
 
+
+ACU_INT first_voip_card;                         /* card number of first voip card */
+static ACU_INT call_driver_installed=TRUE;       /* identifies existance of call driver code */
 
 /*----------- Function Prototypes ---------------*/
 /*                                               */
@@ -74,6 +57,7 @@ ACUDLL ACU_INT  clopendev      ( void );
 ACUDLL ACU_INT  opendevdrv     ( void );
 
 ACUDLL void handle_decomp      ( ACU_INT, DC * );
+ACUDLL ACU_INT  net_2_unet     ( ACU_INT card, ACU_INT net );
 ACUDLL ACU_INT  unet_2_net     ( ACU_INT );
 ACUDLL ACU_INT  unet_2_card    ( ACU_INT );
 ACUDLL ACU_INT  unet_2_switch  ( ACU_INT );
@@ -85,7 +69,6 @@ ACUDLL ACU_INT  handle2io      ( ACU_INT );
 ACUDLL ACU_INT  nch2handle     ( ACU_INT, ACU_INT );
 ACUDLL ACU_INT  patch_handle   ( ACU_INT, ACU_INT );
 ACUDLL int      update_ss_type ( ACU_INT );
-ACUDLL int call_free_admin_msg ( voip_admin_msg * adminp);
 ACUDLL ACU_INT  card_2_voipcard ( ACU_INT );
 ACUDLL ACU_INT  card_2_net      ( ACU_INT );
 
@@ -100,45 +83,32 @@ static char isallowed_string ( char * );
 
 static int    config_assoc_net (ACU_INT, ACU_INT) ;
 static ACU_INT xlate_assoc (ACU_INT * ) ;
+static ACU_INT call_add_assoc_net  ( ACUC_ASSOC_NET_XPARMS * );
 
 static int  feature_openout_enquiry ( int, FEATURE_OUT_XPARMS * );
-ACUDLL int ACU_WINAPI call_feature_details ( struct feature_detail_xparms * );
-static ACU_INT call_maintenance_cmd(ACUC_MAINTENANCE_XPARMS * ) ;
-
-#ifdef ACU_VOIP_CC
-static int process_voip_admin_msg (uint32 msg_type, IOCTLU *pioctlu); /* VoIP only */
-int start_rpc_sessions ( char * board_ip_address , int card_num ); /* VoIP only */
+static ACU_INT call_maintenance_cmd(ACUC_MAINTENANCE_XPARMS *, int );
 int parse_config_str ( char * config_string, char * ip_address1, char * ip_address2,
                        char *subnet_address1, char * subnet_address2, char * gateway_address, int * Download_DHCP);
 void parse_string (char *config_string, char search_string[4],char *found_string);
-#endif
 
 /*------------- external functions --------------*/
 
 ACUDLL int      clopen         ( char * );
-ACUDLL ACU_INT  clioctl        ( ACU_INT, IOCTLU *, int, int);
+ACUDLL ACU_INT  clioctl        ( ACU_INT, IOCTLU *, int, int, int);
 ACUDLL ACU_INT  clpblock_ioctl ( ACU_INT, V5_PBLOCK_IOCTLU *, int, int );
 ACUDLL void     clclose        ( void );
 ACUDLL ACU_INT  cldosioctl     ( int, char *, int );
 ACUDLL void     clspecial      ( void );
 ACUDLL char     * cldev        ( void );
 
-
-#ifdef ACU_VOIP_CC
-extern ACUDLL ACU_INT  voipioctl      ( ACU_INT, IOCTLU *, int, int , int );
-extern void init_card_info ( int );
-extern acu_error management_init( char * boardipaddress, unsigned int board_number);
-extern acu_error session_init( char * boardipaddress);
-extern flag_pipe_not_running();
-extern bool is_pipe_running();
-
-extern ACU_VCC_THREAD_ID pipe_client_thread[MAX_NUM_BOARDS+1];
-extern done_init[];
-
-extern int        xxcall_event   ( LEQ far * );      
-#endif
-
-
+extern ACU_INT srvioctl       ( ACU_INT  function, IOCTLU  *pioctl, int len , int board_card_number, int voip_protocol);
+extern int     pipe_client_send_application_terminated( int board_card_number );
+extern int     create_pipe_admin_thread  ( void );
+extern int     is_voip_card ( int swdrvr );
+extern void    init_card_info            ( int );
+extern void    flag_pipe_not_running     ( void );
+extern ACU_INT is_pipe_running           ( void );
+extern const ACU_INT* get_voip_protocol_index_array ( int* num_of_protocols );
 
 ACUDLL extern int  clfileopen  ( char * );
 ACUDLL extern int  clfileread  ( int, char *, unsigned int );
@@ -154,12 +124,10 @@ static ACU_INT  tnets  = 0;
 int    ncards = 0;
 CARD   clcard[NCARDS];                  /* card control structure */
 static int   switchbase = 0;
-#ifdef ACU_VOIP_CC
 
-static uint8 default_codecs[MAXCODECS+1];     /* default codec list            */
+static ACU_UCHAR default_codecs[MAXCODECS+1];     /* default codec list            */
 static DEFAULT_RAS_CONFIG default_ras_info;   /* default structure for RAS */
 static const int MANAGEMENT_INIT_TIMEOUT = 25 ;
-#endif
 
 /*------------- init_reg_api -------------*/
 /* initialise the library version         */
@@ -189,15 +157,13 @@ ACUDLL int ACU_WINAPI call_init ( struct init_xparms * initp )
    {
    ACU_INT  result;
    int  i;
-#ifdef ACU_VOIP_CC
-   int voip_card_number=0;    /* numbers voip cards 1,2,3 etc. */
-   ACU_VCC_THREAD_ID this_thread;           /* VoIP specific */
-   V1BMI_CARD_INFO_PARMS cardinfo ;
+   int voip_card_number=1;    /* numbers voip cards 1,2,3 etc. */
    struct set_sysinfo_xparms set_sysinfo;
    struct sysinfo_xparms    sysinfo;
-   char   board_addr[32] = "";
-   int    board_net_number =-1;   /* -1 so first net is 0 */
-#endif
+   int total_network_ports=0;
+   const ACU_INT* usable_voip_protocol_indexes;
+   int voip_protocol=0;
+   int num_of_voip_ports_per_ip_port=0;
 
    result = clopendev ( );              /* open the device */
 
@@ -205,104 +171,57 @@ ACUDLL int ACU_WINAPI call_init ( struct init_xparms * initp )
       {
       /* initialise all cards in the system */
 
+      /* figure out if there's any voip protocols */
+      usable_voip_protocol_indexes = get_voip_protocol_index_array(&num_of_voip_ports_per_ip_port);
+       
+       
       for ( i = 0; i < ncards; i++ )
          {
-#ifdef ACU_VOIP_CC
-         board_net_number = board_net_number+clcard[i].nnets;     /* keep a count of the boards nets */
+         /* keep a count of the boards nets */
+         total_network_ports = total_network_ports + clcard[i].nnets;
          if (clcard[i].voipservice == ACU_VOIP_ACTIVE)
             {  
-            /* copy the ip address into clcard */
-            result =  v1bmi_card_info( clcard[i].v1bmi_card_num , &cardinfo );
-
-            if (result != 0)
+            strcpy(clcard[i].board_ip_address,initp->board_ip_address);
+            for(voip_protocol = 0; voip_protocol < num_of_voip_ports_per_ip_port; voip_protocol++)
                {
-               ACU_LOG(call_get_voip_admin_msg, warn,("Error: failed to access card %d\n",i));
-               return(ERR_CFAIL);
-               }
-            if (cardinfo.ip_is_configured!=0)
-               {
-               sprintf(board_addr, "%d.%d.%d.%d",    
-                       cardinfo.ip_addr1[0],
-                       cardinfo.ip_addr1[1],
-                       cardinfo.ip_addr1[2],
-                       cardinfo.ip_addr1[3]);
+               initp->nnets = clcard[i].v1bmi_card_num;
 
-               strcpy(clcard[i].board_ip_address,board_addr);
-
-        /* 
-         * new method for obtaining voip card number - this now works 
-         * when no PM2 module is present
-         */
-         
-               voip_card_number++;
-
-               set_sysinfo.net = board_net_number;
+               /* net number of the H323 port */
+               set_sysinfo.net = total_network_ports - num_of_voip_ports_per_ip_port + voip_protocol; 
                set_sysinfo.board_number = voip_card_number;
-               strcpy(set_sysinfo.board_ip_address , board_addr);
- 
-               result = start_rpc_sessions(board_addr,voip_card_number);
-               
-               if (result == ACU_ERR_WRONG_BOARD_VER) return(ERR_BOARD_VERSION);
-               
-               if (result != 0) return(ERR_NO_BOARD);
-               
+               set_sysinfo.v1bmi_card_num = clcard[i].v1bmi_card_num;
+               strcpy(set_sysinfo.board_ip_address, initp->board_ip_address);
                call_set_system_info ( &set_sysinfo,&sysinfo );
-               }
-            else
-               {    /* the driver has not been configured so VOIPLDR has not been run.*/
-               ACU_LOG(call_get_voip_admin_msg, warn,("Error: Software not downloaded for card %d\n",i));
-               return(ERR_BOARD_UNLOADED);
-               }
-            /* assign this thread id to init_xparms*/
 
-            vcc_thread_get_id(&this_thread);
-            initp->unique_xparms.sig_h323.calling_thread = this_thread;
-            result = voipioctl ( CALL_INIT, 
-                                 (IOCTLU *) initp, 
-                                 clcard[i].clh,
-                                 sizeof ( INIT_XPARMS ),
-                                 card_2_voipcard(i));
+               result = srvioctl ( CALL_INIT, (IOCTLU *) initp, sizeof ( INIT_XPARMS ), card_2_voipcard(i), usable_voip_protocol_indexes[voip_protocol]);
+
+               if (result != 0)  /* if a board fails what to we do? */
+                  {
+                  if (result != ERR_BOARD_UNLOADED)  /* ERR_BOARD_UNLOADED could happen  so don't abort */
+                     {
+                     return ( result );  /* otherwise error talking to a board so exit */
+                     }
+                  }
+               }
+               voip_card_number++;
             }
          else
             {
             result = clioctl ( CALL_INIT, 
-                               (IOCTLU *) initp, 
-                               clcard[i].clh,
+                              (IOCTLU *) initp, 
+                               i, 
+                               -1,
                                sizeof ( INIT_XPARMS ));
             }
-#else
-         result = clioctl ( CALL_INIT,
-                           (IOCTLU *) initp,
-                            clcard[i].clh,
-                            sizeof ( INIT_XPARMS ));
-#endif
          }
       }
    else
       {
       result = ERR_CFAIL;
-      }
-
-#ifdef ACU_VOIP_CC
-   if ((result != 0)&&(!is_pipe_running()))     /* check that the service is up and running */
-      {
-      for (i=0;i<20;i++)
-         {
-         if (is_pipe_running())
-            break;
-         Sleep(500);
-         }
-      if (!is_pipe_running())       /* if not up after 5 seconds then flag an error */
-         {
-         result = ERR_NO_SERVICE;
-         ACU_LOG(call_get_voip_admin_msg, critical,("Error: failed to access service \n"));
-         }
-      }
-
-#endif
-
+      } 
+   
    initp->nnets = tnets;                /* put in total networks */
-
+   
    return ( result );
    }
 /*---------------------------------------*/
@@ -329,13 +248,11 @@ ACUDLL int ACU_WINAPI dpns_openout ( struct dpns_out_xparms * outdetailsp )
       if ( card >= 0 )                               /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          outdetailsp->net = unet_2_net ( unet );     /* and the network port */
 
@@ -344,7 +261,7 @@ ACUDLL int ACU_WINAPI dpns_openout ( struct dpns_out_xparms * outdetailsp )
 
             result = clioctl ( DPNS_OPENOUT,
                                (IOCTLU *) outdetailsp,
-                               clcard[card].clh,
+                               card, unet, 
                                sizeof (DPNS_OUT_XPARMS));
 
             if ( result == 0 )
@@ -400,13 +317,11 @@ ACUDLL int ACU_WINAPI dpns_send_overlap ( struct dpns_overlap_xparms * overlapp 
       if ( dc.result >= 0 )                  /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          overlapp->handle = dc.handle;       /* get the fixed up handle */
 
@@ -417,9 +332,9 @@ ACUDLL int ACU_WINAPI dpns_send_overlap ( struct dpns_overlap_xparms * overlapp 
          else
             {
             dc.result = clioctl ( DPNS_SEND_OVERLAP,
-                                  (IOCTLU *) overlapp,
-                                   clcard[dc.card].clh,
-                                   sizeof (DPNS_OVERLAP_XPARMS));
+                                 (IOCTLU *) overlapp,
+                                 dc.card, -1,
+                                 sizeof (DPNS_OVERLAP_XPARMS));
             }
          }
       }
@@ -438,35 +353,32 @@ ACUDLL int ACU_WINAPI dpns_send_overlap ( struct dpns_overlap_xparms * overlapp 
 /* get dpnss call details                     */
 /*                                            */
 
-ACUDLL int ACU_WINAPI dpns_call_details ( detailsp )
-struct dpns_detail_xparms * detailsp;
-   {
+ACUDLL int ACU_WINAPI dpns_call_details (struct dpns_detail_xparms *detailsp)
+{
    ACU_INT  uhandle;
    DC   dc;
-
-
+   
    uhandle = detailsp->handle;               /* save user handle */
 
-   dc.result = clopendev ( );
+   dc.result = clopendev();
 
-   if ( dc.result == 0 )
+   if (dc.result == 0)
       {
-      handle_decomp ( detailsp->handle, &dc );
+      handle_decomp(detailsp->handle, &dc);
 
-      if ( dc.result >= 0 )                  /* check for error */
+      if (dc.result >= 0)                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
-            return (ERR_COMMAND);
+            return ERR_COMMAND;
             }
-#endif
+
          detailsp->handle = dc.handle;       /* get the fixed up handle */
 
          dc.result = clioctl ( DPNS_CALL_DETAILS,
-                              (IOCTLU *) detailsp,
-                               clcard[dc.card].clh,
+                               (IOCTLU *) detailsp,
+                               dc.card, -1, 
                                sizeof (DPNS_DETAIL_XPARMS));
          }
       }
@@ -477,8 +389,8 @@ struct dpns_detail_xparms * detailsp;
 
    detailsp->handle = uhandle;
 
-   return ( dc.result );
-   }
+   return dc.result;
+}
 /*---------------------------------------*/
 
 
@@ -498,19 +410,17 @@ ACUDLL int ACU_WINAPI dpns_incoming_ringing ( struct dpns_incoming_ring_xparms  
 
       if ( dc.result >= 0 )             /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          inringp->handle = dc.handle;   /* get the fixed up handle */
 
          dc.result = clioctl ( DPNS_INCOMING_RINGING,
                               (IOCTLU *) inringp,
-                               clcard[dc.card].clh,
+                               dc.card, -1,
                                sizeof (DPNS_INCOMING_RING_XPARMS));
          }
       }
@@ -538,19 +448,17 @@ ACUDLL int ACU_WINAPI dpns_call_accept ( struct dpns_call_accept_xparms  *accept
 
       if ( dc.result >= 0 )             /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          acceptp->handle = dc.handle;   /* get the fixed up handle */
 
          dc.result = clioctl ( DPNS_CALL_ACCEPT,
                                (IOCTLU *) acceptp,
-                               clcard[dc.card].clh,
+                               dc.card, -1,
                                sizeof ( DPNS_CALL_ACCEPT_XPARMS));
          }
       }
@@ -580,19 +488,17 @@ ACUDLL int ACU_WINAPI dpns_send_feat_info ( struct dpns_feature_xparms  *feature
 
       if ( dc.result >= 0 )             /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          featurep->handle = dc.handle;   /* get the fixed up handle */
 
          dc.result = clioctl ( DPNS_SEND_FEAT_INFO,
                                (IOCTLU *) featurep,
-                               clcard[dc.card].clh,
+                               dc.card, -1,
                                sizeof (DPNS_FEATURE_XPARMS));
          }
       }
@@ -640,17 +546,15 @@ ACUDLL int xdpns_set_transit ( struct dpns_set_transit_xparms  *transitp )
       if ( dc.result >= 0 )             /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          dc.result = clioctl ( DPNS_SET_TRANSIT,
                               (IOCTLU *) transitp,
-                              clcard[dc.card].clh,
+                              dc.card, -1,
                      sizeof (DPNS_SET_TRANSIT_XPARMS));
          }
       }
@@ -685,18 +589,16 @@ ACUDLL int ACU_WINAPI dpns_transit_details ( struct dpns_transit_xparms  *transi
       if ( dc.result >= 0 )                  /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          transitp->handle = dc.handle;       /* get the fixed up handle */
 
          dc.result = clioctl ( DPNS_TRANSIT_DETAILS,
                                (IOCTLU *) transitp,
-                               clcard[dc.card].clh,
+                               dc.card, -1, 
                                sizeof(DPNS_TRANSIT_XPARMS));
          }
       }
@@ -728,19 +630,17 @@ ACUDLL int ACU_WINAPI dpns_send_transit ( struct dpns_transit_xparms  *transitp 
 
       if ( dc.result >= 0 )              /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          transitp->handle = dc.handle;   /* get the fixed up handle */
 
          dc.result = clioctl ( DPNS_SEND_TRANSIT,
                               (IOCTLU *) transitp,
-                              clcard[dc.card].clh,
+                              dc.card, -1,
                               sizeof (DPNS_TRANSIT_XPARMS));
          }
       }
@@ -773,18 +673,16 @@ ACUDLL int ACU_WINAPI dpns_disconnect ( struct dpns_cause_xparms * causep )
 
       if ( dc.result >= 0 )            /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          causep->handle = dc.handle;
 
          dc.result = clioctl ( DPNS_DISCONNECT,
                                (IOCTLU *) causep,
-                               clcard[dc.card].clh,
+                               dc.card, -1,
                                sizeof (DPNS_CAUSE_XPARMS));
          }
       }
@@ -818,13 +716,11 @@ ACUDLL int ACU_WINAPI dpns_release ( struct dpns_cause_xparms * causep )
 
       if ( dc.result >= 0 )            /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          causep->handle = dc.handle;
 
          /* clear the entry before going to the driver */
@@ -833,7 +729,7 @@ ACUDLL int ACU_WINAPI dpns_release ( struct dpns_cause_xparms * causep )
 
          dc.result = clioctl ( DPNS_RELEASE,
                                (IOCTLU *) causep,
-                               clcard[dc.card].clh,
+                               dc.card, -1,
                                sizeof (DPNS_CAUSE_XPARMS));
          }
       }
@@ -868,18 +764,16 @@ ACUDLL int ACU_WINAPI dpns_getcause ( struct dpns_cause_xparms * causep )
 
       if ( dc.result >= 0 )            /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          causep->handle = dc.handle;
 
          dc.result = clioctl ( DPNS_GETCAUSE,
                                (IOCTLU *) causep,
-                               clcard[dc.card].clh,
+                               dc.card, -1,
                                sizeof (DPNS_CAUSE_XPARMS));
          }
       }
@@ -915,20 +809,18 @@ ACUDLL int ACU_WINAPI dpns_set_l2_ch ( struct dpns_l2_xparms * dpns_l2_parms )
 
       if ( card >= 0 )                                 /* Check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          dpns_l2_parms->net = unet_2_net ( unet );     /* Get network port */
 
          if ( dpns_l2_parms->net >= 0 )                /* Check for error */
             {
             result = clioctl ( DPNS_SET_L2_CH,
                                (IOCTLU *) dpns_l2_parms,
-                               clcard[card].clh,
+                               card, -1,
                                sizeof (DPNS_L2_XPARMS));
             }
          else
@@ -973,20 +865,18 @@ ACUDLL int ACU_WINAPI dpns_l2_state ( struct dpns_l2_xparms * dpns_l2_parms )
 
       if ( card >= 0 )                                 /* Check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          dpns_l2_parms->net = unet_2_net ( unet );     /* Get network port */
 
          if ( dpns_l2_parms->net >= 0 )                /* Check for error */
             {
             result = clioctl ( DPNS_L2_STATE,
                                (IOCTLU *) dpns_l2_parms,
-                               clcard[card].clh,
+                               card, -1,
                                sizeof (DPNS_L2_XPARMS));
             }
          else
@@ -1041,10 +931,8 @@ ACUDLL int ACU_WINAPI call_signal_info ( struct siginfo_xparms * siginfop )
    {
    ACU_INT  result;
    int  i;
+   int increment_ptr = 0;
    struct siginfo_xparms * lsigp;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;           /* VoIP specific */
-#endif
 
    result = clopendev ( );
 
@@ -1052,38 +940,39 @@ ACUDLL int ACU_WINAPI call_signal_info ( struct siginfo_xparms * siginfop )
       {
       lsigp = siginfop;       /* keep a local copy of the info pointer */
 
+      /* iterate through the cards in the system */
       for ( i = 0; i < ncards; i++ )
          {
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (clcard[i].voipservice == ACU_VOIP_ACTIVE)
-            {
-            vcc_thread_get_id(&this_thread);
-            lsigp->unique_xparms.sig_h323.calling_thread = this_thread;
-
-            result = voipioctl ( CALL_SIGNAL_INFO,
-                                (IOCTLU *) lsigp,
-                                 clcard[i].clh,
-                                 sizeof ( SIGINFO_XPARMS ) * MAXPPC ,
-                                 card_2_voipcard(i));
-#endif
-            }
-         else
+         /* for a non VoIP card call to driver */
+         if ( clcard[i].voipservice != ACU_VOIP_ACTIVE )
             {
             result = clioctl ( CALL_SIGNAL_INFO,
                                (IOCTLU *) lsigp,
-                               clcard[i].clh,
+                               i, -1,
                                sizeof ( SIGINFO_XPARMS ) * MAXPPC );
+
+            increment_ptr = lsigp->nnets;
+            } 
+         else  /* for VoIP card */
+            {
+            /* iterate through the nets on VoIPcard calling clioctl for each */
+            int j = 0;
+            int cards_first_net = card_2_net ( i );
+            for ( j = 0; j < clcard[i].nnets; j++ )
+               {
+               result = clioctl ( CALL_SIGNAL_INFO,
+                                  (IOCTLU *) &lsigp[j],
+                                  i, cards_first_net + j,
+                                  sizeof ( SIGINFO_XPARMS ) * MAXPPC );
+               }
+            increment_ptr = clcard[i].nnets;
             }
 
          if ( result == 0 )
             {
             /* move the info pointer by the number */
             /* of networks on the card             */
-
-            lsigp = &lsigp[lsigp->nnets];
+            lsigp = &lsigp[increment_ptr];
             }
          }
       }
@@ -1093,11 +982,12 @@ ACUDLL int ACU_WINAPI call_signal_info ( struct siginfo_xparms * siginfop )
       }
 
    siginfop->nnets = tnets;             /* copy the number of networks */
-
-
+   
+   
    return ( result );
    }
 /*---------------------------------------*/
+
 
 
 /*---------- call_system_info -----------*/
@@ -1105,13 +995,10 @@ ACUDLL int ACU_WINAPI call_signal_info ( struct siginfo_xparms * siginfop )
 /*                                       */
 
 ACUDLL int ACU_WINAPI call_system_info ( struct sysinfo_xparms * sysinfop )
-   {
-   ACU_INT  result;
+{
+   ACU_INT  result;   
    ACU_INT  card;
    ACU_INT  unet;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;           /* VoIP specific */
-#endif
 
 
    unet = sysinfop->net;                      /* save user net    */
@@ -1121,36 +1008,19 @@ ACUDLL int ACU_WINAPI call_system_info ( struct sysinfo_xparms * sysinfop )
    if ( result == 0 )
       {
       card = unet_2_card ( unet );            /* get the card number */
-
+       
       if ( card >= 0 )                        /* check for error */
          {
          sysinfop->net = unet_2_net ( unet ); /* and the network port */
-
+   
          if ( sysinfop->net >= 0 )            /* check for error */
             {
-#ifndef ACU_VOIP_CC
-            if ( 0 )
-               {
-          /* If VoIP card then thread identification is required */
-#else
-            if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
-               {
-               vcc_thread_get_id(&this_thread);
-               sysinfop->unique_xparms.sig_h323.calling_thread = this_thread; /* assign this thread id */
-               result = voipioctl ( CALL_SYSTEM_INFO,
-                                    (IOCTLU *) sysinfop,
-                                    clcard[card].clh,
-                                    sizeof (SYSINFO_XPARMS ),
-                                    card_2_voipcard(card));
-#endif
-               }
-            else
-               {
-               result = clioctl ( CALL_SYSTEM_INFO,
-                                  (IOCTLU *) sysinfop,
-                                  clcard[card].clh,
-                                  sizeof (SYSINFO_XPARMS ));
-               }
+     
+            result = clioctl ( CALL_SYSTEM_INFO,
+                               (IOCTLU *) sysinfop,
+                               card, unet, 
+                               sizeof (SYSINFO_XPARMS ));
+     
             if ( result != 0 )
                {
                result = ERR_CFAIL;
@@ -1172,12 +1042,11 @@ ACUDLL int ACU_WINAPI call_system_info ( struct sysinfo_xparms * sysinfop )
       }
 
    return ( result );
-   }
+}
 /*---------------------------------------*/
 
 
 
-#ifdef ACU_VOIP_CC
 /*---------- call_set_system_info -------*/
 /* set the system information            */
 /*                                       */
@@ -1186,7 +1055,6 @@ ACUDLL int ACU_WINAPI call_set_system_info ( struct set_sysinfo_xparms * set_sys
    ACU_INT  result;
    ACU_INT  card;
    ACU_INT  unet;
-   ACU_VCC_THREAD_ID this_thread;                  /* VoIP specific */
 
    unet = set_sysinfop->net;                       /* save user net    */
 
@@ -1195,7 +1063,7 @@ ACUDLL int ACU_WINAPI call_set_system_info ( struct set_sysinfo_xparms * set_sys
    if ( result == 0 )
       {
       card = unet_2_card ( unet );                 /* get the card number */
-
+       
       if ( card >= 0 )                             /* check for error */
          {
          set_sysinfop->net = unet_2_net ( unet );  /* and the network port */
@@ -1205,24 +1073,25 @@ ACUDLL int ACU_WINAPI call_set_system_info ( struct set_sysinfo_xparms * set_sys
             /* If VoIP card then thread identification is required */
             if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
                {
-               vcc_thread_get_id(&this_thread);
-               set_sysinfop->unique_xparms.sig_h323.calling_thread = this_thread; /* assign this thread id */
-               }
-
-               result = voipioctl ( CALL_SET_SYSTEM_INFO,
-                                    (IOCTLU *) set_sysinfop,
-                                    clcard[card].clh,
-                                    sizeof (SET_SYSINFO_XPARMS ),
-                                    card_2_voipcard(card));
+               result = clioctl ( CALL_SET_SYSTEM_INFO,
+                                  (IOCTLU *) set_sysinfop,
+                                  card, unet,
+                                  sizeof (SET_SYSINFO_XPARMS ));
                if ( result != 0 )
                   {
                   result = ERR_CFAIL;
                   }
                }
-          else
-             {
-          result = set_sysinfop->net;     /* return error code */
-             }
+            else 
+               {
+               /* command only supported for VoIP */
+               result = ERR_COMMAND;
+               }
+            }
+         else
+            {
+            result = set_sysinfop->net;     /* return error code */
+            }
          }
       else
          {
@@ -1237,7 +1106,6 @@ ACUDLL int ACU_WINAPI call_set_system_info ( struct set_sysinfo_xparms * set_sys
    return ( result );
    }
 /*---------------------------------------*/
-#endif
 
 
 /*--------- call_endcode_devts ----------*/
@@ -1305,20 +1173,18 @@ ACUDLL int call_endpoint_initialise ( struct send_spid_xparms * send_spidp )
 
       if ( card >= 0 )                   /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          send_spidp->net = unet_2_net ( unet ); /* and the network port */
 
          if ( send_spidp->net >= 0 )     /* check for error */
             {
             result = clioctl ( CALL_ENDPOINT_INITIALISE,
                                (IOCTLU *) send_spidp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (SEND_SPID_XPARMS));
             }
          else
@@ -1364,20 +1230,18 @@ ACUDLL int call_get_endpoint_status ( struct send_spid_xparms * sendspidp )
 
       if ( card >= 0 )                   /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          sendspidp->net = unet_2_net ( unet ); /* and the network port */
 
          if ( sendspidp->net >= 0 )     /* check for error */
             {
             result = clioctl ( CALL_GET_ENDPOINT_STATUS,
                                (IOCTLU *) sendspidp,
-                               clcard[card].clh,
+                               card, unet, 
                                sizeof (SEND_SPID_XPARMS));
             }
          else
@@ -1424,20 +1288,18 @@ ACUDLL int call_get_spid ( struct get_spid_xparms * get_spidp )
 
       if ( card >= 0 )                   /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          get_spidp->net = unet_2_net ( unet ); /* and the network port */
 
          if ( get_spidp->net >= 0 )     /* check for error */
             {
             result = clioctl ( CALL_GET_SPID,
                                (IOCTLU *) get_spidp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (GET_SPID_XPARMS));
             }
          else
@@ -1482,13 +1344,11 @@ ACUDLL int call_send_endpoint_id ( struct send_endpoint_id_xparms *send_endpoint
 
       if ( card >= 0 )                   /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          send_endpointp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -1496,7 +1356,7 @@ ACUDLL int call_send_endpoint_id ( struct send_endpoint_id_xparms *send_endpoint
             {
             result = clioctl ( CALL_SEND_ENDPOINT_ID,
                                (IOCTLU *) send_endpointp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (SEND_ENDPOINT_ID_XPARMS));
             }
          else
@@ -1535,15 +1395,12 @@ ACUDLL int ACU_WINAPI call_send_keypad_info ( struct keypad_xparms * keypadp )
 static int keypad_info ( int cmd, struct keypad_xparms * keypadp )
    {
    ACU_INT  card;
-   ACU_INT  unet;
-   ACU_INT  uhandle;
+   ACU_INT  unet = 0;
+   ACU_INT  uhandle = 0;
    DC       dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;                 /* VoIP specific */
-#endif
 
 
-   dc.result = clopendev ( );                                      /* open the device */
+   dc.result = clopendev ( );    /* open the device */
 
 
    if ( dc.result == 0 )
@@ -1552,34 +1409,35 @@ static int keypad_info ( int cmd, struct keypad_xparms * keypadp )
 
       switch( call_type(handle2net(keypadp->handle)) )
          {
-#ifdef ACU_VOIP_CC
          case S_H323:
-         /* If VoIP card then thread identification is required */
-            vcc_thread_get_id(&this_thread);
-            keypadp->unique_xparms.sig_h323.calling_thread = this_thread; /* assign thread id */
 
-         /* also check keypad ie length is valid */
-         if (keypadp->unique_xparms.sig_h323.keypad.ie[0] >= MAXKEYPAD)
-            {
-            dc.result = ERR_PARM;
-            }
+            /* check keypad ie length is valid */
+            if (keypadp->unique_xparms.sig_h323.keypad.ie[0] >= MAXKEYPAD)
+               {
+               dc.result = ERR_PARM;
+               }
 
-         if (dc.result >= 0)
-            {
-            keypadp->handle = dc.handle;
+            if (dc.result >= 0)
+               {
+               uhandle = keypadp->handle;
+               keypadp->handle = dc.handle;
 
-            dc.result = voipioctl ( cmd,
+               dc.result = clioctl ( cmd,
                                      ( IOCTLU *) keypadp,
-                                       clcard[dc.card].clh,
-                                       sizeof (KEYPAD_XPARMS),
-                                       card_2_voipcard(dc.card) );
-            }
+                                     dc.card, handle2net(uhandle), 
+                                     sizeof (KEYPAD_XPARMS) );
+               }
          break;
-#endif
+
+         case S_SIP:
+
+            /* Not supported by SIP */
+            dc.result = ERR_COMMAND;
+         break;
 
          default :   /* Q.931 */
 
-            unet    = keypadp->unique_xparms.sig_q931.net;               /* save user net    */
+            unet    = keypadp->unique_xparms.sig_q931.net;  /* save user net    */
             uhandle = keypadp->handle;
 
             if (uhandle == 0)
@@ -1596,8 +1454,8 @@ static int keypad_info ( int cmd, struct keypad_xparms * keypadp )
                if (dc.result >= 0)
                   {
                   dc.result = clioctl ( cmd,
-                                      ( IOCTLU *) keypadp,
-                                        clcard[card].clh,
+                                        ( IOCTLU *) keypadp,
+                                        card, unet,
                                         sizeof (KEYPAD_XPARMS));
                   }
                }
@@ -1610,12 +1468,12 @@ static int keypad_info ( int cmd, struct keypad_xparms * keypadp )
                   keypadp->handle = dc.handle;
 
                   dc.result = clioctl ( cmd,
-                                      ( IOCTLU *) keypadp,
-                                        clcard[dc.card].clh,
+                                        ( IOCTLU *) keypadp,
+                                        dc.card, unet,
                                         sizeof (KEYPAD_XPARMS));
                   }
                }
-         break;
+            break;
          } /* switch */
       }
    else
@@ -1623,9 +1481,10 @@ static int keypad_info ( int cmd, struct keypad_xparms * keypadp )
       dc.result = ERR_CFAIL;
       }
 
-   keypadp->unique_xparms.sig_q931.net = unet;               /* restore user parameter */
-   keypadp->handle = uhandle;         /* restore user parameter */
-
+   /* restore user parameters */
+   keypadp->unique_xparms.sig_q931.net = unet;      
+   keypadp->handle = uhandle;    
+   
    return ( dc.result );
    }
 /*---------------------------------------*/
@@ -1648,37 +1507,26 @@ ACUDLL int ACU_WINAPI call_openin ( struct in_xparms * indetailsp )
 
    if ( result == 0 )
       {
-#ifndef ACU_VOIP_CC
-      if ( 0 )
-         {
-#else
       /* Check for VoIP card */
       card = unet_2_card (indetailsp->net);
       if ( card >= 0 && clcard[card].voipservice == ACU_VOIP_ACTIVE)
          {
          ACU_INT sig_net  = indetailsp->net ;  /* Fixed up by xlate_assoc */
-         ACU_VCC_THREAD_ID this_thread;
-
-         vcc_thread_get_id(&this_thread);
-         indetailsp->unique_xparms.sig_h323.calling_thread = this_thread; /* assign this thread id */
-
          indetailsp->net = unet_2_net ( sig_net ); /* and the network port */
 
 
-         result = voipioctl ( CALL_OPENIN,
+         result = clioctl ( CALL_OPENIN,
                             ( IOCTLU *) indetailsp,
-                              clcard[card].clh,
-                              sizeof (IN_XPARMS),
-                              card_2_voipcard(card));
+                            card, unet,
+                            sizeof (IN_XPARMS));
          if ( result == 0 )
             {
             indetailsp->handle = patch_handle (indetailsp->handle, sig_net );
             }
          else
             {
-               return (result);  /* return error code */
+            return (result);  /* return error code */
             }
-#endif
          }
       else
          {
@@ -1700,7 +1548,7 @@ ACUDLL int ACU_WINAPI call_openin ( struct in_xparms * indetailsp )
                indetailsp->net |= ((assoc_net +1) << 8) ;
                result = clioctl ( CALL_OPENIN,
                                   (IOCTLU *) indetailsp,
-                                  clcard[card].clh,
+                                  card, sig_net,
                                   sizeof (IN_XPARMS));
 
                if ( result == 0 )
@@ -1760,9 +1608,7 @@ static int openout_enquiry ( int mode, struct out_xparms * calloutp )
    ACU_INT  result;
    ACU_INT  card;
    ACU_INT  unet;
-#ifdef ACU_VOIP_CC
    ACU_INT  i;
-#endif
 
    unet = calloutp->net;            /* save user net */
 
@@ -1774,62 +1620,54 @@ static int openout_enquiry ( int mode, struct out_xparms * calloutp )
       {
       card = unet_2_card (calloutp->net);
 
-#ifndef ACU_VOIP_CC
-      if ( 0 )
-         {
-#else
      /* Check for VoIP card */
       if (card >= 0 && clcard[card].voipservice == ACU_VOIP_ACTIVE)
          {
          ACU_INT sig_net  = calloutp->net ;   /* Fixed up by xlate_assoc */
-
-         ACU_VCC_THREAD_ID this_thread;
-         vcc_thread_get_id(&this_thread);
-         calloutp->unique_xparms.sig_h323.calling_thread = this_thread; /* put in this thread id */
-
          calloutp->net = unet_2_net ( sig_net ); /* and the network port */
 
-         /* check codec assignment */
-         if ( (calloutp->unique_xparms.sig_h323.codecs[0] == 0) &&
+         if ( S_H323 == call_type(unet) )
+            {
+            /* check codec assignment */
+            if ( (calloutp->unique_xparms.sig_h323.codecs[0] == 0) &&
                default_codecs[0] )
-            {
-            for ( i = 0; i < MAXCODECS; i++ )
                {
-               calloutp->unique_xparms.sig_h323.codecs[i] = default_codecs[i];
-               /* 0 signifies end of codec list so stop assignment here for efficiency */
-               if (default_codecs[i] == 0 )
-                  break;
+               for ( i = 0; i < MAXCODECS; i++ )
+                  {
+                  calloutp->unique_xparms.sig_h323.codecs[i] = default_codecs[i];
+                  /* 0 signifies end of codec list so stop assignment here for efficiency */
+                  if (default_codecs[i] == 0 )
+                     break;
+                  }
                }
+
+            /* check GK assignment */
+            if ( default_ras_info.request_admission )
+               {
+               /* load default GK info */
+               calloutp->unique_xparms.sig_h323.request_admission = default_ras_info.request_admission;
+               calloutp->unique_xparms.sig_h323.gk_addr = default_ras_info.gk_addr;
+               for ( i = 0; i < default_ras_info.endpoint_identifier_length; i++ )
+                  {
+                  calloutp->unique_xparms.sig_h323.endpoint_identifier[i] = default_ras_info.endpoint_identifier[i];
+                  }
+                  calloutp->unique_xparms.sig_h323.endpoint_identifier_length = default_ras_info.endpoint_identifier_length;
+               }
+
             }
 
-         /* check GK assignment */
-         if ( default_ras_info.request_admission )
-            {
+         result = clioctl ( mode,
+                            (IOCTLU *) calloutp,
+                            card,sig_net,
+                            sizeof (OUT_XPARMS));
 
-            /* load default GK info */
-            calloutp->unique_xparms.sig_h323.request_admission = default_ras_info.request_admission;
-            calloutp->unique_xparms.sig_h323.gk_addr = default_ras_info.gk_addr;
-            for ( i = 0; i < default_ras_info.endpoint_identifier_length; i++ )
-               {
-               calloutp->unique_xparms.sig_h323.endpoint_identifier[i] = default_ras_info.endpoint_identifier[i];
-               }
-            calloutp->unique_xparms.sig_h323.endpoint_identifier_length = default_ras_info.endpoint_identifier_length;
-            }
-
-         result = voipioctl ( mode,
-                              (IOCTLU *) calloutp,
-                              clcard[card].clh,
-                              sizeof (OUT_XPARMS),
-                              card_2_voipcard(card));
-
-         if (result == 0);
+         if (result == 0)
             {
             /* now patch the handle to reflect the network */
             calloutp->handle = patch_handle (calloutp->handle, sig_net );
             }
 
          return(result);
-#endif
          }
       else
          {
@@ -1899,8 +1737,8 @@ static int openout_enquiry ( int mode, struct out_xparms * calloutp )
                      }
                   else
                      result = clioctl ( mode,
-                                       (IOCTLU *) calloutp,
-                                        clcard[card].clh,
+                                        (IOCTLU *) calloutp,
+                                        card,sig_net,
                                         sizeof (OUT_XPARMS));
 
                   if ( result == 0 )
@@ -1940,57 +1778,33 @@ ACUDLL int ACU_WINAPI call_state ( struct state_xparms * statep )
    {
    ACU_INT  uhandle;
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
 
 
    uhandle = statep->handle;                /* save user handle */
 
    dc.result = clopendev ( );               /* open the device  */
-
+   
    if ( dc.result == 0 )
       {
       handle_decomp ( statep->handle, &dc );
-
+       
       if ( dc.result >= 0 )                 /* check for error */
          {
          statep->handle = dc.handle;
-
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if ( dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE )
-            {
-            /* VoIP specific */
-            vcc_thread_get_id(&this_thread);
-            statep->unique_xparms.sig_h323.calling_thread = this_thread; /* put in this thread id */
-
-            dc.result = voipioctl ( CALL_STATE,
-                                   (IOCTLU *) statep,
-                                   clcard[dc.card].clh,
-                                   sizeof (STATE_XPARMS),
-                                   card_2_voipcard(dc.card));
-
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_STATE,
-                                  (IOCTLU *) statep,
-                                  clcard[dc.card].clh,
-                                  sizeof (STATE_XPARMS));
-            }
+      
+         dc.result = clioctl ( CALL_STATE,
+                               (IOCTLU *) statep,
+                               dc.card, handle2net(uhandle),
+                               sizeof (STATE_XPARMS));
          }
       }
    else
       {
       dc.result = ERR_CFAIL;
       }
-
+   
    statep->handle = uhandle;
-
+   
    return ( dc.result );
    }
 /*---------------------------------------*/
@@ -2013,21 +1827,20 @@ ACUDLL int ACU_WINAPI call_event ( struct state_xparms * eventp )
 
    if ( result == 0 )
       {
-      card  = unet_2_card ( unet );
       if ( eventp->handle != 0 )
          {
          unet = handle2net ( eventp->handle );
-
+         card  = unet_2_card ( unet );
          event_if_xparms.cmd = ACUC_EVENT_POLL_SPECIFIC ;
          event_if_xparms.timeout = eventp->timeout ;
 
          result = clioctl ( CALL_EVENT_IF,
                             (IOCTLU *) &event_if_xparms,
-                            clcard[card].clh,
+                            card, unet,
                             sizeof (event_if_xparms));
 
          }
-       else
+      else
          {
          /* Global event polling mode. */
          int event_possible ;
@@ -2039,38 +1852,37 @@ ACUDLL int ACU_WINAPI call_event ( struct state_xparms * eventp )
             event_if_xparms.timeout = eventp->timeout ;
 
             result = clioctl ( CALL_EVENT_IF,
-                            (IOCTLU *) &event_if_xparms,
-                            clcard[0].clh,
-                            sizeof (event_if_xparms));
+                               (IOCTLU *) &event_if_xparms,
+                               0, -1,
+                               sizeof (event_if_xparms));
 
             if (result !=0)
-              break ;
+               break ;
 
             if (event_if_xparms.cnum >=0)
                {
                event_possible = 1 ;
 
-              /* Drv 0 has reported a possible event on nominated cnum.  See if
-              it's real... */
+               /* Drv 0 has reported a possible event on nominated cnum.  See if
+               it's real... */
 
-              event_if_xparms.cmd = ACUC_EVENT_POLL_SPECIFIC ;
+               event_if_xparms.cmd = ACUC_EVENT_POLL_SPECIFIC ;
 
-              result = clioctl ( CALL_EVENT_IF,
-                            (IOCTLU *) &event_if_xparms,
-                            clcard[event_if_xparms.cnum].clh,
-                            sizeof (event_if_xparms));
+               result = clioctl ( CALL_EVENT_IF,
+                                  (IOCTLU *) &event_if_xparms,
+                                  event_if_xparms.cnum,-1,
+                                  sizeof (event_if_xparms));
 
-              if (event_if_xparms.handle != 0)
-                 {
-                 break ;		/* Got valid event! */
-                 }
+               if (event_if_xparms.handle != 0)
+                  {
+                  break ;         /* Got valid event! */
+                  }
 
-              }
-           else
-              event_possible = 0 ;
+               }
+            else
+               event_possible = 0 ;
 
             } while (event_possible) ;
-
          }
       }
 
@@ -2088,18 +1900,10 @@ ACUDLL int ACU_WINAPI call_event ( struct state_xparms * eventp )
 /*                                       */
 ACUDLL int ACU_WINAPI call_event ( struct state_xparms * eventp )
    {
-   static  ACU_INT fsm = 0;
    ACU_INT  result;   
    ACU_INT  unet;
    LEQ      leq;
 
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;   /* required for VoIP messaging */
-   /* obtain and store this thread id for VoIP */
-   vcc_thread_get_id(&this_thread);
-   leq.unique_xparms.sig_h323.calling_thread = this_thread;    
-   eventp->unique_xparms.sig_h323.calling_thread = this_thread;
-#endif
 
    result = clopendev ( );
    
@@ -2122,33 +1926,32 @@ ACUDLL int ACU_WINAPI call_event ( struct state_xparms * eventp )
          {
          /* Global Mode - Driver based events */	
          leq.valid = FALSE;
+         leq.net = -1;
+         leq.card = 0;   /* require a sensible value for use with clioctl */
          }
 
       eventp->handle = 0;               /* clear for the call */
       leq.timeout    = eventp->timeout; /* patch the timeout */
 
-#ifdef ACU_VOIP_CC
+
       if ( call_driver_installed ) 
          {
-
-      /* call driver installed somewhere in the system so we can call clioctl */
+          
+          /* call driver installed somewhere in the system so we can call clioctl */
          result = clioctl ( CALL_LEQ, 
-                           (IOCTLU *) &leq, 
-                           clcard[0].clh,
-                           sizeof (LEQ ));
+                            (IOCTLU *) &leq, 
+                            0, leq.net,
+                            sizeof (LEQ ));  
          }
-      else 
+      else
          {
-         /* no call driver so must deal with it in the user space */
-         result = xxcall_event ( &leq );
+          /* no call driver installed so we must deal with it in the user space */
+         result = srvioctl ( CALL_LEQ, 
+                            (IOCTLU *) &leq,
+                            sizeof (LEQ ), net_2_unet(leq.card, leq.net),
+                            card_2_voipcard(leq.card));
          }
-#else
-      result = clioctl ( CALL_LEQ, 
-                         (IOCTLU *) &leq, 
-                         clcard[0].clh,
-                         sizeof (LEQ ));
 
-#endif
 
       if ( result == 0 )
          {
@@ -2157,28 +1960,12 @@ ACUDLL int ACU_WINAPI call_event ( struct state_xparms * eventp )
             eventp->handle  = nch2handle ( leq.net, leq.ch );
             eventp->handle |= leq.io;                               /* add the direction */
             eventp->timeout = 0;
-
-#ifndef ACU_VOIP_CC
-            if ( 0 )
-               {
-#else
-            if (clcard[leq.card].voipservice == ACU_VOIP_ACTIVE)
-               {
-               result = voipioctl ( CALL_LEQ_S, 
-                                   (IOCTLU *) eventp, 
-                                   clcard[leq.card].clh,
-                                   sizeof (STATE_XPARMS ),
-                                   card_2_voipcard(leq.card));
-#endif
-               }
-            else
-               {
-               result = clioctl ( CALL_LEQ_S, 
-                                  (IOCTLU *) eventp, 
-                                  clcard[leq.card].clh,
-                                  sizeof (STATE_XPARMS ));
-               }
-
+ 
+            result = clioctl ( CALL_LEQ_S, 
+                               (IOCTLU *) eventp, 
+                               leq.card, net_2_unet(leq.card, leq.net),
+                               sizeof (STATE_XPARMS ));
+               
             eventp->timeout = leq.timeout;
 
             if ( result == 0 )
@@ -2208,9 +1995,7 @@ ACUDLL int ACU_WINAPI call_details ( struct detail_xparms * detailsp )
    {
    ACU_INT  uhandle;
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
+
 
    uhandle = detailsp->handle;               /* save user handle */
 
@@ -2219,61 +2004,35 @@ ACUDLL int ACU_WINAPI call_details ( struct detail_xparms * detailsp )
    if ( dc.result == 0 )
       {
       handle_decomp ( detailsp->handle, &dc );
-
+       
       if ( dc.result >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
-         switch(call_type(handle2net(detailsp->handle)))
-            {
-            case S_H323 :
-            /* assign this thread id */
-               vcc_thread_get_id(&this_thread);
-               detailsp->unique_xparms.sig_h323.calling_thread = this_thread;
-               detailsp->handle = dc.handle;       /* get the fixed up handle */
 
-               dc.result = voipioctl ( CALL_DETAILS,
-                                      (IOCTLU *) detailsp,
-                                       clcard[dc.card].clh,
-                                       sizeof (DETAIL_XPARMS),
-                                       card_2_voipcard(dc.card));
-            break;
-
-            default :
-               detailsp->handle = dc.handle;       /* get the fixed up handle */
-
-               dc.result = clioctl ( CALL_DETAILS,
-                                    (IOCTLU *) detailsp,
-                                     clcard[dc.card].clh,
-                                     sizeof (DETAIL_XPARMS));
-            break;
-            }
-#else
          detailsp->handle = dc.handle;       /* get the fixed up handle */
 
          dc.result = clioctl ( CALL_DETAILS,
                                (IOCTLU *) detailsp,
-                                clcard[dc.card].clh,
-                                sizeof (DETAIL_XPARMS));
-#endif
+                               dc.card, handle2net(uhandle),
+                               sizeof (DETAIL_XPARMS));
+   
          if (dc.result == 0)
             {
             if (call_type(handle2net(uhandle)) == S_ISUP)
                {
                /* Avoidance for ISUP NFAS driver problem whereby driver may
-               be unable to resolve the stream correctly */
+                  be unable to resolve the stream correctly */
                detailsp->stream = call_port_2_stream (call_handle_2_port(uhandle)) ;
                }
             }
-
          }
       }
    else
       {
       dc.result = ERR_CFAIL;
       }
-
+   
    detailsp->handle = uhandle;
-
+   
    return ( dc.result );
    }
 /*---------------------------------------*/
@@ -2301,19 +2060,17 @@ ACUDLL int ACU_WINAPI call_get_charge ( struct get_charge_xparms * chargep )
       if ( dc.result >= 0 )                  /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          chargep->handle = dc.handle;       /* get the fixed up handle */
 
          dc.result = clioctl ( CALL_GET_CHARGE,
                                (IOCTLU *) chargep,
-                                clcard[dc.card].clh,
-                                sizeof (GET_CHARGE_XPARMS ));
+                               dc.card, handle2net(chargep->handle),
+                               sizeof (GET_CHARGE_XPARMS ));
          }
       }
    else
@@ -2349,20 +2106,18 @@ ACUDLL int ACU_WINAPI call_put_charge ( struct put_charge_xparms * chargep )
       if ( dc.result >= 0 )                  /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          chargep->handle = dc.handle;       /* get the fixed up handle */
 
          dc.result = clioctl ( CALL_PUT_CHARGE,
                                (IOCTLU *) chargep,
-                                clcard[dc.card].clh,
-                                sizeof (PUT_CHARGE_XPARMS));
+                               dc.card, handle2net(chargep->handle),
+                               sizeof (PUT_CHARGE_XPARMS));
          }
       }
    else
@@ -2398,13 +2153,11 @@ ACUDLL int ACU_WINAPI call_send_overlap ( struct overlap_xparms * overlapp )
       if ( dc.result >= 0 )                  /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          overlapp->handle = dc.handle;       /* get the fixed up handle */
 
@@ -2416,8 +2169,8 @@ ACUDLL int ACU_WINAPI call_send_overlap ( struct overlap_xparms * overlapp )
             {
             dc.result = clioctl ( CALL_SEND_OVERLAP,
                                   (IOCTLU *) overlapp,
-                                   clcard[dc.card].clh,
-                                   sizeof (OVERLAP_XPARMS));
+                                  dc.card,  handle2net(overlapp->handle),
+                                  sizeof (OVERLAP_XPARMS));
             }
          }
       }
@@ -2457,27 +2210,19 @@ ACUDLL int ACU_WINAPI call_accept ( int acchandle )
 ACUDLL int ACU_WINAPI xcall_accept ( struct accept_xparms *acceptp )
    {
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread; /* VoIP specific */
    ACU_INT i;
-#endif
+   ACU_INT unet;
 
    dc.result = clopendev ( );
+   unet = handle2net(acceptp->handle);
 
    if ( dc.result == 0 )
       {
       handle_decomp ( acceptp->handle, &dc );
 
-      switch(call_type(handle2net(acceptp->handle)))
+      switch(call_type(unet))
          {
-#ifdef ACU_VOIP_CC
          case S_H323:
-            /*
-             * VoIP specific - assign this thread id
-             * used by the generic/tls thread to send ACK message back
-             */
-            vcc_thread_get_id(&this_thread);
-            acceptp->unique_xparms.sig_h323.calling_thread = this_thread;
 
             if ( (acceptp->unique_xparms.sig_h323.codecs[0] == 0) &&
                   default_codecs[0] )
@@ -2504,7 +2249,6 @@ ACUDLL int ACU_WINAPI xcall_accept ( struct accept_xparms *acceptp )
                acceptp->unique_xparms.sig_h323.endpoint_identifier_length = default_ras_info.endpoint_identifier_length;
                }
             break;
-#endif
           case S_ISUP :
              if (acceptp->unique_xparms.sig_isup.progress_indicator.ie[0] >= MAXPROGRESS)  /* check progress_indicator length */
                  {
@@ -2535,26 +2279,11 @@ ACUDLL int ACU_WINAPI xcall_accept ( struct accept_xparms *acceptp )
          {
          acceptp->handle = dc.handle;           /* get the fixed up handle */
 
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            dc.result = voipioctl ( CALL_ACCEPT,
-                                   (IOCTLU *) acceptp,
-                                    clcard[dc.card].clh,
-                                    sizeof ( ACCEPT_XPARMS ),
-                                    card_2_voipcard(dc.card));
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_ACCEPT,
-                                 (IOCTLU *) acceptp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( ACCEPT_XPARMS ));
-            }
+         dc.result = clioctl ( CALL_ACCEPT,
+                               (IOCTLU *) acceptp,
+                               dc.card, unet,
+                               sizeof ( ACCEPT_XPARMS ));
+          
          }
       }
    else
@@ -2603,16 +2332,15 @@ ACUDLL int ACU_WINAPI call_reconnect ( int holdhandle )
 /*---------------------------------------*/
 
 
-/*-------------- call_hold --------------*/
+/*-------------- xcall_hold -------------*/
 /* put call on hold                      */
 /*                                       */
 
 ACUDLL int ACU_WINAPI xcall_hold ( HOLD_XPARMS *holdp )
    {
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
+   ACU_INT unet;
+
 
    dc.result = clopendev ( );
 
@@ -2622,46 +2350,22 @@ ACUDLL int ACU_WINAPI xcall_hold ( HOLD_XPARMS *holdp )
 
       if ( dc.result >= 0 )             /* check for error */
          {
+         unet = handle2net(holdp->handle);  
          holdp->handle = dc.handle;     /* get the fixed up handle */
-
-
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /*
-             * VoIP specific - assign this thread id
-             * used by the generic/tls thread to send ACK message back
-             */
-            vcc_thread_get_id(&this_thread);
-            holdp->unique_xparms.sig_h323.calling_thread = this_thread;
-
-            dc.result = voipioctl ( CALL_HOLD,
-                                 (IOCTLU *) holdp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( HOLD_XPARMS ),
-                                  card_2_voipcard(dc.card));
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_HOLD,
+       
+         dc.result = clioctl ( CALL_HOLD,
                                (IOCTLU *) holdp,
-                               clcard[dc.card].clh,
+                               dc.card,unet,
                                sizeof ( HOLD_XPARMS ));
-            }
          }
       }
    else
       {
       dc.result = ERR_CFAIL;
       }
-
+   
    return ( dc.result );
    }
-
 
 /*---------- xcall_reconnect ------------*/
 /* get call on hold                      */
@@ -2670,10 +2374,7 @@ ACUDLL int ACU_WINAPI xcall_hold ( HOLD_XPARMS *holdp )
 ACUDLL int ACU_WINAPI xcall_reconnect ( HOLD_XPARMS *holdp )
    {
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
-
+   ACU_INT unet;
 
    dc.result = clopendev ( );
 
@@ -2683,41 +2384,20 @@ ACUDLL int ACU_WINAPI xcall_reconnect ( HOLD_XPARMS *holdp )
 
       if ( dc.result >= 0 )             /* check for error */
          {
+         unet = handle2net(holdp->handle);
          holdp->handle = dc.handle;     /* get the fixed up handle */
 
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /*
-             * VoIP specific - assign this thread id
-             * used by the generic/tls thread to send ACK message back
-             */
-            vcc_thread_get_id(&this_thread);
-            holdp->unique_xparms.sig_h323.calling_thread = this_thread;
-            dc.result = voipioctl ( CALL_RECONNECT,
-                                  (IOCTLU *) holdp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( HOLD_XPARMS ),
-                                  card_2_voipcard(dc.card));
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_RECONNECT,
-                                  (IOCTLU *) holdp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( HOLD_XPARMS ));
-            }
+         dc.result = clioctl ( CALL_RECONNECT,
+                               (IOCTLU *) holdp,
+                               dc.card,unet,
+                               sizeof ( HOLD_XPARMS ));
          }
       }
    else
       {
       dc.result = ERR_CFAIL;
       }
-
+   
    return ( dc.result );
    }
 /*---------------------------------------*/
@@ -2732,6 +2412,7 @@ ACUDLL int ACU_WINAPI call_transfer ( TRANSFER_XPARMS * transferp )
    ACU_INT  uhandlea;
    ACU_INT  uhandlec;
    DC   dc;
+   ACU_INT unet;
 
 
    dc.result = clopendev ( );
@@ -2741,6 +2422,7 @@ ACUDLL int ACU_WINAPI call_transfer ( TRANSFER_XPARMS * transferp )
       dc.result = ERR_PARM;
 
       /* must be on the same port */
+      unet = handle2net ( transferp->handlea );
 
       if ( handle2net ( transferp->handlea ) == handle2net (  transferp->handlec ))
          {
@@ -2756,13 +2438,6 @@ ACUDLL int ACU_WINAPI call_transfer ( TRANSFER_XPARMS * transferp )
             if ( dc.result >= 0 )                  /* check for error */
                {
 
-#ifdef ACU_VOIP_CC
-               /* command not supported for VoIP */
-               if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-                  {
-                  return (ERR_COMMAND);
-               }
-#endif
                transferp->handlea = dc.handle;       /* get the fixed up handle */
 
                handle_decomp ( transferp->handlec, &dc );
@@ -2773,8 +2448,8 @@ ACUDLL int ACU_WINAPI call_transfer ( TRANSFER_XPARMS * transferp )
 
                   dc.result = clioctl ( CALL_TRANSFER,
                                         (IOCTLU *) transferp,
-                                         clcard[dc.card].clh,
-                                         sizeof (TRANSFER_XPARMS));
+                                        dc.card,unet,
+                                        sizeof (TRANSFER_XPARMS));
                   }
                }
             }
@@ -2782,15 +2457,16 @@ ACUDLL int ACU_WINAPI call_transfer ( TRANSFER_XPARMS * transferp )
             {
             dc.result = ERR_CFAIL;
             }
-
+ 
          transferp->handlea = uhandlea;
          transferp->handlec = uhandlec;
          }
       }
-
+   
    return ( dc.result );
    }
 /*---------------------------------------*/
+
 
 /*------------ call_answercode ----------*/
 /* set the answer code value             */
@@ -2811,18 +2487,16 @@ ACUDLL int ACU_WINAPI call_answercode ( struct cause_xparms * causep )
 
       if ( dc.result >= 0 )            /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          causep->handle = dc.handle;
 
          dc.result = clioctl ( CALL_ANSWERCODE,
                                (IOCTLU *) causep,
-                               clcard[dc.card].clh,
+                               dc.card,handle2net(uhandle),
                                sizeof ( CAUSE_XPARMS ));
          }
       }
@@ -2865,9 +2539,7 @@ ACUDLL int ACU_WINAPI call_incoming_ringing ( int ringhandle )
 ACUDLL int ACU_WINAPI xcall_incoming_ringing ( struct incoming_ringing_xparms *incoming_ringingp )
    {
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
+   ACU_INT unet;
 
    dc.result = clopendev ( );
 
@@ -2875,14 +2547,14 @@ ACUDLL int ACU_WINAPI xcall_incoming_ringing ( struct incoming_ringing_xparms *i
       {
       handle_decomp ( incoming_ringingp->handle, &dc );
 
-      switch(call_type(handle2net(incoming_ringingp->handle)))
+      unet = handle2net(incoming_ringingp->handle);
+      switch(call_type(unet))
           {
-#ifdef ACU_VOIP_CC
           case S_H323 :
              if ( (incoming_ringingp->unique_xparms.sig_h323.codecs[0] == 0) &&
                    default_codecs[0] )
                 {
-             /* load default codecs here */
+                /* load default codecs here */
                 int i;
                 for ( i = 0; i < MAXCODECS; i++ )
                    {
@@ -2906,7 +2578,6 @@ ACUDLL int ACU_WINAPI xcall_incoming_ringing ( struct incoming_ringing_xparms *i
                   incoming_ringingp->unique_xparms.sig_h323.endpoint_identifier_length = default_ras_info.endpoint_identifier_length;
                }
           break;
-#endif
 
           case S_ISUP :
              if (incoming_ringingp->unique_xparms.sig_isup.progress_indicator.ie[0] >= MAXPROGRESS)  /* check progress_indicator length */
@@ -2929,44 +2600,21 @@ ACUDLL int ACU_WINAPI xcall_incoming_ringing ( struct incoming_ringing_xparms *i
       if ( dc.result >= 0 )             /* check for error */
          {
          incoming_ringingp->handle = dc.handle;           /* get the fixed up handle */
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /*
-             * VoIP specific - assign this thread id
-             * used by the generic/tls thread to send ACK message back
-             */
-             vcc_thread_get_id(&this_thread);
-             incoming_ringingp->unique_xparms.sig_h323.calling_thread = this_thread;
 
-             dc.result = voipioctl ( CALL_INCOMING_RINGING,
-                                    (IOCTLU *) incoming_ringingp,
-                                     clcard[dc.card].clh,
-                                     sizeof ( INCOMING_RINGING_XPARMS ),
-                                     card_2_voipcard(dc.card));
-#endif
-             }
-         else
-             {
-             dc.result = clioctl ( CALL_INCOMING_RINGING,
-                                  (IOCTLU *) incoming_ringingp,
-                                   clcard[dc.card].clh,
-                                   sizeof ( INCOMING_RINGING_XPARMS ));
-             }
+         dc.result = clioctl ( CALL_INCOMING_RINGING,
+                               (IOCTLU *) incoming_ringingp,
+                               dc.card,unet,
+                               sizeof ( INCOMING_RINGING_XPARMS ));
          }
       }
    else
       {
       dc.result = ERR_CFAIL;
       }
-
+   
    return ( dc.result );
    }
 /*---------------------------------------*/
-
 
 /*------ call_get_originating_addr ------*/
 /* get call details                      */
@@ -3004,18 +2652,16 @@ ACUDLL int ACU_WINAPI xcall_get_originating_addr ( struct get_originating_addr_x
 
       if ( dc.result >= 0 )             /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
          get_originating_addrp->handle = dc.handle;   /* get the fixed up handle */
 
          dc.result = clioctl ( CALL_GET_ORIGINATING_ADDR,
                                (IOCTLU *) get_originating_addrp,
-                               clcard[dc.card].clh,
+                               dc.card, -1, 
                                sizeof ( GET_ORIGINATING_ADDR_XPARMS ));
          }
       }
@@ -3061,7 +2707,7 @@ ACUDLL int ACU_WINAPI call_disconnect ( struct cause_xparms * causep )
 }
 
 
-/*------------- call_disconnect ---------*/
+/*------------- xcall_disconnect --------*/
 /* release channel                       */
 /*                                       */
 
@@ -3069,9 +2715,7 @@ ACUDLL int ACU_WINAPI xcall_disconnect ( struct disconnect_xparms * disconnectp 
    {
    ACU_INT  uhandle;
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
+   ACU_INT unet = 0;
 
    uhandle = disconnectp->handle;            /* save user handle */
 
@@ -3080,16 +2724,13 @@ ACUDLL int ACU_WINAPI xcall_disconnect ( struct disconnect_xparms * disconnectp 
    if (dc.result >= 0)
        {
        handle_decomp ( disconnectp->handle, &dc );
+       unet = handle2net(disconnectp->handle);
 
-       switch(call_type(handle2net(disconnectp->handle)))
+       switch(call_type(unet))
            {
-#ifdef ACU_VOIP_CC
            case S_H323 :
-              /* assign this thread id */
-              vcc_thread_get_id(&this_thread);
-              disconnectp->unique_xparms.sig_h323.calling_thread = this_thread;
+
               break;
-#endif
            case S_ISUP :
                if (disconnectp->unique_xparms.sig_isup.progress_indicator.ie[0] >= MAXPROGRESS)  /* check progress_indicator length */
                    {
@@ -3116,26 +2757,10 @@ ACUDLL int ACU_WINAPI xcall_disconnect ( struct disconnect_xparms * disconnectp 
          {
          disconnectp->handle = dc.handle;
 
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            dc.result = voipioctl ( CALL_DISCONNECT,
-                                  (IOCTLU *) disconnectp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( DISCONNECT_XPARMS ),
-                                  card_2_voipcard(dc.card));
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_DISCONNECT,
-                                  (IOCTLU *) disconnectp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( DISCONNECT_XPARMS ));
-            }
+         dc.result = clioctl ( CALL_DISCONNECT,
+                               (IOCTLU *) disconnectp,
+                               dc.card,unet,
+                               sizeof ( DISCONNECT_XPARMS ));
          }
       }
    else
@@ -3168,14 +2793,17 @@ ACUDLL int ACU_WINAPI call_getcause ( struct cause_xparms * causep )
    causep->cause  = disconnectp.cause;
 
    switch(call_type(handle2net(disconnectp.handle)))
-       {
-       case S_ISUP :
-           causep->raw = disconnectp.unique_xparms.sig_isup.raw;
-           break;
-       default :
-           causep->raw = disconnectp.unique_xparms.sig_q931.raw;
-           break;
-       }
+      {
+      case S_ISUP :
+         causep->raw = disconnectp.unique_xparms.sig_isup.raw;
+         break;
+      case S_H323:
+         causep->raw = disconnectp.unique_xparms.sig_h323.raw;
+         break;
+      default :
+         causep->raw = disconnectp.unique_xparms.sig_q931.raw;
+         break;
+      }
 
    return ( dc.result );
 }
@@ -3189,9 +2817,7 @@ ACUDLL int ACU_WINAPI xcall_getcause ( struct disconnect_xparms * disconnectp )
    {
    ACU_INT  uhandle;
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
+
 
    uhandle = disconnectp->handle;            /* save user handle */
 
@@ -3205,31 +2831,10 @@ ACUDLL int ACU_WINAPI xcall_getcause ( struct disconnect_xparms * disconnectp )
          {
          disconnectp->handle = dc.handle;
 
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /* If VoIP call then assign calling thread */
-            /* identity otherwise do nothing           */
-            vcc_thread_get_id(&this_thread);
-            disconnectp->unique_xparms.sig_h323.calling_thread = this_thread;
-
-            dc.result = voipioctl ( CALL_GETCAUSE,
-                                 (IOCTLU *) disconnectp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( DISCONNECT_XPARMS ),
-                                  card_2_voipcard(dc.card));
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_GETCAUSE,
-                                  (IOCTLU *) disconnectp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( DISCONNECT_XPARMS ));
-            }
+         dc.result = clioctl ( CALL_GETCAUSE,
+                               (IOCTLU *) disconnectp,
+                               dc.card, handle2net(uhandle),
+                               sizeof ( DISCONNECT_XPARMS ));
          }
       }
    else
@@ -3276,7 +2881,7 @@ ACUDLL int ACU_WINAPI call_release ( struct cause_xparms * causep )
    return ( dc.result );
 }
 
-/*------------- call_release ------------*/
+/*------------- xcall_release -----------*/
 /* release channel                       */
 /*                                       */
 
@@ -3284,9 +2889,8 @@ ACUDLL int ACU_WINAPI xcall_release ( struct disconnect_xparms * disconnectp )
    {
    ACU_INT  uhandle;
    DC   dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
+   ACU_INT unet;
+
 
    uhandle = disconnectp->handle;            /* save user handle */
 
@@ -3295,8 +2899,8 @@ ACUDLL int ACU_WINAPI xcall_release ( struct disconnect_xparms * disconnectp )
    if ( dc.result == 0 )
       {
       handle_decomp ( disconnectp->handle, &dc );
-
-      switch(call_type(handle2net(disconnectp->handle)))
+      unet = handle2net(disconnectp->handle);  
+      switch(call_type(unet))
           {
           case S_ISUP :
               if (disconnectp->unique_xparms.sig_isup.progress_indicator.ie[0] >= MAXPROGRESS)  /* check progress_indicator length */
@@ -3324,29 +2928,10 @@ ACUDLL int ACU_WINAPI xcall_release ( struct disconnect_xparms * disconnectp )
          /* this will stop us calling the driver from  */
          /* the exit list routine                      */
 
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            vcc_thread_get_id(&this_thread);
-            disconnectp->unique_xparms.sig_h323.calling_thread = this_thread;
-
-            dc.result = voipioctl ( CALL_RELEASE,
-                                  (IOCTLU *) disconnectp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( DISCONNECT_XPARMS ),
-                                  card_2_voipcard(dc.card));
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_RELEASE,
-                                  (IOCTLU *) disconnectp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( DISCONNECT_XPARMS ));
-            }
+         dc.result = clioctl ( CALL_RELEASE,
+                              (IOCTLU *) disconnectp,
+                              dc.card,unet,
+                              sizeof ( DISCONNECT_XPARMS ));
          }
       }
    else
@@ -3370,9 +2955,8 @@ ACUDLL int ACU_WINAPI call_progress ( struct progress_xparms * progressp )
    {
    ACU_INT  uhandle;
    DC       dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;              /* VoIP specific */
-#endif
+   ACU_INT unet;
+
 
    uhandle = progressp->handle;            /* save user handle */
 
@@ -3381,10 +2965,14 @@ ACUDLL int ACU_WINAPI call_progress ( struct progress_xparms * progressp )
    if ( dc.result == 0 )
       {
       handle_decomp ( progressp->handle, &dc );
+      unet = handle2net(progressp->handle);
 
-      switch(call_type(handle2net(progressp->handle)))
+      switch(call_type(unet))
          {
-#ifdef ACU_VOIP_CC
+        case S_SIP:
+            dc.result = ERR_COMMAND;
+            break;
+          
          case S_H323 :
             /* also check display length */
             if (progressp->unique_xparms.sig_h323.display.ie[0] >= MAXDISPLAY)
@@ -3392,7 +2980,6 @@ ACUDLL int ACU_WINAPI call_progress ( struct progress_xparms * progressp )
                dc.result = ERR_PARM;
                }
             break;
-#endif
 
          case S_ISUP :
             if (progressp->unique_xparms.sig_isup.progress_indicator.ie[0] >= MAXPROGRESS)  /* check progress_indicator length */
@@ -3418,30 +3005,10 @@ ACUDLL int ACU_WINAPI call_progress ( struct progress_xparms * progressp )
          {
          progressp->handle = dc.handle;
 
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /* If VoIP card then thread identification is required */
-            vcc_thread_get_id(&this_thread);
-            progressp->unique_xparms.sig_h323.calling_thread = this_thread; /* assign thread id */
-
-            dc.result = voipioctl ( CALL_PROGRESS,
-                                  (IOCTLU *) progressp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( PROGRESS_XPARMS ),
-                                  card_2_voipcard(dc.card));
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_PROGRESS,
-                                  (IOCTLU *) progressp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( PROGRESS_XPARMS ));
-            }
+         dc.result = clioctl ( CALL_PROGRESS,
+                               (IOCTLU *) progressp,
+                               dc.card,unet,
+                               sizeof ( PROGRESS_XPARMS ));
          }
       }
    else
@@ -3464,10 +3031,8 @@ ACUDLL int ACU_WINAPI call_proceeding ( struct proceeding_xparms * proceedingp )
    {
    ACU_INT  uhandle;
    DC       dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;                /* VoIP specific */
    ACU_INT   i;
-#endif
+   ACU_INT unet;
 
    uhandle = proceedingp->handle;            /* save user handle */
 
@@ -3476,10 +3041,14 @@ ACUDLL int ACU_WINAPI call_proceeding ( struct proceeding_xparms * proceedingp )
    if ( dc.result == 0 )
       {
       handle_decomp ( proceedingp->handle, &dc );
+      unet = handle2net(proceedingp->handle);
 
-      switch(call_type(handle2net(proceedingp->handle)))
+      switch(call_type(unet))
           {
-#ifdef ACU_VOIP_CC
+        case S_SIP:
+            dc.result = ERR_COMMAND;
+            break;
+
           case S_H323 :
              if ( (proceedingp->unique_xparms.sig_h323.codecs[0] == 0) &&
                    default_codecs[0] )
@@ -3492,7 +3061,7 @@ ACUDLL int ACU_WINAPI call_proceeding ( struct proceeding_xparms * proceedingp )
                    if (default_codecs[i] == 0 )
                       break;
                    }
-                 }
+                }
                 /* check GK assignment */
              if ( default_ras_info.request_admission )
                 {
@@ -3507,7 +3076,6 @@ ACUDLL int ACU_WINAPI call_proceeding ( struct proceeding_xparms * proceedingp )
                 }
 
              break;
-#endif
 
           case S_ISUP :
               if (proceedingp->unique_xparms.sig_isup.progress_indicator.ie[0] >= MAXPROGRESS)  /* check progress_indicator length */
@@ -3529,7 +3097,6 @@ ACUDLL int ACU_WINAPI call_proceeding ( struct proceeding_xparms * proceedingp )
 
       if ( dc.result >= 0 )            /* check for error */
          {
-#ifdef ACU_VOIP_CC
          /* load default codecs here */  /* is this still required was removed in DLL code. */
          for ( i = 0; i < MAXCODECS; i++ )
             {
@@ -3538,34 +3105,12 @@ ACUDLL int ACU_WINAPI call_proceeding ( struct proceeding_xparms * proceedingp )
             if (default_codecs[i] == 0 )
                break;
             }
-#endif
          proceedingp->handle = dc.handle;
 
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /* If VoIP card then thread identification is required */
-            vcc_thread_get_id(&this_thread);
-            proceedingp->unique_xparms.sig_h323.calling_thread = this_thread; /* assign thread id */
-
-            dc.result = voipioctl ( CALL_PROCEEDING,
-                                  (IOCTLU *) proceedingp,
-                                   clcard[dc.card].clh,
-                                   sizeof ( PROCEEDING_XPARMS ),
-                                   card_2_voipcard(dc.card));
-
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_PROCEEDING,
-                                  (IOCTLU *) proceedingp,
-                                   clcard[dc.card].clh,
-                                   sizeof ( PROCEEDING_XPARMS ));
-            }
+         dc.result = clioctl ( CALL_PROCEEDING,
+                               (IOCTLU *) proceedingp,
+                               dc.card, unet,
+                               sizeof ( PROCEEDING_XPARMS ));
          }
       }
    else
@@ -3589,9 +3134,6 @@ ACUDLL int ACU_WINAPI call_setup_ack ( struct setup_ack_xparms * setup_ackp )
    {
    ACU_INT  uhandle;
    DC       dc;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;               /* VoIP specific */
-#endif
 
    uhandle = setup_ackp->handle;            /* save user handle */
 
@@ -3603,6 +3145,10 @@ ACUDLL int ACU_WINAPI call_setup_ack ( struct setup_ack_xparms * setup_ackp )
 
       switch(call_type(handle2net(setup_ackp->handle)))
          {
+        case S_SIP:
+            dc.result = ERR_COMMAND;
+            break;
+
          default :
              if (setup_ackp->unique_xparms.sig_q931.progress_indicator.ie[0] >= MAXPROGRESS)  /* check progress_indicator length */
                  {
@@ -3620,30 +3166,10 @@ ACUDLL int ACU_WINAPI call_setup_ack ( struct setup_ack_xparms * setup_ackp )
          {
          setup_ackp->handle = dc.handle;
 
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
-         if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /* If VoIP card then thread identification is required */
-            vcc_thread_get_id(&this_thread);
-            setup_ackp->unique_xparms.sig_h323.calling_thread = this_thread; /* assign thread id */
-
-            dc.result = voipioctl ( CALL_SETUP_ACK,
-                                    (IOCTLU *) setup_ackp,
-                                    clcard[dc.card].clh,
-                                    sizeof ( SETUP_ACK_XPARMS ),
-                                    card_2_voipcard(dc.card));
-#endif
-            }
-         else
-            {
-            dc.result = clioctl ( CALL_SETUP_ACK,
-                                  (IOCTLU *) setup_ackp,
-                                  clcard[dc.card].clh,
-                                  sizeof ( SETUP_ACK_XPARMS ));
-            }
+         dc.result = clioctl ( CALL_SETUP_ACK,
+                               (IOCTLU *) setup_ackp,
+                               dc.card, handle2net(uhandle),
+                               sizeof ( SETUP_ACK_XPARMS ));
          }
       }
    else
@@ -3680,13 +3206,11 @@ ACUDLL int ACU_WINAPI call_notify ( struct notify_xparms * notifyp )
       if ( dc.result >= 0 )            /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          /* command not supported for VoIP */
          if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             return (ERR_COMMAND);
             }
-#endif
 
          if (notifyp->unique_xparms.sig_q931.notify_indicator.ie[0] == 0x00 ||
              notifyp->unique_xparms.sig_q931.notify_indicator.ie[0] >= MAXNOTIFY)  /* check notify_indicator length */
@@ -3699,7 +3223,7 @@ ACUDLL int ACU_WINAPI call_notify ( struct notify_xparms * notifyp )
 
              dc.result = clioctl ( CALL_NOTIFY,
                                    (IOCTLU *) notifyp,
-                                   clcard[dc.card].clh,
+                                   dc.card, handle2net(uhandle),
                                    sizeof ( NOTIFY_XPARMS ));
              }
          }
@@ -3745,6 +3269,11 @@ static int feature_openout_enquiry ( int mode, struct feature_out_xparms * callo
    ACU_INT  result;
    ACU_INT  card;
    ACU_INT  unet;
+   ACU_INT  i;
+   ACU_INT sig_net  = calloutp->net ;	/* Fixed up by xlate_assoc */
+	   
+   card = unet_2_card ( sig_net );        /* get the card number */
+	   
 
    unet = calloutp->net;            /* save user net */
 
@@ -3754,121 +3283,210 @@ static int feature_openout_enquiry ( int mode, struct feature_out_xparms * callo
 
    if ( result == 0 )
       {
-      /* Translate user's bearer network to actual signalling network... */
-      /* and associated bearer network port...                           */
-      ACU_INT assoc_net = xlate_assoc(&calloutp->net) ;
-      ACU_INT sig_net  = calloutp->net ;	/* Fixed up by xlate_assoc */
-
-      card = unet_2_card ( sig_net );        /* get the card number */
-
-      if ( card >= 0 )                    /* check for error */
+      /* Check for VoIP card */
+      if (card >= 0 && clcard[card].voipservice == ACU_VOIP_ACTIVE)
          {
-
-#ifdef ACU_VOIP_CC
-         if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /* command not supported for VoIP */
-            return (ERR_COMMAND);
-            }
-#endif
-
          calloutp->net = unet_2_net ( sig_net ); /* and the network port */
 
-         if ( calloutp->net >= 0 )     /* check for error */
+         /* check codec assignment */
+         if ( (calloutp->unique_xparms.sig_h323.codecs[0] == 0) &&
+               default_codecs[0] )
             {
-            switch (call_type(calloutp->net))
+            for ( i = 0; i < MAXCODECS; i++ )
                {
-               case S_ISUP :
-                  if (calloutp->unique_xparms.sig_isup.bearer.ie[0] >= MAXBEARER)
-                     {
-                     result = ERR_SERVICE;
-                     }
-                  else if (calloutp->unique_xparms.sig_isup.lolayer.ie[0] >= MAXLOLAYER)
-                     {
-                     result = ERR_SERVICE;
-                     }
-                  else if (calloutp->unique_xparms.sig_isup.hilayer.ie[0] >= MAXHILAYER)
-                     {
-                     result = ERR_SERVICE;
-                     }
-                  else if (calloutp->unique_xparms.sig_isup.progress_indicator.ie[0] >= MAXPROGRESS)
-                     {
-                     result = ERR_PARM;
-                     }
-               break ;
-
-               default :
-                  if (calloutp->unique_xparms.sig_q931.bearer.ie[0] >= MAXBEARER)
-                     {
-                     result = ERR_SERVICE;
-                     }
-                  else if (calloutp->unique_xparms.sig_q931.lolayer.ie[0] >= MAXLOLAYER)
-                     {
-                     result = ERR_SERVICE;
-                     }
-                  else if (calloutp->unique_xparms.sig_q931.hilayer.ie[0] >= MAXHILAYER)
-                     {
-                     result = ERR_SERVICE;
-                     }
-                  else if (calloutp->unique_xparms.sig_q931.progress_indicator.ie[0] >= MAXPROGRESS)
-                     {
-                     result = ERR_PARM;
-                     }
-                  if((calloutp->feature_information & FEATURE_FACILITY) == FEATURE_FACILITY)
-                     {
-                     if(calloutp->feature.facility.length> MAXFACILITY_INFO)
-                        {
-                        result = ERR_PARM;
-                        }
-                     }
-                  if((calloutp->feature_information & FEATURE_USER_USER) == FEATURE_USER_USER)
-                     {
-                     if(calloutp->feature.uui.length> MAXUUI_INFO)
-                        {
-                        result = ERR_PARM;
-                        }
-                     }
-                  if((calloutp->feature_information & FEATURE_RAW_DATA) == FEATURE_RAW_DATA)
-                     {
-                     if(calloutp->feature.raw_data.length> MAXRAWDATA)
-                        {
-                        result = ERR_PARM;
-                        }
-                     }
-               break;
-
+               calloutp->unique_xparms.sig_h323.codecs[i] = default_codecs[i];
+               /* 0 signifies end of codec list so stop assignment here for efficiency */
+               if (default_codecs[i] == 0 )
+                  break;
                }
-            if (result == 0)
-               {
-               /* We encode associated bearer net in upper bits of sig_net... */
-	       calloutp->net |= ((assoc_net +1) << 8) ;
+            }
 
-               if (  !isallowed_string ( calloutp->destination_addr )       /* check if the characaters in the string are allowed */
-                  || !isallowed_string ( calloutp->originating_addr ))
+         /* check GK assignment */
+         if ( default_ras_info.request_admission )
+            {
+
+            /* load default GK info */
+            calloutp->unique_xparms.sig_h323.request_admission = default_ras_info.request_admission;
+            calloutp->unique_xparms.sig_h323.gk_addr = default_ras_info.gk_addr;
+            for ( i = 0; i < default_ras_info.endpoint_identifier_length; i++ )
+               {
+               calloutp->unique_xparms.sig_h323.endpoint_identifier[i] = default_ras_info.endpoint_identifier[i];
+               }
+            calloutp->unique_xparms.sig_h323.endpoint_identifier_length = default_ras_info.endpoint_identifier_length;
+            }
+
+         switch (calloutp->feature_information) 
+            {
+            case FEATURE_NON_STANDARD:
+               /* Too much data anywhere? */
+               if(calloutp->feature.non_standard.length> MAXRAWDATA)
                   {
                   result = ERR_PARM;
                   }
-               else
-                  result = clioctl ( mode,
-                                    (IOCTLU *) calloutp,
-                                     clcard[card].clh,
-                                     sizeof (FEATURE_OUT_XPARMS));
-
-               if ( result == 0 )
+               switch(calloutp->feature.non_standard.id_type) 
                   {
-                  /* now patch the handle to reflect the network */
-                  calloutp->handle = patch_handle (calloutp->handle, sig_net );
+                  case NON_STANDARD_ID_TYPE_H221:
+                  break;
+                  case NON_STANDARD_ID_TYPE_OBJECT:
+                     if(calloutp->feature.non_standard.id.object_id.length> MAXOID)
+                        {
+                        result = ERR_PARM;
+                        }
+                  break;
+                  default:
+                     result = ERR_PARM;
                   }
+               break;
+               default:
+                  result = ERR_PARM;
+               break;
+            }
+
+         if (result == 0) 
+            {
+            result = clioctl ( mode,
+                               (IOCTLU *) calloutp,
+                               card, sig_net,
+                               sizeof (FEATURE_OUT_XPARMS));
+            if (result == 0)
+               {
+               /* now patch the handle to reflect the network */
+               calloutp->handle = patch_handle (calloutp->handle, sig_net );
+               }
+            }
+
+            return(result);
+         }
+      else 
+         {
+         /* Translate user's bearer network to actual signalling network... */
+         /* and associated bearer network port...                           */
+         ACU_INT assoc_net = xlate_assoc(&calloutp->net) ;
+
+         if ( card >= 0 )                    /* check for error */
+            {
+
+            calloutp->net = unet_2_net ( sig_net ); /* and the network port */
+
+            if ( calloutp->net >= 0 )     /* check for error */
+               {
+               switch (call_type(calloutp->net))
+                  {
+                  case S_ISUP :
+                     if (calloutp->unique_xparms.sig_isup.bearer.ie[0] >= MAXBEARER)
+                        {
+                        result = ERR_SERVICE;
+                        }
+                     else if (calloutp->unique_xparms.sig_isup.lolayer.ie[0] >= MAXLOLAYER)
+                        {
+                        result = ERR_SERVICE;
+                        }
+                     else if (calloutp->unique_xparms.sig_isup.hilayer.ie[0] >= MAXHILAYER)
+                        {
+                        result = ERR_SERVICE;
+                        }
+                     else if (calloutp->unique_xparms.sig_isup.progress_indicator.ie[0] >= MAXPROGRESS)
+                        {
+                        result = ERR_PARM;
+                        }
+                  break ;
+
+                  default :
+                     if (calloutp->unique_xparms.sig_q931.bearer.ie[0] >= MAXBEARER)
+                        {
+                        result = ERR_SERVICE;
+                        }
+                     else if (calloutp->unique_xparms.sig_q931.lolayer.ie[0] >= MAXLOLAYER)
+                        {
+                        result = ERR_SERVICE;
+                        }
+                        else if (calloutp->unique_xparms.sig_q931.hilayer.ie[0] >= MAXHILAYER)
+                        {
+                        result = ERR_SERVICE;
+                        }
+                    else if (calloutp->unique_xparms.sig_q931.progress_indicator.ie[0] >= MAXPROGRESS)
+                        {
+                        result = ERR_PARM;
+                        }
+                   
+                    if((calloutp->feature_information & FEATURE_FACILITY) == FEATURE_FACILITY)
+                       {
+                       if(calloutp->feature.facility.length> MAXFACILITY_INFO)
+                          {
+                          result = ERR_PARM;
+                          }
+                       }
+                    if((calloutp->feature_information & FEATURE_USER_USER) == FEATURE_USER_USER)
+                       {
+                       if(calloutp->feature.uui.length> MAXUUI_INFO)
+                          {
+                          result = ERR_PARM;
+                          }
+                       }
+                  
+                    if((calloutp->feature_information & FEATURE_RAW_DATA) == FEATURE_RAW_DATA)
+                       {
+                       if(calloutp->feature.raw_data.length> MAXRAWDATA)
+                          {
+                          result = ERR_PARM;
+                          }
+                       }
+                   
+                    if((calloutp->feature_information & FEATURE_MLPP) == FEATURE_MLPP)
+                       {
+                       if( (calloutp->feature.mlpp.Prec_level<0) ||
+                           (calloutp->feature.mlpp.Prec_level>4)     )
+                          {
+                          result = ERR_PARM;
+                          }
+                       if( (calloutp->feature.mlpp.LFB_Indictn<0) ||
+                           (calloutp->feature.mlpp.LFB_Indictn>2)     )
+                          {
+                          result = ERR_PARM;
+                          }
+                       for (i=0;i<5;i++)      /* if any part of Svc_Domn is 0 */
+                          {
+                          if (calloutp->feature.mlpp.MLPP_Svc_Domn[i]==0) 
+                             result = ERR_PARM;
+                          }
+                       }
+                   break;
+                   }
+                
+               if (result == 0)
+                  {
+                  /* We encode associated bearer net in upper bits of sig_net... */
+                  calloutp->net |= ((assoc_net +1) << 8) ;
+
+                  if (  !isallowed_string ( calloutp->destination_addr )       /* check if the characaters in the string are allowed */
+                     || !isallowed_string ( calloutp->originating_addr ))
+                      {
+                      result = ERR_PARM;
+                      }
+                  else
+                      {
+                      result = clioctl ( mode,
+                                         (IOCTLU *) calloutp,
+                                         card, sig_net,
+                                         sizeof (FEATURE_OUT_XPARMS));
+                      }
+
+                  if ( result == 0 )
+                     {
+                     /* now patch the handle to reflect the network */
+                     calloutp->handle = patch_handle (calloutp->handle, sig_net );
+                     }
+                  }
+               }
+            else
+               {
+               result = calloutp->net;  /* return error code */
                }
             }
          else
             {
-            result = calloutp->net;  /* return error code */
+            result = card;                 /* return error code */
             }
-         }
-      else
-         {
-         result = card;                 /* return error code */
          }
       }
    else
@@ -3877,7 +3495,7 @@ static int feature_openout_enquiry ( int mode, struct feature_out_xparms * callo
       }
 
    calloutp->net = unet;             /* restore user parameter */
-
+   
    return ( result );
    }
 /*---------------------------------------*/
@@ -3902,14 +3520,6 @@ ACUDLL int ACU_WINAPI call_feature_details ( struct feature_detail_xparms * deta
       if ( dc.result >= 0 )                  /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
-         if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            /* command not supported for VoIP */
-            return (ERR_COMMAND);
-            }
-#endif
-
          detailsp->handle = dc.handle;       /* get the fixed up handle */
          if(detailsp->feature_type == 0)
             {
@@ -3917,10 +3527,11 @@ ACUDLL int ACU_WINAPI call_feature_details ( struct feature_detail_xparms * deta
             }
          if ( dc.result >= 0 )               /* check for error */
             {
+
             dc.result = clioctl ( CALL_FEATURE_DETAILS,
-                               (IOCTLU *) detailsp,
-                                clcard[dc.card].clh,
-                                sizeof (FEATURE_DETAIL_XPARMS));
+                                  (IOCTLU *) detailsp,
+                                  dc.card, handle2net(uhandle),
+                                  sizeof (FEATURE_DETAIL_XPARMS));
             }
          }
       }
@@ -3955,43 +3566,64 @@ ACUDLL int ACU_WINAPI call_feature_send ( struct feature_detail_xparms * details
       if ( dc.result >= 0 )                  /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
-         if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
+         /* Most feature_types not supported for VoIP */
+         if (clcard[dc.card].voipservice == ACU_VOIP_ACTIVE
+             && detailsp->feature_type != FEATURE_NON_STANDARD
+			 && S_SIP != call_type(call_handle_2_port(detailsp->handle)))
             {
-            /* command not supported for VoIP */
-            return (ERR_COMMAND);
+            dc.result = ERR_PARM;
             }
-#endif
 
          detailsp->handle = dc.handle;       /* get the fixed up handle */
          switch(detailsp->feature_type)
-         {
+            {
             case 0:
             case FEATURE_HOLD_RECONNECT:
             case FEATURE_TRANSFER:
             case FEATURE_DIVERSION:
+            case FEATURE_MLPP:
                break;
             case FEATURE_FACILITY:
                /* return error if length of facility data exceeds limit */
                if(detailsp->feature.facility.length> MAXFACILITY_INFO
                    || (detailsp->feature.facility.length == 0) )
-               {
+                  {
                   dc.result = ERR_PARM;
-               }
+                  }
                break;
             case FEATURE_USER_USER:
                /* return error if length of user to user data exceeds limit */
                if(detailsp->feature.uui.length> MAXUUI_INFO)
-               {
+                  {
                   dc.result = ERR_PARM;
-               }
+                  }
                break;
             case FEATURE_RAW_DATA:
                /* return error if length of raw data exceeds limit */
                if(detailsp->feature.raw_data.length> MAXRAWDATA)
-               {
+                  {
                   dc.result = ERR_PARM;
-               }
+                  }
+               break;
+            case FEATURE_NON_STANDARD:
+               /* Too much data anywhere? */
+               if(detailsp->feature.non_standard.length> MAXRAWDATA)
+                  {
+                  dc.result = ERR_PARM;
+                  }
+               switch(detailsp->feature.non_standard.id_type) 
+                  {
+                  case NON_STANDARD_ID_TYPE_H221:
+                  break;
+                  case NON_STANDARD_ID_TYPE_OBJECT:
+                     if(detailsp->feature.non_standard.id.object_id.length> MAXOID)
+                        {
+                        dc.result = ERR_PARM;
+                        }
+                  break;
+                  default:
+                     dc.result = ERR_PARM;
+                  }
                break;
             default:
                dc.result = ERR_PARM;
@@ -4002,9 +3634,8 @@ ACUDLL int ACU_WINAPI call_feature_send ( struct feature_detail_xparms * details
             {
             dc.result = clioctl ( CALL_FEATURE_SEND,
                                   (IOCTLU *) detailsp,
-                                   clcard[dc.card].clh,
-                                   sizeof (FEATURE_DETAIL_XPARMS));
-
+                                  dc.card, handle2net(uhandle),
+                                  sizeof (FEATURE_DETAIL_XPARMS));
             }
          }
       }
@@ -4044,38 +3675,45 @@ ACUDLL int ACU_WINAPI call_send_connectionless ( FEATURE_DETAIL_XPARMS *fdetails
       if ( card >= 0 )                   /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          fdetailsp->net = unet_2_net ( unet ); /* and the network port */
 
          if ( fdetailsp->net >= 0 )     /* check for error */
             {
-                  switch(fdetailsp->feature_type)
+            switch(fdetailsp->feature_type)
+               {
+               case FEATURE_FACILITY:
+                  if ( (fdetailsp->feature.facility.length > MAXFACILITY_INFO)
+                    || (fdetailsp->feature.facility.length == 0) )
                      {
-                     case FEATURE_FACILITY:
-                         if( (fdetailsp->feature.facility.length > MAXFACILITY_INFO)
-                                || (fdetailsp->feature.facility.length == 0) )
-                            {
-                            result = ERR_PARM;
-                            }
-                         break;
-                     default:
-                         result = ERR_PARM;
-                         break;
+                     result = ERR_PARM;
                      }
-                     if (result==0)
-                     {
-                         result = clioctl ( CALL_SEND_CONNECTIONLESS,
-                               (IOCTLU *) fdetailsp,
-                               clcard[card].clh,
-                               sizeof (FEATURE_DETAIL_XPARMS));
-                     }
+               break;
+               case FEATURE_RAW_DATA:
+                  if( (fdetailsp->feature.raw_data.length > MAXRAWDATA)
+                     || (fdetailsp->feature.raw_data.length == 0) )
+                      {
+                      result = ERR_PARM;
+                      }
+               break;
+
+               default:
+                  result = ERR_PARM;
+               break;
+               }
+
+            if (result==0)
+               {
+               result = clioctl ( CALL_SEND_CONNECTIONLESS,
+                                  (IOCTLU *) fdetailsp,
+                                  card, unet,
+                                  sizeof (FEATURE_DETAIL_XPARMS));
+               }
             }
          else
             {
@@ -4123,13 +3761,11 @@ ACUDLL int ACU_WINAPI call_get_connectionless ( FEATURE_DETAIL_XPARMS *fdetailsp
       if ( card >= 0 )                   /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          fdetailsp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4137,7 +3773,7 @@ ACUDLL int ACU_WINAPI call_get_connectionless ( FEATURE_DETAIL_XPARMS *fdetailsp
             {
             result = clioctl ( CALL_GET_CONNECTIONLESS,
                                (IOCTLU *) fdetailsp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (FEATURE_DETAIL_XPARMS));
             }
          else
@@ -4182,13 +3818,11 @@ ACUDLL int ACU_WINAPI call_send_alarm ( struct alarm_xparms * alarmp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          alarmp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4196,7 +3830,7 @@ ACUDLL int ACU_WINAPI call_send_alarm ( struct alarm_xparms * alarmp )
             {
             result = clioctl ( CALL_SEND_ALARM,
                                (IOCTLU *) alarmp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (ALARM_XPARMS ));
 
             }
@@ -4242,13 +3876,11 @@ ACUDLL int call_send_q921 ( struct q921_xparms * q921p )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          q921p->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4257,7 +3889,7 @@ ACUDLL int call_send_q921 ( struct q921_xparms * q921p )
 
             result = clioctl ( CALL_SEND_Q921,
                                (IOCTLU *) q921p,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (Q921_XPARMS ));
 
             }
@@ -4303,23 +3935,20 @@ ACUDLL int call_get_q921 ( struct q921_xparms * q921p )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          q921p->net = unet_2_net ( unet ); /* and the network port */
 
          if ( q921p->net >= 0 )        /* check for error */
             {
-
-               result = clioctl ( CALL_GET_Q921,
+            result = clioctl ( CALL_GET_Q921,
                                (IOCTLU *) q921p,
-                                clcard[card].clh,
-                                sizeof (Q921_XPARMS));
+                               card, unet,
+                               sizeof (Q921_XPARMS));
             }
          else
             {
@@ -4357,20 +3986,18 @@ ACUDLL int ACU_WINAPI call_watchdog ( struct watchdog_xparms * watchp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
          watchp->net = unet_2_net ( unet ); /* and the network port */
 
          if ( watchp->net >= 0 )        /* check for error */
             {
             result = clioctl ( CALL_WATCHDOG,
                                (IOCTLU *) watchp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (WATCHDOG_XPARMS ));
 
             }
@@ -4416,13 +4043,11 @@ ACUDLL int send_dpr_command ( struct dpr_xparms * dprp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          dprp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4430,7 +4055,7 @@ ACUDLL int send_dpr_command ( struct dpr_xparms * dprp )
             {
             result = clioctl ( SEND_DPR_COMMAND,
                                (IOCTLU *) dprp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (DPR_XPARMS ));
 
             }
@@ -4475,13 +4100,11 @@ ACUDLL int receive_dpr_event ( struct dpr_xparms * dprp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          dprp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4489,7 +4112,7 @@ ACUDLL int receive_dpr_event ( struct dpr_xparms * dprp )
             {
             result = clioctl ( RECEIVE_DPR_EVENT,
                                (IOCTLU *) dprp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (DPR_XPARMS ));
 
             }
@@ -4538,13 +4161,11 @@ ACUDLL int ACU_WINAPI call_l1_stats ( struct l1_xstats * l1_xstatsp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          l1_xstatsp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4552,7 +4173,7 @@ ACUDLL int ACU_WINAPI call_l1_stats ( struct l1_xstats * l1_xstatsp )
             {
             result = clioctl ( CALL_L1_STATS,
                                (IOCTLU *) l1_xstatsp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (L1_XSTATS ));
 
             }
@@ -4604,13 +4225,11 @@ ACUDLL int ACU_WINAPI call_l2_state ( struct l2_xstate * l2_xstatep )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          l2_xstatep->net = unet_2_net ( sig_net ); /* and the network port */
 
@@ -4621,7 +4240,7 @@ ACUDLL int ACU_WINAPI call_l2_state ( struct l2_xstate * l2_xstatep )
 
             result = clioctl ( CALL_L2_STATE,
                                (IOCTLU *) l2_xstatep,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (L2_XSTATE ));
 
             }
@@ -4669,13 +4288,11 @@ ACUDLL int call_br_l1_stats ( struct br_l1_xstats * br_l1_xstatsp )
       if ( card >= 0 )                   /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          br_l1_xstatsp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4683,7 +4300,7 @@ ACUDLL int call_br_l1_stats ( struct br_l1_xstats * br_l1_xstatsp )
             {
             result = clioctl ( CALL_BR_L1_STATS,
                                (IOCTLU *) br_l1_xstatsp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (BR_L1_XSTATS ));
 
             }
@@ -4731,13 +4348,11 @@ ACUDLL int ACU_WINAPI call_dcba ( struct dcba_xparms * dcbap )
       if ( card >= 0 )                  /* check for error */
          {
 
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          dcbap->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4745,7 +4360,7 @@ ACUDLL int ACU_WINAPI call_dcba ( struct dcba_xparms * dcbap )
             {
             result = clioctl ( CALL_DCBA,
                                (IOCTLU *) dcbap,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (DCBA_XPARMS ));
 
             }
@@ -4791,13 +4406,11 @@ ACUDLL int ACU_WINAPI call_protocol_trace ( struct log_xparms * logp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          logp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4805,7 +4418,7 @@ ACUDLL int ACU_WINAPI call_protocol_trace ( struct log_xparms * logp )
             {
             result = clioctl ( CALL_PROTOCOL,
                                (IOCTLU *) logp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (LOG_XPARMS ));
 
             }
@@ -4850,13 +4463,11 @@ ACUDLL int call_pblock ( struct v5_pblock_xparms * pblockp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
 
          pblockp->net = unet_2_net ( unet ); /* and the network port */
 
@@ -4864,7 +4475,7 @@ ACUDLL int call_pblock ( struct v5_pblock_xparms * pblockp )
             {
             result = clpblock_ioctl ( CALL_V5PBLOCK,
                                      (V5_PBLOCK_IOCTLU *) pblockp,
-                                      clcard[card].clh,
+                                      card,
                                       sizeof (V5_PBLOCK_XPARMS));
             }
          else
@@ -4909,20 +4520,18 @@ ACUDLL int call_tcmd ( struct tcmd_xparms * tcmdp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
             /* command not supported for VoIP */
             return (ERR_COMMAND);
             }
-#endif
          tcmdp->net = unet_2_net ( unet ); /* and the network port */
 
          if ( tcmdp->net >= 0 )    /* check for error */
             {
             result = clioctl ( CALL_TCMD,
                                (IOCTLU *) tcmdp,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (TCMD_XPARMS));
 
             }
@@ -4957,10 +4566,6 @@ ACUDLL int ACU_WINAPI call_dsp_config ( struct dsp_xparms * pdsp )
    ACU_INT  card;
    ACU_INT  unet;
 
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;
-#endif
-
 
    unet = pdsp->net;                   /* save user net */
 
@@ -4977,29 +4582,10 @@ ACUDLL int ACU_WINAPI call_dsp_config ( struct dsp_xparms * pdsp )
          if ( pdsp->net >= 0 )    /* check for error */
             {
 
-#ifndef ACU_VOIP_CC
-            if ( 0 )
-               {
-#else
-            if (card >= 0 && clcard[card].voipservice == ACU_VOIP_ACTIVE)
-               {
-               vcc_thread_get_id(&this_thread);
-               pdsp->unique_xparms.sig_h323.calling_thread = this_thread;
-
-               result = voipioctl ( CALL_DSP_CONFIG,
-                                    (IOCTLU *) pdsp,
-                                    clcard[card].clh,
-                                    sizeof (DSP_XPARMS),
-                                    card_2_voipcard(card));
-#endif
-               }
-            else
-               {
-               result = clioctl ( CALL_DSP_CONFIG,
-                                  (IOCTLU *) pdsp,
-                                  clcard[card].clh,
-                                  sizeof (DSP_XPARMS));
-               }
+            result = clioctl ( CALL_DSP_CONFIG,
+                               (IOCTLU *) pdsp,
+                               card, unet,
+                               sizeof (DSP_XPARMS));
             }
          else
             {
@@ -5024,7 +4610,7 @@ ACUDLL int ACU_WINAPI call_dsp_config ( struct dsp_xparms * pdsp )
 /*---------------------------------------*/
 
 
-#ifdef ACU_VOIP_CC
+
 
 /*-------------- call_codec_config---------*/
 /* Set codec preferences for VoIP          */
@@ -5056,7 +4642,6 @@ ACUDLL int call_get_configuration ( struct get_configuration_xparms * pdsp )
    ACU_INT  result;
    ACU_INT  card;
    ACU_INT  unet;
-   ACU_VCC_THREAD_ID this_thread;           /* VoIP specific */
 
    unet = pdsp->net;                    /* save user net */
 
@@ -5072,28 +4657,25 @@ ACUDLL int call_get_configuration ( struct get_configuration_xparms * pdsp )
          /* If VoIP card then thread identification is required */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
-            vcc_thread_get_id(&this_thread);
-            pdsp->unique_xparms.sig_h323.calling_thread = this_thread;
+            pdsp->net = unet_2_net ( unet ); /* and the network port */
+
+            if ( pdsp->net >= 0 )    /* check for error */
+               {
+               result = clioctl ( CALL_GET_CONFIGURATION, 
+                                  (IOCTLU *) pdsp,
+                                  card, unet,
+                                  sizeof (GET_CONFIGURATION_XPARMS));
+               }
+            else
+               {
+               result = pdsp->net;        /* return error code */
+               }
             }
          else
             {
             return (ERR_COMMAND);
             }
 
-         pdsp->net = unet_2_net ( unet ); /* and the network port */
-
-         if ( pdsp->net >= 0 )    /* check for error */
-            {
-            result = voipioctl ( CALL_GET_CONFIGURATION,
-                              (IOCTLU *) pdsp,
-                               clcard[card].clh,
-                               sizeof (GET_CONFIGURATION_XPARMS),
-                               card_2_voipcard(card));
-            }
-         else
-            {
-            result = pdsp->net;        /* return error code */
-            }
          }
       else
          {
@@ -5120,7 +4702,7 @@ ACUDLL int call_set_configuration ( struct set_configuration_xparms * pdsp )
    ACU_INT  result;
    ACU_INT  card;
    ACU_INT  unet;
-   ACU_VCC_THREAD_ID this_thread;           /* VoIP specific */
+
 
    unet = pdsp->net;                    /* save user net */
 
@@ -5135,28 +4717,24 @@ ACUDLL int call_set_configuration ( struct set_configuration_xparms * pdsp )
          /* If VoIP card then thread identification is required */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
-            vcc_thread_get_id(&this_thread);
-            pdsp->unique_xparms.sig_h323.calling_thread = this_thread;
+            pdsp->net = unet_2_net ( unet ); /* and the network port */
+            pdsp->board_ip_address = clcard[card].board_ip_address;
+
+            if ( pdsp->net >= 0 )    /* check for error */
+               {
+               result = clioctl ( CALL_SET_CONFIGURATION,
+                                  (IOCTLU *) pdsp,
+                                  card, unet, 
+                                  sizeof (SET_CONFIGURATION_XPARMS));
+               }
+            else
+               {
+               result = pdsp->net;        /* return error code */
+               }
             }
          else
             {
             return ( ERR_COMMAND);
-            }
-
-         pdsp->net = unet_2_net ( unet ); /* and the network port */
-         pdsp->board_ip_address = clcard[card].board_ip_address;
-
-         if ( pdsp->net >= 0 )    /* check for error */
-            {
-            result = voipioctl ( CALL_SET_CONFIGURATION,
-                              (IOCTLU *) pdsp,
-                               clcard[card].clh,
-                               sizeof (SET_CONFIGURATION_XPARMS),
-                               card_2_voipcard(card));
-            }
-         else
-            {
-            result = pdsp->net;        /* return error code */
             }
          }
       else
@@ -5165,12 +4743,12 @@ ACUDLL int call_set_configuration ( struct set_configuration_xparms * pdsp )
          }
       }
    else
-     {
-     result = ERR_CFAIL;
-     }
+      {
+      result = ERR_CFAIL;
+      }
 
    pdsp->net = unet;                   /* restore user parameter */
-
+   
    return ( result );
 
    }
@@ -5186,7 +4764,7 @@ ACUDLL int call_get_stats ( struct voip_get_stats_xparms * pdsp )
    ACU_INT  result;
    ACU_INT  card;
    ACU_INT  unet;
-   ACU_VCC_THREAD_ID this_thread;           /* VoIP specific */
+
 
    unet = pdsp->net;                    /* save user net */
 
@@ -5201,28 +4779,24 @@ ACUDLL int call_get_stats ( struct voip_get_stats_xparms * pdsp )
          /* If VoIP card then thread identification is required */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
-            vcc_thread_get_id(&this_thread);
-            pdsp->unique_xparms.sig_h323.calling_thread = this_thread;
+            pdsp->net = unet_2_net ( unet ); /* and the network port */
+            pdsp->board_ip_address = clcard[card].board_ip_address;
+   
+            if ( pdsp->net >= 0 )    /* check for error */
+               {
+               result = clioctl ( CALL_GET_STATS,
+                                  (IOCTLU *) pdsp,
+                                  card, unet, 
+                                  sizeof (VOIP_GET_STATS_XPARMS));
+               }
+            else
+               {
+               result = pdsp->net;        /* return error code */
+               }
             }
          else
             {
             return ( ERR_COMMAND);
-            }
-
-         pdsp->net = unet_2_net ( unet ); /* and the network port */
-         pdsp->board_ip_address = clcard[card].board_ip_address;
-
-         if ( pdsp->net >= 0 )    /* check for error */
-            {
-            result = voipioctl ( CALL_GET_STATS,
-                               (IOCTLU *) pdsp,
-                               clcard[card].clh,
-                               sizeof (VOIP_GET_STATS_XPARMS),
-                               card_2_voipcard(card));
-            }
-         else
-            {
-            result = pdsp->net;        /* return error code */
             }
          }
       else
@@ -5231,19 +4805,18 @@ ACUDLL int call_get_stats ( struct voip_get_stats_xparms * pdsp )
          }
       }
    else
-     {
-       result = ERR_CFAIL;
-     }
-
+      {
+      result = ERR_CFAIL;
+      }
+   
    pdsp->net = unet;                   /* restore user parameter */
-
+   
    return ( result );
-
+   
    }
 /*---------------------------------------*/
 
 
-#ifdef ACU_VOIP_CC
 
 /* VOIP only */
 /*-------------- call_set_debug------------*/
@@ -5254,7 +4827,7 @@ ACUDLL int call_set_debug ( struct set_debug_xparms * pdsp )
    ACU_INT  result;
    ACU_INT  card;
    ACU_INT  unet;
-   ACU_VCC_THREAD_ID this_thread;           /* VoIP specific */
+
 
    unet = pdsp->net;                    /* save user net */
 
@@ -5269,28 +4842,24 @@ ACUDLL int call_set_debug ( struct set_debug_xparms * pdsp )
          /* If VoIP card then thread identification is required */
          if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
             {
-            vcc_thread_get_id(&this_thread);
-            pdsp->unique_xparms.sig_h323.calling_thread = this_thread;
+            pdsp->net = unet_2_net ( unet ); /* and the network port */
+            pdsp->board_ip_address = clcard[card].board_ip_address;
+
+            if ( pdsp->net >= 0 )    /* check for error */
+               {
+               result = clioctl ( CALL_SET_DEBUG,
+                                  (IOCTLU *) pdsp,
+                                  card, unet,
+                                  sizeof (SET_DEBUG_XPARMS));
+               }
+            else
+               {
+               result = pdsp->net;        /* return error code */
+               }
             }
          else
             {
             return (ERR_COMMAND);
-            }
-
-         pdsp->net = unet_2_net ( unet ); /* and the network port */
-         pdsp->board_ip_address = clcard[card].board_ip_address;
-
-         if ( pdsp->net >= 0 )    /* check for error */
-            {
-            result = voipioctl ( CALL_SET_DEBUG,
-                                 (IOCTLU *) pdsp,
-                                 clcard[card].clh,
-                                 sizeof (SET_DEBUG_XPARMS),
-                                 card_2_voipcard(card));
-            }
-         else
-            {
-            result = pdsp->net;        /* return error code */
             }
          }
       else
@@ -5302,14 +4871,13 @@ ACUDLL int call_set_debug ( struct set_debug_xparms * pdsp )
       {
       result = ERR_CFAIL;
       }
-
+   
    pdsp->net = unet;                   /* restore user parameter */
-
+   
    return ( result );
 
    }
 /*---------------------------------------*/
-#endif
 
 
 
@@ -5317,23 +4885,12 @@ ACUDLL int call_set_debug ( struct set_debug_xparms * pdsp )
 /* Opens the VoIP administration channel           */
 /*                                                 */
 ACUDLL int call_open_voip_admin_chan()
-   {
-   acu_error result;
-   ACU_VCC_THREAD_ID this_thread;
+{
 
-   vcc_thread_get_id( &this_thread );
-
-   result = create_admin_channel( &admin_channel_thread, &this_thread);
-
-   if (result != ACU_ERR_OK)
-      {
-      return ERR_CFAIL;
-      }
-   else
-      {
-      return 0;
-      }
-   }
+  /* dummy function - admin channel no longer exists */
+  return 0;
+  
+}
 /*--------------------------------------------------*/
 
 /*-------------- call_close_voip_admin_chan---------*/
@@ -5341,39 +4898,9 @@ ACUDLL int call_open_voip_admin_chan()
 /*                                                  */
 ACUDLL int call_close_voip_admin_chan()
 {
-   acu_error result;
-   ACU_VCC_THREAD_ID this_thread;
-   generic_tls_msg *admin_msg = NULL;
+  /* dummy function - admin channel no longer exists */
+  return 0;
 
-   vcc_thread_get_id(&this_thread);
-
-
-   /* send msg to admin chan to stop thread */
-   result = api_admin_chan_send_msg(API_AC_STOP,
-                                    NULL,
-                                   &admin_channel_thread,
-                                   &this_thread);
-
-   if (result != ACU_ERR_OK)
-      {
-      result = ERR_CFAIL;
-      }
-   else
-      {
-      /* wait for acknowledgement of sent message */
-      api_admin_chan_wf_msg(admin_msg, &this_thread);
-      if (admin_msg->type != API_AC_SEND_MSG_ACK)
-         {
-         result = ERR_CFAIL;
-         }
-      else
-         {
-         result = 0; /* success */
-         }
-      free (admin_msg);
-      }
-
-   return (result);
 
 }
 /*---------------------------------------*/
@@ -5383,27 +4910,34 @@ ACUDLL int call_close_voip_admin_chan()
 /*                                                         */
 ACUDLL int call_send_voip_admin_msg( struct voip_admin_out_xparms * adminp)
 {
-   acu_error result;
-   ACU_VCC_THREAD_ID this_thread;
+   ACU_INT result;
 
-   vcc_thread_get_id(&this_thread);
-
-   if (admin_channel_thread.id)
+   if (adminp->admin_msg != 0) 
+   {
+      /* Sequence numbers are more constrained than their type may indicate */
+      if (adminp->admin_msg->sequence_number < 1 || 
+	  adminp->admin_msg->sequence_number > 65535) 
       {
-      /* VoIP admin channel exists so retrieve message */
-      adminp->calling_thread = this_thread;
-      result = process_voip_admin_msg(API_SEND_RAS_MSG, (IOCTLU *)adminp);
+	 return ERR_PARM;
       }
+   }
    else
-      {
-      /* admin channel does not exist */
-      ACU_LOG(call_get_voip_admin_msg, warn,
-             ("VoIP admin channel has not been opened so cannot send message\n"));
-      result = ERR_CFAIL;
-      }
+   {
+      return ERR_PARM;
+   }
+
+   /* VoIP admin channel exists so retrieve message */
+   /* 
+     Currently no way of determining whether this is for the SIP or the H323 
+     service, so assume its for the H323 
+   */
+   result = srvioctl ( CALL_SEND_RAS_MSG, 
+                       (IOCTLU *) adminp, 
+                       sizeof ( VOIP_ADMIN_OUT_XPARMS ), 
+                       1, 
+                       0);
 
    return (result);
-
 }
 /*---------------------------------------------------------*/
 
@@ -5412,68 +4946,18 @@ ACUDLL int call_send_voip_admin_msg( struct voip_admin_out_xparms * adminp)
 /*                                                               */
 ACUDLL int call_get_voip_admin_msg( struct voip_admin_in_xparms * adminp)
 {
-   acu_error result;
-   ACU_VCC_THREAD_ID this_thread;
+   ACU_INT result;
 
-   vcc_thread_get_id(&this_thread);
-
-   if (admin_channel_thread.id)
-      {
-      /* VoIP admin channel exists so retrieve message */
-      adminp->calling_thread = this_thread;
-      result = process_voip_admin_msg(API_GET_RAS_MSG, (IOCTLU *)adminp);
-
-      }
-   else
-      {
-      /* admin channel does not exist */
-      ACU_LOG(call_get_voip_admin_msg, warn,
-              ("VoIP admin channel has not been opened so cannot retrieve message\n"));
-      result = ERR_CFAIL;
-      }
+   /* VoIP admin channel exists so retrieve message */
+   result = srvioctl ( CALL_GET_RAS_MSG, 
+                       (IOCTLU *) adminp, 
+                       sizeof ( VOIP_ADMIN_IN_XPARMS ),
+                       1, 0);
+   
    return (result);
 }
 /*---------------------------------------------------------*/
 
-/*---------------process_voip_admin_msg -------------------*/
-/* send supplied message to VoIP administration channel    */
-/*                                                         */
-static int process_voip_admin_msg (uint32 msg_type, IOCTLU *pioctlu)
-{
-   acu_error result;
-   ACU_VCC_THREAD_ID this_thread;
-   generic_tls_msg admin_msg;
-
-   vcc_thread_get_id(&this_thread);
-
-   /* send message to admin channel */
-   result = api_admin_chan_send_msg( msg_type,
-                                     pioctlu,
-                                    &admin_channel_thread,
-                                    &this_thread );
-
-   if (result != ACU_ERR_OK)
-      {
-      result = ERR_CFAIL;
-      }
-   else
-      {
-      /* wait for acknowledgement of sent message */
-      api_admin_chan_wf_msg(&admin_msg, &this_thread);
-      if (admin_msg.type != API_AC_SEND_MSG_ACK)
-         {
-         result = ERR_CFAIL;
-         }
-      else
-         {
-         result = 0; /* success */
-         }
-      }
-   return (result);
-}
-/*-----------------------------------------------------------*/
-
-#endif  /* ACU_VOIP_CC */
 
 /*-------------- call_sfwm --------------*/
 /* start the firmware after a download   */
@@ -5484,11 +4968,10 @@ ACUDLL int call_sfmw ( int portnum, int mode, char * confp )
    ACU_INT  result;
    ACU_INT  card;
    ACU_INT  unet;
+   ACU_INT  usavenet;
    SFMW_XPARMS sfmw;
 
-
-
-   unet = (ACU_INT) portnum;
+   usavenet = unet = (ACU_INT) portnum;
 
    result = clopendev ( );              /* open the device */
 
@@ -5498,19 +4981,17 @@ ACUDLL int call_sfmw ( int portnum, int mode, char * confp )
 
       if ( card >= 0 )                  /* check for error */
          {
-#ifdef ACU_VOIP_CC
-         /* command not supported for VoIP */
-         if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            return (ERR_COMMAND);
-            }
-#endif
-         unet = unet_2_net ( unet );    /* and the network port */
+          unet = unet_2_net ( unet );    /* and the network port */
 
          if ( unet >= 0 )               /* check for error */
             {
             sfmw.net     = mode | unet;
+
+#ifdef ACU_SOLARIS_SPARC
+            sfmw.bufp_confstr = 0L;
+#else
             sfmw.bufp_confstr = confp ;
+#endif
 
             /* For V5 xparms, we supply a copy of confstr as well as a ptr to it,
             then the driver is free to use either... */
@@ -5527,9 +5008,10 @@ ACUDLL int call_sfmw ( int portnum, int mode, char * confp )
             sfmw.regapp  = 0;
             sfmw.ss_vers = 0;
 
+
             result = clioctl ( CALL_SFMW,
                                (IOCTLU *) &sfmw,
-                               clcard[card].clh,
+                               card,usavenet,
                                sizeof (SFMW_XPARMS));
 
             if ( result == 0 )
@@ -5555,6 +5037,7 @@ ACUDLL int call_sfmw ( int portnum, int mode, char * confp )
    return ( result );
    }
 /*---------------------------------------*/
+
 
 /*-------------- call_type --------------*/
 /* return the type of signalling system  */
@@ -5635,31 +5118,26 @@ ACUDLL int ACU_WINAPI call_line ( int portnum )
 
 ACUDLL int ACU_WINAPI call_restart_fmw ( RESTART_XPARMS * restartp )
    {
-   ACU_INT  result;
+   ACU_INT  result = 0;
    struct download_xparms download;
-
-#ifdef ACU_VOIP_CC
    char ip_address1[IP_ADDRESS_SIZE];
    char subnet_address1[IP_ADDRESS_SIZE];
    char ip_address2[IP_ADDRESS_SIZE];
    char subnet_address2[IP_ADDRESS_SIZE];
    char gateway_address[IP_ADDRESS_SIZE];
-   V1BMI_BOARD_ADDR_PARMS vbmi_parms;
-   int card;
-   V1BMI_RESTART_PARMS vbmi_rstrt_parms;
    struct set_sysinfo_xparms set_sysinfo;
    struct sysinfo_xparms     sysinfo;
    int using_dhcp;
-   V1BMI_DEBUG_MODE_PARMS debug;
-#endif
+   int card_number;
 
+   card_number = unet_2_card (restartp->net);
 
-#ifndef ACU_VOIP_CC
-   if ( 0 )
+   if (clcard[card_number].voipservice == ACU_VOIP_ACTIVE)
       {
-#else
-   if (clcard[unet_2_card (restartp->net)].voipservice == ACU_VOIP_ACTIVE)
-      {
+      int voip_card_number;
+
+       voip_card_number = card_2_voipcard(card_number);
+
       /* call function which extracts ip addresses from config string */
       result = parse_config_str(restartp->config_stringp,
                                 ip_address1,
@@ -5669,82 +5147,34 @@ ACUDLL int ACU_WINAPI call_restart_fmw ( RESTART_XPARMS * restartp )
                                 gateway_address,
                                &using_dhcp);
 
+      /* check that ip info was supplied */
+      if (( ip_address1[0] == 0 ) || (subnet_address1[0] == 0)|| (gateway_address[0] == 0))
+            return ERR_CFAIL;
+
+      strcpy(clcard[card_number].board_ip_address,ip_address1);
+
+      result = call_sfmw ( restartp->net,
+                           SFMWMODE_RESTART,
+                           restartp->config_stringp ); /* reset the card */
+
+      download.net = restartp->net;
+      download.filenamep = restartp->filenamep;
+
+      if ( result == 0 )
+         result = call_download_fmw ( &download );  /* transfer the file */
+      
       set_sysinfo.net = restartp->net;
-      set_sysinfo.board_number = unet_2_card (restartp->net-1);
-      strcpy(set_sysinfo.board_ip_address , ip_address1);
+      set_sysinfo.board_number = voip_card_number;
+      set_sysinfo.v1bmi_card_num = clcard[card_number].v1bmi_card_num;
       call_set_system_info ( &set_sysinfo, &sysinfo );
-      strcpy(clcard[unet_2_card (restartp->net)].board_ip_address,ip_address1);
 
-      if (( ip_address1[0] == 0) || ( subnet_address1[0] == 0) || ( gateway_address[0] == 0))
-      /* if not found three ip address's and DHCP then exit */
-         {
-         ACU_LOG(call_restart_fmw, warn, ("call_restart_fmw  not provided with enough config data \n"));
-         return 0;
-         }
-
-      sscanf(ip_address1,
-             "%d.%d.%d.%d",
-             &vbmi_parms.ip_addr1[0],
-             &vbmi_parms.ip_addr1[1],
-             &vbmi_parms.ip_addr1[2],
-             &vbmi_parms.ip_addr1[3]);
-
-      sscanf(ip_address2,
-             "%d.%d.%d.%d",
-             &vbmi_parms.ip_addr2[0],
-             &vbmi_parms.ip_addr2[1],
-             &vbmi_parms.ip_addr2[2],
-             &vbmi_parms.ip_addr2[3]);
-
-      sscanf(subnet_address1,
-             "%d.%d.%d.%d",
-             &vbmi_parms.subnet_mask1[0],
-             &vbmi_parms.subnet_mask1[1],
-             &vbmi_parms.subnet_mask1[2],
-             &vbmi_parms.subnet_mask1[3]);
-
-      sscanf(subnet_address2,"%d.%d.%d.%d",
-             &vbmi_parms.subnet_mask2[0],
-             &vbmi_parms.subnet_mask2[1],
-             &vbmi_parms.subnet_mask2[2],
-             &vbmi_parms.subnet_mask2[3]);
-
-      sscanf(gateway_address,"%d.%d.%d.%d",
-             &vbmi_parms.default_gateway[0],
-             &vbmi_parms.default_gateway[1],
-             &vbmi_parms.default_gateway[2],
-             &vbmi_parms.default_gateway[3]);
-
-      vbmi_parms.get_ip_addrs_using_dhcp = using_dhcp;
-
-      card = unet_2_card (restartp->net-1);
-      vbmi_rstrt_parms.filename = restartp->filenamep;
-
-      result = v1bmi_set_board_addr(card,&vbmi_parms);
-
-      if (result != 0)
-         {
-         ACU_LOG(session, critical, ("Failed to send board config info to driver \n"));
-         return(result);
-         }
-
-      debug.debug_mode = 4;
-      v1bmi_set_debug_mode( card, &debug );
-
-      result = v1bmi_restart(card,&vbmi_rstrt_parms);
-
-      if (result != 0)
-         {
-         ACU_LOG(session, critical, ("Failed to download board software \n"));
-         return(result);
-         }
+      pipe_client_send_application_terminated(voip_card_number);
 
       return ( result );
-
-#endif
       }
    else
       {
+		ACU_INT attempts = 2;
 
       download.net = restartp->net;
       download.filenamep = restartp->filenamep;
@@ -5753,12 +5183,27 @@ ACUDLL int ACU_WINAPI call_restart_fmw ( RESTART_XPARMS * restartp )
 
       (void)config_assoc_net(restartp->net,0) ;	/* CLear any NFAS-style associations */
 
-      result = call_sfmw ( restartp->net,
-                           SFMWMODE_RESTART,
-                           restartp->config_stringp ); /* reset the card */
+      while (attempts > 0)
+         {
+         result = call_sfmw ( restartp->net,
+                              SFMWMODE_RESTART,
+                              restartp->config_stringp ); /* reset the card */
 
-      if ( result == 0 )
-         result = call_download_fmw ( &download );  /* transfer the file */
+         if ( result == 0 )
+            {
+            result = call_download_fmw ( &download );  /* transfer the file */
+
+            if (result == 0)
+                {
+                break;
+                }
+            }
+         else
+            {
+            break;
+            }
+         --attempts;
+         }
 
       return ( result );
       }
@@ -5773,7 +5218,6 @@ ACUDLL int ACU_WINAPI call_restart_fmw ( RESTART_XPARMS * restartp )
 ACUDLL int ACU_WINAPI call_nports ( void )
    {
    ACU_INT  result;
-
 
    result = clopendev ( );              /* open the device */
 
@@ -5886,14 +5330,9 @@ ACUDLL int ACU_WINAPI call_handle_2_port ( int handle )
 
       if ( dc.result >= 0 )                        /* check for error */
          {
-#ifndef ACU_VOIP_CC
-         if ( 0 )
-            {
-#else
          if (dc.card >= 0 && clcard[dc.card].voipservice == ACU_VOIP_ACTIVE)
             {
             result = handle2net( (ACU_INT) handle);
-#endif
             }
          else
             {
@@ -5904,9 +5343,9 @@ ACUDLL int ACU_WINAPI call_handle_2_port ( int handle )
                simple library translation will suffice */
 
             result = clioctl ( CALL_HANDLE_2_PORT,
-                                  (IOCTLU *) &h2p,
-                                  clcard[dc.card].clh,
-                                  sizeof (HANDLE_2_PORT_XPARMS));
+                              (IOCTLU *) &h2p,
+                               dc.card, -1,
+                               sizeof (HANDLE_2_PORT_XPARMS));
             if (result >=0)
                result = h2p.port ; /* Driver has done the conversion */
             else
@@ -5994,11 +5433,7 @@ ACUDLL int ACU_WINAPI call_download_fmw ( struct download_xparms * download_xpar
    {
    int  error;
    struct sysinfo_xparms    sysinfo;
-#ifdef ACU_VOIP_CC
-    int card;
-	V1BMI_RESTART_PARMS vbmi_rstrt_parms;
-	char * board_ip_address;
-#endif
+   char * board_ip_address;
 
    /* call_set_sys_info sets up the card_info structure for this board. It is required */
    /* to be called before call_system_info which reads the card_info structure */
@@ -6047,22 +5482,11 @@ ACUDLL int ACU_WINAPI call_download_fmw ( struct download_xparms * download_xpar
                   }
                }
          break;
-#ifdef ACU_VOIP_CC
          case C_VOIP:
-            card = unet_2_card (download_xparmsp->net-1);
-
-            vbmi_rstrt_parms.filename = download_xparmsp->filenamep;
-            error = v1bmi_restart(card,&vbmi_rstrt_parms);
-            if (error != 0)
-               {
-               ACU_LOG(session, critical, ("Failed to download board software \n"));
-               return(error);
-               }
-
-            board_ip_address = clcard[unet_2_card (download_xparmsp->net)].board_ip_address;
-
+	   error = call_sfmw ( download_xparmsp->net, SFMWMODE_ZAPDNLD, download_xparmsp->filenamep);
+	   board_ip_address = clcard[unet_2_card (download_xparmsp->net)].board_ip_address;
+	   return (error);
          break;
-#endif
          default:
             error = ERR_DNLD_NOCARD;
          break;
@@ -6144,7 +5568,7 @@ ACUDLL int call_download_brdsp ( struct download_xparms * download_xparmsp )
 
                         error = clpblock_ioctl( CALL_BRDSPBLOCK,
                                                (V5_PBLOCK_IOCTLU *) pblock_xparms,
-                                                clcard[card].clh,
+                                                card,
                                                 sizeof(V5_PBLOCK_XPARMS) );
 
                         while ((error == 0) && ((size != 0) || (pblock_xparms->len == 0)))
@@ -6153,7 +5577,7 @@ ACUDLL int call_download_brdsp ( struct download_xparms * download_xparmsp )
 
                            error = clpblock_ioctl( CALL_BRDSPBLOCK,
                                                    (V5_PBLOCK_IOCTLU *) pblock_xparms,
-                                                   clcard[card].clh,
+                                                   card,
                                                    sizeof(V5_PBLOCK_XPARMS) );
 
                            if ((size == XFERSIZE) && (error == 0))
@@ -6172,7 +5596,7 @@ ACUDLL int call_download_brdsp ( struct download_xparms * download_xparmsp )
 
                            error = clpblock_ioctl ( CALL_BRDSPBLOCK,
                                                     (V5_PBLOCK_IOCTLU *) pblock_xparms,
-                                                     clcard[card].clh,
+                                                     card,
                                                      sizeof(V5_PBLOCK_XPARMS) );
                            }
                         }
@@ -6208,7 +5632,7 @@ ACUDLL int download_file ( struct download_xparms * download_xparmsp )
    {
    int  readh;
    int  result;
-   int  error;
+   int  error = 0;
    int  size;
    struct v5_pblock_xparms *pblock_xparms;
    struct tcmd_xparms       tcmd_xparms;
@@ -6510,7 +5934,9 @@ ACUDLL int ACU_WINAPI xcall_trace ( struct trace_xparms *tracep )
    {
    ACU_INT  result;
    ACU_INT  card;
+   ACU_INT unet;
 
+   unet=tracep->unet;
 
    result = clopendev ( );                 /* open the device */
 
@@ -6518,19 +5944,11 @@ ACUDLL int ACU_WINAPI xcall_trace ( struct trace_xparms *tracep )
       {
       card = unet_2_card ( tracep->unet );  /* get the card number */
 
-#ifdef ACU_VOIP_CC
-         /* command not supported for VoIP */
-         if (clcard[card].voipservice == ACU_VOIP_ACTIVE)
-            {
-            return (ERR_COMMAND);
-            }
-#endif
-
       if ( card >= 0 )                     /* check for error */
          {
          result = clioctl ( CALL_TRACE,
                             (IOCTLU *) tracep,
-                            clcard[card].clh,
+                            card, unet,
                             sizeof (TRACE_XPARMS));
          }
       else
@@ -6643,11 +6061,7 @@ ACUDLL ACU_INT unet_2_switch ( ACU_INT unet )
          {
          i = unet_2_card(unet);
 
-#ifdef ACU_VOIP_CC
          result = clcard[i].v1bmi_card_num;
-#else
-         result = i;                    /* the index is the card number */
-#endif
          result += switchbase;
          }
       }
@@ -6665,6 +6079,28 @@ ACUDLL void call_set_net0_swnum ( int initialLoneSwitchCount )
 {
     switchbase = initialLoneSwitchCount;
 }
+/*---------------------------------------*/
+
+/*------------- net_2_unet --------------*/
+/* returns the unet number when card and */
+/* net number are provided               */
+/*                                       */
+ACUDLL ACU_INT  net_2_unet ( ACU_INT  card, ACU_INT net )
+   {
+
+   ACU_INT  result , i;
+
+   result =0;
+   
+   for (i=0;i<card;i++)
+      {
+      result +=clcard[i].nnets;
+      }
+
+   result += net;
+
+   return ( result );
+   }
 /*---------------------------------------*/
 
 
@@ -6735,11 +6171,9 @@ ACUDLL ACU_INT unet_2_stream ( ACU_INT unet )
             case C_REV5:
                 net = 16 + (net * 2);          /* make into network stream */
             break;
-#ifdef ACU_VOIP_CC
             case C_VOIP:
-                net = 48 + net;                /* virtual stream number */
+                net = 48;   /* virtual stream number - same for VoIP ports */
             break;
-#endif
             }
          }
       }
@@ -6752,7 +6186,6 @@ ACUDLL ACU_INT unet_2_stream ( ACU_INT unet )
    }
 /*---------------------------------------*/
 
-#ifdef ACU_VOIP_CC
 
 /*------------- card_2_voipcard --------------*/
 /* returns the voip card number for the       */
@@ -6767,7 +6200,6 @@ ACUDLL ACU_INT  card_2_voipcard ( ACU_INT  card )
 
    return ( result );
    }
-#endif
 /*---------------------------------------*/
 
 
@@ -6809,7 +6241,7 @@ ACUDLL ACU_INT patch_handle ( ACU_INT handle, ACU_INT net )
    }
 /*---------------------------------------*/
 
-#ifndef ACU_VOIP_CC
+
 /*------------- handle2net --------------*/
 /* convert handle to a network number    */
 /*                                       */
@@ -6869,7 +6301,7 @@ ACUDLL ACU_INT nch2handle ( ACU_INT net, ACU_INT ch )
    return ( (((net << 8 ) & 0xff00) + ((ch + 1) & 0x00ff)));
    }
 /*---------------------------------------*/
-#endif
+
 
 /*------------ update_ss_type -----------*/
 /* update the signalling system types    */
@@ -6881,46 +6313,25 @@ ACUDLL int update_ss_type ( ACU_INT portnum )
    ACU_INT  card;
    ACU_INT  net;
    SFMW_XPARMS sfmw;
-#ifdef ACU_VOIP_CC
-   ACU_VCC_THREAD_ID this_thread;           /* VoIP specific */
-#endif
+
 
 
    card = unet_2_card ( portnum );      /* get the card number */
 
    net = unet_2_net ( portnum );        /* and the network port */
 
+   memset(&sfmw, 0, sizeof(sfmw));
+   
    sfmw.net        = SFMWMODE_SSTYPE | net;
    sfmw.confstr[0] = '\0';
    sfmw.regapp     = 0;
    sfmw.ss_vers    = 0;
 
-#ifndef ACU_VOIP_CC
-   if ( 0 )
-      {
-#else
-      if (card >= 0 && clcard[card].voipservice == ACU_VOIP_ACTIVE)
-         {
-         /* If VoIP card then thread identification is required */
-         vcc_thread_get_id(&this_thread);
-         sfmw.unique_xparms.sig_h323.calling_thread = this_thread; /* assign this thread id */
-
-         result = voipioctl ( CALL_SFMW,
-                              (IOCTLU *) &sfmw,
-                              clcard[card].clh,
-                              sizeof (SFMW_XPARMS),
-                              card_2_voipcard(card));
-#endif
-         }
-      else
-         {
-         result = clioctl ( CALL_SFMW,
-                            (IOCTLU *) &sfmw,
-                            clcard[card].clh,
-                            sizeof (SFMW_XPARMS));
-         }
-
-
+   result = clioctl ( CALL_SFMW,
+                      (IOCTLU *) &sfmw,
+                      card, portnum, 
+                      sizeof (SFMW_XPARMS) );
+   
    if ( result == 0 )
       {
       clcard[card].types[net] = sfmw.ss_type;
@@ -6959,6 +6370,14 @@ static char isallowed_string ( char * strp )
          case '#':
          case '*':
          case ',':
+         case 'a':      /* digit 10 for SS7 */
+         case 'A':
+         case 'b':      /* digit 11 for SS7 */
+         case 'B':
+         case 'd':      /* digit 13 for SS7 */
+         case 'D':
+         case 'e':      /* digit 14 for SS7 */
+         case 'E':
          case 'g':      /* ss5 for code 11      */
          case 'G':
          case 'h':      /* ss5 for code 12      */
@@ -7008,7 +6427,7 @@ ACUDLL ACU_INT clopendev ( void )
 
 ACUDLL ACU_INT opendevdrv( void )
    {
-   ACU_INT  result;
+   ACU_INT  result = 0;
    int  i;
    int  addrnum;
    char cext;
@@ -7017,18 +6436,8 @@ ACUDLL ACU_INT opendevdrv( void )
    struct siginfo_xparms * lsigp;
    char   cldevname[16];
 
-#ifdef ACU_VOIP_CC
    /* VoIP specific */
    int                   voip_card_number;    /* numbers voip cards 1,2,3 etc. */
-   acu_error             vresult;
-   ACU_VCC_THREAD_ID     this_thread;
-   tls_test_thread_info  *thread_info;
-   void                  *conn_mgr = NULL;
-   int                   rc;
-   V1BMI_CARD_INFO_PARMS cardInfoParms;
-   int                   nvcards = 0;
-
-#endif
 
    clspecial ( );                                /* do special case */
 
@@ -7046,7 +6455,7 @@ ACUDLL ACU_INT opendevdrv( void )
 
       strcpy ( cldevname, cldev ( ));
 
-      addrnum = strlen ( cldevname ) - 1;        /* position to address digit */
+      addrnum = (int)strlen ( cldevname ) - 1;        /* position to address digit */
 
       if ( ncards <= 9 )                         /* sort out driver extension */
          {
@@ -7087,35 +6496,25 @@ ACUDLL ACU_INT opendevdrv( void )
 
          result = clioctl ( CALL_SFMW,
                             (IOCTLU *) &sfmw,
-                            clcard[i].clh,
+                            i, -1,
                             sizeof (SFMW_XPARMS ));
-
 
 
          result = clioctl ( CALL_SIGNAL_INFO,
                             (IOCTLU *) lsigp,
-                            clcard[i].clh,
+                            i, -1,
                             sizeof (SIGINFO_XPARMS) * MAXPPC );
 
-
-
-
-
          if ( result == 0 )
-            {
-            /* move the info pointer by the number */
-            /* of networks on the card             */
-
-            clcard[i].nnets = lsigp->nnets;   /* register number of networks */
-            tnets += lsigp->nnets;            /* count total networks        */
-#ifdef ACU_VOIP_CC
-            clcard[i].v1bmi_card_num = i;     /* store the driver and switch number */
-#endif
-            }
+         {
+         clcard[i].v1bmi_card_num = i; /* store driver and switch number */
+         clcard[i].nnets = lsigp->nnets;   /* register number of networks */
+         tnets += lsigp->nnets;            /* count total networks        */
+         }
          else
-            {
+         {
             break;
-            }
+         }
          }
 
 
@@ -7143,9 +6542,7 @@ ACUDLL ACU_INT opendevdrv( void )
       }
    else
       {
-#ifdef ACU_VOIP_CC
       call_driver_installed = FALSE;
-#endif
       result = ERR_CFAIL;
       }
 
@@ -7159,9 +6556,9 @@ ACUDLL ACU_INT opendevdrv( void )
       event_if_xparms.cmd = ACUC_EVENT_ALLOC_EMID ;
 
       result = clioctl ( CALL_EVENT_IF,
-                            (IOCTLU *) &event_if_xparms,
-                            clcard[0].clh,
-                            sizeof (event_if_xparms));
+                         (IOCTLU *) &event_if_xparms,
+                         0,
+                         sizeof (event_if_xparms));
 
 
       if (result == 0)
@@ -7176,9 +6573,9 @@ ACUDLL ACU_INT opendevdrv( void )
             event_if_xparms.cnum = i ;
 
             result = clioctl ( CALL_EVENT_IF,
-                            (IOCTLU *) &event_if_xparms,
-                            clcard[0].clh,
-                            sizeof (event_if_xparms));
+                               (IOCTLU *) &event_if_xparms,
+                               0,
+                               sizeof (event_if_xparms));
             if (result != 0)
                 break ;
             }
@@ -7186,150 +6583,90 @@ ACUDLL ACU_INT opendevdrv( void )
       }
 #endif
 
-
-#ifdef ACU_VOIP_CC
-   /****************************************************************************/
    /*
-    * Carry out thread initialisation rqd for VoIP.  This must
-    * be performed at the earliest opportunity.
+    * create pipe administration thread - used to monitor communication with service
+    * if we fail to launch the pipe administration thread then we assume voip is not
+    * present in the system
     */
 
-   vcc_thread_get_id(&this_thread);  /* obtain this thread id */
+  if ( result == 0 )
+    {
+     if(0 == create_pipe_admin_thread())
+     {
+      int swdrvr,isvoip;
+      int card_number = ncards;
+      int voip_protocol = 0;
+      int num_of_voip_ports_per_ip_port = 0;
+      const ACU_INT* usable_voip_protocol_indexes = 0;
 
-   /* create and initialise VoIP call control components      */
-   /* create thread_info and initialise memory region to zero */
+      /* 
+       * find out how many voip protocols are running and get an array of indexes which may be 
+       * used as the protocol argument to srvioctl
+       */
+       usable_voip_protocol_indexes = get_voip_protocol_index_array(&num_of_voip_ports_per_ip_port);
 
-   thread_info = malloc(sizeof(tls_test_thread_info));
-   memset(thread_info, 0, sizeof(tls_test_thread_info));
-
-   vresult = create_call_records(thread_info);
-
-   if ( vresult != ACU_ERR_OK )
+      voip_card_number = 1;
+      first_voip_card = -1;
+        /*  We have found all the non-voip cards. Now look for all the voip cards */
+        /*  by iteration through all the switch drivers looking for those that belong*/
+        /*  to a VOIP card */
+      for ( swdrvr = 0 ; swdrvr < NCARDS; swdrvr++)
       {
-      ACU_LOG(opendevdrv, critical, ("failed to create call records\n"));
-      return(ERR_CFAIL);
+        isvoip = is_voip_card( swdrvr );
+        if ( isvoip <0 ) break;
+        if ( isvoip )
+        {
+               /* set up information relating to this VoIP board */ 
+               if (first_voip_card == -1)
+                 first_voip_card = card_number;
+
+               clcard[card_number].v1bmi_card_num = swdrvr;  /* store driver and switch number */
+               clcard[card_number].voipservice = ACU_VOIP_ACTIVE;
+
+               /* now setup information relating to each VoIP protocol that is running */
+               for(voip_protocol = 0; voip_protocol < num_of_voip_ports_per_ip_port; voip_protocol++)
+               {
+                   /* bump up network port count for VOIP for each iteration of this loop */ 
+                   clcard[card_number].nnets += 1; 
+		   memset(&sfmw, 0, sizeof(sfmw));
+
+                   /* send SMFW message to stop ERR_DRV_INCOMPAT errors */
+                   sfmw.net     = SFMWMODE_REGISTER;
+                   sfmw.confstr[0] = '\0';
+                   sfmw.regapp  = REGISTER_XAPI;      /* register extended API */
+                   sfmw.ss_vers = 0;
+                   result = srvioctl ( CALL_SFMW,
+                                       (IOCTLU *) &sfmw,
+                                       sizeof (SFMW_XPARMS ),
+                                       voip_card_number, 
+                                       usable_voip_protocol_indexes[voip_protocol]);
+
+                   /* read net info from card */
+                   sfmw.net     = SFMWMODE_SSTYPE;             /* ask for signalling type */
+                   sfmw.confstr[0] = '\0';
+                   result = srvioctl ( CALL_SFMW,
+                                       (IOCTLU *) &sfmw,
+                                       sizeof (SFMW_XPARMS ),
+                                       voip_card_number, 
+                                       usable_voip_protocol_indexes[voip_protocol]);
+
+                   clcard[card_number].types[voip_protocol] = sfmw.ss_type;    /* should be S_H323*/
+                   clcard[card_number].lines[voip_protocol] = sfmw.ss_line;    /* should be L_PSN */
+                   clcard[card_number].version  = sfmw.ss_vers;    /* read from acu_system_version.h */
+                   tnets+=1;                       /* increment total number of ports by one */
+               }
+
+               card_number++;
+               voip_card_number++;
+        
+        }
       }
-
-   /* assign thread id and handle for this thread to thread_info
-    * where this thread represents the application thread
-    */
-
-   vcc_thread_get_id(&thread_info->this_thread);
-
-
-#if CALL_CONTROL_LOG_THREAD
-
-   /*
-    * create Log Thread
-    */
-
-   cc_log_init();
-   while (log_thread_created() == FALSE)
-      {
-      Sleep(10);
-      }; /* wait for logging to start */
-#endif
-
-   /* Now go looking for voip drivers. If one is found add to clcards in the next position. */
-   ACU_DEBUG_LOG(opendevdrv,("Creating Generic/Thin Layer thread\n"));
-   first_voip_card = -1;
-
-   for ( nvcards = 0; nvcards < NCARDS; nvcards++ )
-      {
-      rc = v1bmi_card_info(nvcards,&cardInfoParms);
-
-      /* if a voip card load up clcard and start the tls threads and pipe_threads for that thread */
-      if (rc == 0)
-         {
-         if ( cardInfoParms.ip_is_configured == 0) /* board software not loaded so fail.*/
-            {
-            ACU_LOG(ServiceStart, critical,
-                    ("Software not loaded for driver: %d  board: %d \n", nvcards,nvcards+1));
-            return(ERR_BOARD_UNLOADED);
-            }
-
-         if (first_voip_card == -1)
-            first_voip_card = ncards;
-
-         clcard[ncards].nnets = 1;            /* register 1 network port for VOIP */
-         clcard[ncards].types[0] = S_H323;    /* assign signalling type to port 0 */
-         clcard[ncards].lines[0] = L_PSN;
-         clcard[ncards].version  = 0x520;
-         clcard[ncards].v1bmi_card_num = nvcards;  /* store the driver and switch number */
-         clcard[ncards].voipservice = ACU_VOIP_ACTIVE;
-
-         /*
-          * create Generic/TLS threads
-          */
-
-         voip_card_number = ncards-first_voip_card+1;
-
-         done_init[voip_card_number] = FALSE;
-         vresult = generic_tls_thread_init(&generic_tls_thread[voip_card_number], &this_thread);
-
-         if ( vresult != ACU_ERR_OK )
-            {
-            ACU_LOG(opendevdrv, critical, ("failed to launch generic/tls thread %d\n",voip_card_number));
-            return(ERR_CFAIL);
-            }
-
-         /* block until message is received on this thread */
-         generic_tls_wf_init_complete(&this_thread);
-
-         /* send SMFW message to stop ERR_DRV_INCOMPAT errors */
-
-         sfmw.net     = SFMWMODE_REGISTER;
-         sfmw.confstr[0] = '\0';
-         sfmw.regapp  = REGISTER_XAPI;      /* register extended API */
-         sfmw.ss_vers = 0;
-
-         vcc_thread_get_id(&this_thread);
-         sfmw.unique_xparms.sig_h323.calling_thread = this_thread;
-
-         result = voipioctl ( CALL_SFMW,
-                              (IOCTLU *) &sfmw,
-                              clcard[ncards].clh,
-                              sizeof (SFMW_XPARMS ),
-                              voip_card_number);
-         /*
-          * create pipe client thread - used by service
-          */
-
-         vresult = create_pipe_client_thread(&pipe_client_thread[voip_card_number],voip_card_number); /* pipes number from 1 */
-
-         if ( vresult != ACU_ERR_OK )
-            {
-            ACU_LOG(opendevdrv, critical, ("failed to launch pipe client thread %d\n",voip_card_number));
-            return(ERR_CFAIL);
-            }
-
-         clopened = TRUE;                /* library opened */
-         ncards++;
-         tnets+=1;                       /* increment total number of ports by one */
-         }  /* end of if (rc==0) */
-      else  /* no voip driver for this position. If we have already found a voip card then we */
-         {    /* have found all the voip cards */
-         if (first_voip_card != -1) break;
-         }
-
-
-      /* dont allow more cards than we can cope with. */
-      if (ncards == MAX_NUM_BOARDS+first_voip_card) break;
-
-      } /* end of for loop */
-
-
-    /* assign generic_tli_thread id from newly created
-    * generic/tls array - rqd by create_h323_thread
-    */
-   if (first_voip_card == -1)    /* no voip card found */
-      {
-      ACU_LOG(opendevdrv,critical,("No VOIP card found\n"));
-      }
-
-   ACU_DEBUG_LOG(opendevdrv, ("----- VoIP Thread Initialisation Complete -----\n"));
-
-#endif  /* if ACU_VOIP_CC */
+      ncards = card_number;
+     }
+   }
+ 
+   clopened = TRUE;                /* library opened */
+   
 
    return ( result );
 
@@ -7363,7 +6700,7 @@ ACUDLL ACU_INT call_tsinfo ( struct tsinfo_xparms * tsinfop )
             {
             result = clioctl ( CALL_TSINFO,
                                (IOCTLU *) tsinfop,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (TSINFO_XPARMS ));
 
             }
@@ -7384,29 +6721,34 @@ ACUDLL ACU_INT call_tsinfo ( struct tsinfo_xparms * tsinfop )
 /*                                                          */
 
 static
-ACU_INT call_maintenance_cmd(ACUC_MAINTENANCE_XPARMS * maint)
+ACU_INT call_maintenance_cmd(ACUC_MAINTENANCE_XPARMS * maint, int xlate)
    {
    ACU_INT result ;
    ACU_INT card ;
-
+   ACU_INT unet;
+   
    result = clopendev ( );                    /* open the device */
 
    if ( result == 0 )
       {
-      /* Fix up 'net' to signalling net, unet to user net  or -1 */
-      maint->unet = xlate_assoc(&maint->net) ;
+      if (xlate)
+        /* Fix up 'net' to signalling net, unet to user net  or -1 */
+        maint->unet = xlate_assoc(&maint->net) ;
+      else
+        maint->unet = -1 ;
 
       /* The maintenance cmd is sent to the sig net, rather than unser net... */
       card = unet_2_card ( maint->net );            /* get the card number */
       if ( card >= 0 )                        /* check for error */
          {
+         unet = maint->net;   
          maint->net = unet_2_net ( maint->net ); /* and the network port */
 
          if ( maint->net >= 0 )            /* check for error */
             {
             result = clioctl ( CALL_MAINTENANCE,
                                (IOCTLU *) maint,
-                               clcard[card].clh,
+                               card, unet,
                                sizeof (ACUC_MAINTENANCE_XPARMS ));
             }
          else
@@ -7420,6 +6762,7 @@ ACU_INT call_maintenance_cmd(ACUC_MAINTENANCE_XPARMS * maint)
    }
 
 
+
 /*---------- port_unblocking ------------*/
 /* Protocol-unblock a group of timeslots */
 /*                                       */
@@ -7427,6 +6770,8 @@ ACUDLL ACU_INT ACU_WINAPI
 call_maint_port_unblock ( PORT_BLOCKING_XPARMS * blockingp)
    {
    ACUC_MAINTENANCE_XPARMS maint ;
+   
+   memset (&maint , 0 , sizeof(maint)) ;
 
    maint.net = blockingp->net ;
    maint.type = blockingp->type ;
@@ -7444,7 +6789,7 @@ call_maint_port_unblock ( PORT_BLOCKING_XPARMS * blockingp)
         break ;
       }
 
-   return call_maintenance_cmd(&maint) ;
+   return call_maintenance_cmd(&maint,1) ;
 }
 /*---------------------------------------*/
 
@@ -7457,6 +6802,8 @@ call_maint_port_block ( PORT_BLOCKING_XPARMS * blockingp)
    {
    ACUC_MAINTENANCE_XPARMS maint ;
 
+   memset (&maint , 0 , sizeof(maint)) ;
+   
    maint.net = blockingp->net ;
    maint.type = blockingp->type ;
    maint.flags = blockingp->flags ;
@@ -7472,7 +6819,7 @@ call_maint_port_block ( PORT_BLOCKING_XPARMS * blockingp)
         break ;
       }
 
-   return call_maintenance_cmd(&maint) ;
+   return call_maintenance_cmd(&maint , 1) ;
    }
 
 
@@ -7483,6 +6830,8 @@ ACUDLL ACU_INT ACU_WINAPI
 call_maint_port_reset ( PORT_RESET_XPARMS * resetp)
    {
    ACUC_MAINTENANCE_XPARMS maint ;
+
+   memset (&maint , 0 , sizeof(maint)) ;
 
    maint.net = resetp->net ;
    maint.flags = resetp->flags ;
@@ -7498,7 +6847,7 @@ call_maint_port_reset ( PORT_RESET_XPARMS * resetp)
         break ;
       }
 
-   return call_maintenance_cmd(&maint) ;
+   return call_maintenance_cmd(&maint , 1) ;
    }
 
 
@@ -7510,11 +6859,13 @@ call_maint_ts_block ( TS_BLOCKING_XPARMS * blockingp)
    {
    ACUC_MAINTENANCE_XPARMS maint ;
 
+   memset (&maint , 0 , sizeof(maint)) ;
+
    maint.net = blockingp->net ;
    maint.ts = blockingp->ts ;
    maint.flags = blockingp->flags ;
    maint.cmd = ACUC_MAINT_TS_BLOCK ;
-   return call_maintenance_cmd(&maint) ;
+   return call_maintenance_cmd(&maint , 1) ;
    }
 
 
@@ -7527,11 +6878,275 @@ call_maint_ts_unblock ( TS_BLOCKING_XPARMS * blockingp)
    {
    ACUC_MAINTENANCE_XPARMS maint ;
 
+   memset (&maint , 0 , sizeof(maint)) ;
+
    maint.net = blockingp->net ;
    maint.ts = blockingp->ts ;
    maint.flags = blockingp->flags ;
    maint.cmd = ACUC_MAINT_TS_UNBLOCK ;
-   return call_maintenance_cmd(&maint) ;
+   return call_maintenance_cmd(&maint , 1) ;
+   }
+
+/*---- Resolve a link from a linkset---*/
+/*                                       */
+ACUDLL ACU_INT 
+ACU_WINAPI call_maint_mtp3_resolve_linkset(struct mtp3_resolve_linkset_xparms * lsp)
+   {
+   ACU_INT resp = 0 ;
+   
+   ACUC_MAINTENANCE_XPARMS maint ;
+
+   ACU_UCHAR * p = &maint.unique_xparms.sig_isup.generic[1]  ;  /* [0] is for length */
+   
+   memset (&maint , 0 , sizeof(maint)) ;
+
+   maint.net = lsp->net ;
+   maint.cmd = ACUC_MAINT_FW_GENERIC ;
+   
+   maint.unique_xparms.sig_isup.action = ACUC_MAINT_GETOPT ;
+   maint.unique_xparms.sig_isup.module  = ACUC_MAINT_IF_MTP3 ;
+   maint.unique_xparms.sig_isup.option  = ACUC_MAINT_MTP3_RESOLVE_LINKSET ;
+   
+   /* fill the parameters in generic data area... */
+   *p++ = (ACU_UCHAR) (lsp->dpc & 0xff );
+   *p++ = (ACU_UCHAR) ((lsp->dpc >> 8) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((lsp->dpc >> 16) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((lsp->dpc >> 24) & 0xff) ;
+   
+   *p++ = lsp->sys_flags ;
+   
+   *p++ = lsp->slc ;
+   
+   
+   maint.unique_xparms.sig_isup.generic[0] = p - maint.unique_xparms.sig_isup.generic ;
+   
+   
+   resp = call_maintenance_cmd(&maint , 1) ;
+   
+   if (resp ==0)
+      {
+      /* success - pass return values back to caller... */
+      p = &maint.unique_xparms.sig_isup.generic[1]  ;  /* [0] is for length */
+      
+      lsp->dpc = *p++ ;
+      lsp->dpc += *p++ << 8 ;
+      lsp->dpc += *p++ << 16 ;
+      lsp->dpc += *p++ << 24 ;
+      
+      lsp->sys_flags = *p++ ;
+      
+      lsp->slc = *p ;
+      }
+      
+   return resp ;
+   }
+
+
+/*---- Resolve a route from a routeset---*/
+/*                                       */
+ACUDLL ACU_INT 
+ACU_WINAPI call_maint_mtp3_resolve_routeset(struct mtp3_resolve_routeset_xparms * rsp)
+   {
+   ACU_INT resp = 0 ;
+   
+   ACUC_MAINTENANCE_XPARMS maint ;
+   ACU_UCHAR * p = &maint.unique_xparms.sig_isup.generic[1]  ;  /* [0] is for length */
+
+   memset (&maint , 0 , sizeof(maint)) ;
+
+   maint.net = rsp->net ;
+   maint.cmd = ACUC_MAINT_FW_GENERIC ;
+   
+   maint.unique_xparms.sig_isup.action = ACUC_MAINT_GETOPT ;
+   maint.unique_xparms.sig_isup.module  = ACUC_MAINT_IF_MTP3 ;
+   maint.unique_xparms.sig_isup.option  = ACUC_MAINT_MTP3_RESOLVE_ROUTESET ;
+   
+   /* fill the parameters in generic data area... */
+   *p++ = (ACU_UCHAR) (rsp->dpc & 0xff );
+   *p++ = (ACU_UCHAR) ((rsp->dpc >> 8) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rsp->dpc >> 16) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rsp->dpc >> 24) & 0xff) ;
+   
+   *p++ = rsp->sys_flags ;
+   
+   *p++ = (ACU_UCHAR) (rsp->apc & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rsp->apc >> 8) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rsp->apc >> 16) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rsp->apc >> 24) & 0xff) ;
+   
+   
+   maint.unique_xparms.sig_isup.generic[0] = p - maint.unique_xparms.sig_isup.generic ;
+   
+   resp = call_maintenance_cmd(&maint , 1) ;
+   
+   if (resp ==0)
+      {
+      /* success - pass return values back to caller... */
+      p = &maint.unique_xparms.sig_isup.generic[1]  ;  /* [0] is for length */
+      
+      rsp->dpc = *p++ ;
+      rsp->dpc += *p++ << 8 ;
+      rsp->dpc += *p++ << 16 ;
+      rsp->dpc += *p++ << 24 ;
+      
+      rsp->sys_flags = *p++ ;
+      
+      rsp->apc = *p++ ;
+      rsp->apc += *p++ << 8 ;
+      rsp->apc += *p++ << 16 ;
+      rsp->apc += *p++ << 24 ;
+      }
+      
+   return resp ;
+   }
+   
+/*---- Get status of a signalling point--*/
+/*                                       */
+ACUDLL ACU_INT 
+ACU_WINAPI call_maint_mtp3_get_sp_status(struct mtp3_sp_status_xparms * sp)
+   {
+   ACU_INT resp = 0 ;
+   
+   ACUC_MAINTENANCE_XPARMS maint ;
+   ACU_UCHAR * p = &maint.unique_xparms.sig_isup.generic[1]  ;  /* [0] is for length */
+
+   memset (&maint , 0 , sizeof(maint)) ;
+
+   maint.net = sp->net ;
+   maint.cmd = ACUC_MAINT_FW_GENERIC ;
+   
+   maint.unique_xparms.sig_isup.action = ACUC_MAINT_GETOPT ;
+   maint.unique_xparms.sig_isup.module  = ACUC_MAINT_IF_MTP3 ;
+   maint.unique_xparms.sig_isup.option  = ACUC_MAINT_MTP3_SP_STATUS ;
+   
+   /* fill the parameters in generic data area... */
+   *p++ = (ACU_UCHAR) (sp->dpc & 0xff );
+   *p++ = (ACU_UCHAR) ((sp->dpc >> 8) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((sp->dpc >> 16) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((sp->dpc >> 24) & 0xff) ;
+   
+   maint.unique_xparms.sig_isup.generic[0] = p - maint.unique_xparms.sig_isup.generic ;
+   
+   resp = call_maintenance_cmd(&maint , 1) ;
+   
+   if (resp ==0) 
+      {
+      /* success - pass status back to caller */
+      sp->acc_status = maint.unique_xparms.sig_isup.generic[5]  ; 
+      sp->con_status  = maint.unique_xparms.sig_isup.generic[6]  ; 
+      }
+      
+   return resp ;
+   }
+   
+   
+/*---- Get status of a signalling route--*/
+/*                                       */
+ACUDLL ACU_INT 
+ACU_WINAPI call_maint_mtp3_get_route_status(struct mtp3_route_status_xparms * rp)
+   {
+   ACU_INT resp = 0 ;
+   
+   ACUC_MAINTENANCE_XPARMS maint ;
+   ACU_UCHAR * p = &maint.unique_xparms.sig_isup.generic[1]  ;  /* [0] is for length */
+
+   memset (&maint , 0 , sizeof(maint)) ;
+
+   maint.net = rp->net ;
+   maint.cmd = ACUC_MAINT_FW_GENERIC ;
+   
+   maint.unique_xparms.sig_isup.action = ACUC_MAINT_GETOPT ;
+   maint.unique_xparms.sig_isup.module  = ACUC_MAINT_IF_MTP3 ;
+   maint.unique_xparms.sig_isup.option  = ACUC_MAINT_MTP3_ROUTE_STATUS ;
+   
+   /* fill the parameters in generic data area... */
+   *p++ = (ACU_UCHAR) (rp->dpc & 0xff );
+   *p++ = (ACU_UCHAR) ((rp->dpc >> 8) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rp->dpc >> 16) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rp->dpc >> 24) & 0xff) ;
+   
+   *p++ = (ACU_UCHAR) (rp->apc & 0xff );
+   *p++ = (ACU_UCHAR) ((rp->apc >> 8) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rp->apc >> 16) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((rp->apc >> 24) & 0xff) ;
+   
+   
+   maint.unique_xparms.sig_isup.generic[0] = p - maint.unique_xparms.sig_isup.generic ;
+   
+   resp = call_maintenance_cmd(&maint , 1) ;
+   
+   if (resp ==0) 
+      {
+      /* success - pass status back to caller */
+      rp->rt_state  = maint.unique_xparms.sig_isup.generic[9]  ; 
+      rp->rt_priority  = maint.unique_xparms.sig_isup.generic[10]  ; 
+      }
+      
+   return resp ;
+   }
+
+   
+
+/*---- Get status of a signalling link --*/
+/*                                       */
+ACUDLL ACU_INT 
+ACU_WINAPI call_maint_mtp3_get_link_status(struct mtp3_link_status_xparms * lp)
+   {
+   int resp = 0 ;
+   
+   ACUC_MAINTENANCE_XPARMS maint ;
+   ACU_UCHAR * p = &maint.unique_xparms.sig_isup.generic[1]  ;  /* [0] is for length */
+
+   memset (&maint , 0 , sizeof(maint)) ;
+
+   maint.net = lp->net ;
+   maint.cmd = ACUC_MAINT_FW_GENERIC ;
+   
+   maint.unique_xparms.sig_isup.action = ACUC_MAINT_GETOPT ;
+   maint.unique_xparms.sig_isup.module  = ACUC_MAINT_IF_MTP3 ;
+   maint.unique_xparms.sig_isup.option  = ACUC_MAINT_MTP3_LINK_STATUS ;
+   
+   /* fill the parameters in generic data area... */
+   *p++ = (ACU_UCHAR) (lp->dpc & 0xff );
+   *p++ = (ACU_UCHAR) ((lp->dpc >> 8) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((lp->dpc >> 16) & 0xff) ;
+   *p++ = (ACU_UCHAR) ((lp->dpc >> 24) & 0xff) ;
+   
+   *p++ = lp->slc ;
+   
+   maint.unique_xparms.sig_isup.generic[0] = p - maint.unique_xparms.sig_isup.generic ;
+   
+   resp = call_maintenance_cmd(&maint , 1) ;
+   
+   if (resp ==0) 
+      {
+      /* success - pass status back to caller */
+      lp->lk_flags  = maint.unique_xparms.sig_isup.generic[6]  ; 
+      }
+      
+   return resp ;
+   }
+   
+ACUDLL int ACU_WINAPI call_maint_isup_net_2_dpc(struct isup_net_2_dpc_xparms * net2dpc) 
+   {
+   int resp = 0 ;
+   ACUC_MAINTENANCE_XPARMS maint ;
+   maint.unique_xparms.sig_isup.generic[0]  = 0 ; /* No generic data with this one */
+
+   memset (&maint , 0 , sizeof(maint)) ;
+
+   maint.net = net2dpc->net ;
+   maint.cmd = ACUC_MAINT_NET_2_DPC  ;
+   maint.flags = ACUC_MAINT_TLS ;
+   
+   resp = (ACU_LONG) call_maintenance_cmd(&maint , 0 ) ;
+   
+   if (resp >=0) 
+      {
+        net2dpc->dpc  = maint.unique_xparms.sig_isup.dpc ;
+      }
+      
+   return resp ;
    }
 
 
@@ -7565,7 +7180,7 @@ call_del_assoc_net  ( struct acuc_assoc_net_xparms * assocp )
                assocp->mode = ACUC_ASSOC_CLEAR ;
                result = clioctl ( CALL_ASSOC_NET,
                                (IOCTLU *) assocp,
-                               clcard[card].clh,
+                               card, snet,
                                sizeof (ACUC_ASSOC_NET_XPARMS ));
 
                /* Clear the translation tables maintained in driver 0 */
@@ -7575,7 +7190,7 @@ call_del_assoc_net  ( struct acuc_assoc_net_xparms * assocp )
                   assocp->mode = ACUC_ASSOC_SET ;
                   result = clioctl ( CALL_ASSOC_NET,
                                (IOCTLU *) assocp,
-                               clcard[0].clh,
+                               0, snet,
                                sizeof (ACUC_ASSOC_NET_XPARMS ));
                   }
                }
@@ -7590,11 +7205,12 @@ call_del_assoc_net  ( struct acuc_assoc_net_xparms * assocp )
    }
 /*---------------------------------------*/
 
+
 /*--------- call_add_assoc_net  ---------*/
 /*  Add an associated (NFAS) network     */
 /*  port to a signalling port.           */
 
-ACUDLL ACU_INT
+static ACU_INT
 call_add_assoc_net  ( struct acuc_assoc_net_xparms * assocp )
    {
    ACU_INT  result;
@@ -7622,9 +7238,9 @@ call_add_assoc_net  ( struct acuc_assoc_net_xparms * assocp )
                assocp->net = unet_2_net ( snet ); /* and the network port */
                assocp->mode = ACUC_ASSOC_CONF ;
                result = clioctl ( CALL_ASSOC_NET,
-                               (IOCTLU *) assocp,
-                               clcard[card].clh,
-                               sizeof (ACUC_ASSOC_NET_XPARMS ));
+                                  (IOCTLU *) assocp,
+                                  card, snet,
+                                  sizeof (ACUC_ASSOC_NET_XPARMS ));
 
                /* Set the translation tables maintained in driver 0 */
                if (result == 0)
@@ -7632,9 +7248,9 @@ call_add_assoc_net  ( struct acuc_assoc_net_xparms * assocp )
                   assocp->net = snet ;	/* Configure the new network params */
                   assocp->mode = ACUC_ASSOC_SET ;
                   result = clioctl ( CALL_ASSOC_NET,
-                               (IOCTLU *) assocp,
-                               clcard[0].clh,
-                               sizeof (ACUC_ASSOC_NET_XPARMS ));
+                                     (IOCTLU *) assocp,
+                                     0, snet,
+                                     sizeof (ACUC_ASSOC_NET_XPARMS ));
                   }
                }
             }
@@ -7682,7 +7298,7 @@ config_assoc_net (ACU_INT net, ACU_INT add)
 
             result = clioctl ( CALL_ASSOC_NET,
                                (IOCTLU *) &assoc_net,
-                               clcard[card].clh,
+                               card, net,
                                sizeof (ACUC_ASSOC_NET_XPARMS ));
 
 
@@ -7719,7 +7335,7 @@ config_assoc_net (ACU_INT net, ACU_INT add)
 /*                                        */
 /* Fixes up supplied user net to be the   */
 /* corresponding signalling net, and      */
-/* returns either the original user net,  *
+/* returns either the original user net,  */
 /* or -1 if the driver is non-NFAS.       */
 
 static ACU_INT
@@ -7735,11 +7351,11 @@ xlate_assoc (ACU_INT * unet)
    associated signalling net */
 
    if ( (*unet < tnets) &&
-      (clioctl ( CALL_ASSOC_NET,
-                (IOCTLU *) &assoc,
-                clcard[0].clh,
-                sizeof (ACUC_ASSOC_NET_XPARMS)) == 0))
-      {
+       (clioctl ( CALL_ASSOC_NET,
+                 (IOCTLU *) &assoc,
+                 0, -1,
+                 sizeof (ACUC_ASSOC_NET_XPARMS)) == 0))
+     {
       /* Driver supports NFAS-style bearers, and this is an NFAS network, */
       assoc_net = *unet ;	/* Associated net is original user net */
       *unet = assoc.net ;	/*...and user net becomes signalling net */
@@ -7815,7 +7431,7 @@ ACUDLL ACU_INT call_signal_apievent ( struct signal_apievent_xparms *signal_apie
          {
          result = clioctl ( CALL_SIGNAL_APIEVENT,
                             (IOCTLU *) signal_apieventp,
-                            clcard[card].clh,
+                            card, -1,
                             sizeof (SIGNAL_APIEVENT_XPARMS ));
          }
       else
@@ -7831,42 +7447,6 @@ ACUDLL ACU_INT call_signal_apievent ( struct signal_apievent_xparms *signal_apie
 
 
 
-/* This function starts the management and session RPC sessions */
-/* if it doesnt succeed the first time it waits a second and tries again */
-#ifdef ACU_VOIP_CC
-int start_rpc_sessions ( char * board_ip_address , int card_num )
-{
-   int  error = 0;
-   int attempt;
-   acu_error result;
-
-   ACU_DEBUG_LOG(Management, ("Initialising client side management library\n"));
-   for (attempt=0;attempt<30;attempt++)
-      {
-      result = management_init(board_ip_address,card_num);
-      if (result == 0)
-         {
-         ACU_DEBUG_LOG(Management, ("Management Server %s initialised\n", board_ip_address));
-         break;
-         }
-      else if ((result == ACU_ERR_WRONG_BOARD_VER)||(result == ACU_ERR_NO_BOARD))
-         {
-         return result;
-         }
-      else
-         Sleep(1000);
-      }
-   if (attempt == 30)
-      {
-      ACU_LOG(management, critical, ("Failed to connect to server%s\n", board_ip_address));
-      error = ERR_MANAGEMENT_RPC;
-      }
-   return ( error );
-}
-
-
-
-
 /*--------------------------------------------------------------------------------------------------*/
 /* this function searchs through the config string and extracts the ip_address, subnet_address and  */
 /* gateway_address. It expects that they are preceded by the correct flags, are separated by a space*/
@@ -7874,13 +7454,12 @@ int start_rpc_sessions ( char * board_ip_address , int card_num )
 /* config parameter options  -A1=  board address1, -A2=  board address2, -B1 subnet mask1,          */
 /*                           -B2 subnet mask1, -C default gateway, -D use DHCP 1= yes               */
 /*--------------------------------------------------------------------------------------------------*/
-#ifdef ACU_VOIP_CC
 int parse_config_str(char * config_string, char * ip_address1, char * ip_address2,
                      char * subnet_address1, char * subnet_address2,
                      char * gateway_address, int *Download_DHCP)
 {
    int number_found;
-   bool found;
+   int found;
    char dhcp_string[16];
 
    number_found = 0;
@@ -7934,9 +7513,6 @@ void parse_string (char *config_string, char search_string[4],char *found_string
    }
 }
 
-#endif
-
-
 /*---------------------------------------*/
 /* call_free_admin_msg                   */
 /*                                       */
@@ -7955,11 +7531,11 @@ ACUDLL int call_free_admin_msg(voip_admin_msg *adminp)
          free ( adminp->prefixes );
          adminp->prefixes = NULL;;
          }
-      return ACU_ERR_OK;
+      return 0;
       }
    else
       {
-      return ACU_ERR_INVALID_ARGUMENT;
+      return ERR_PARM;
       }
    }
 
@@ -7992,9 +7568,116 @@ ACUDLL int call_set_default_gk_config ( struct default_ras_config *ras_info )
       }
    else
       {
-      return ACU_ERR_INVALID_ARGUMENT;
+      return ERR_PARM;
       }
 }
-#endif
+/*   -------------- IPTOS ----------------                */
+/* Return the IP TOS field                                */
+/*                                                        */
+/* Input unsigned integer PRE : precedence value          */
+/*       unsigned integer TOS : type of service requested */ 
+/*                                                        */
+/* Output unsigned integer : IP TOS composed of PRE,TOS   */
+/*                                                        */
+/* NOTE to indicate that this is not a default zero value */
+/* the last bit of the first byte is always set           */
+/*  ----------------------------------------              */
+ACUDLL ACU_UINT call_generate_iptos ( unsigned int pre, unsigned int tos )
+{
+    /* ignore all but the last three bits */
+    pre &= 0x07;
+    tos &= 0x07; 
+
+    switch (tos)
+    {
+        case ACU_PREC_TOS_HIGH_RELIABILITY:
+        case ACU_PREC_TOS_HIGH_THROUGHPUT:
+        case ACU_PREC_TOS_LOW_DELAY:
+            break;
+        default:
+            tos = ACU_PREC_TOS_DEFAULT;
+    }
+
+    /* if all bits are 0 then normal service */
+    if (tos == ACU_PREC_TOS_DEFAULT) pre = ACU_PREC_TOS_DEFAULT; 
+
+    tos <<= 2;
+    pre <<= 5;
+
+    /* stitch them together and always set the next bit */
+    return (pre | tos | 0x100 );
+}
+
+/*   -------------- DSCP ----------------                  */
+/* Return the DSCP field                                   */
+/*                                                         */
+/* Input unsigned integer CP : code point value	           */
+/*                                                         */
+/* Output unsigned integer : DSCP composed of CP,2bits(=0) */
+/*                                                         */
+/* NOTE as with iptos above we set the next bit to indicate*/
+/* that this is not a default zero value                   */
+/*  ----------------------------------------               */
+ACUDLL ACU_UINT call_generate_dscp ( unsigned int cp )
+{
+    cp &= 0x3F;
+    cp <<= 2;
+    return (cp | 0x100);
+}
+
+
+
+/*-------------- call_register_system ---------------------*/
+/*   Register a VoIP endpoint with a server                */
+/*                                                         */
+/*   Currently this only works for SIP                     */
+/*                                                         */
+
+ACUDLL int ACU_WINAPI call_register_system ( struct register_xparms * reg_parms )
+{
+    if( S_SIP != call_type(reg_parms->net) )
+    {
+        return ERR_COMMAND;
+    }
+
+    return clioctl ( VOIP_NEW_REGISTRATION, (IOCTLU *) reg_parms,
+                       unet_2_card ( reg_parms->net ), reg_parms->net, sizeof ( REGISTER_XPARMS ) );
+}
+
+/*-------------- call_unregister_system -------------------*/
+/*   Unregister a VoIP endpoint with a server              */
+/*                                                         */
+/*   Currently this only works for SIP                     */
+/*                                                         */
+ACUDLL int ACU_WINAPI call_unregister_system ( struct register_xparms * reg_parms )
+{
+    if( S_SIP != call_type(reg_parms->net) )
+    {
+        return ERR_COMMAND;
+    }
+
+    return clioctl ( VOIP_DELETE_REGISTRATION, (IOCTLU *) reg_parms,
+                       unet_2_card ( reg_parms->net ), reg_parms->net, sizeof ( REGISTER_XPARMS ) );
+}
+
+/*-------------- call_query_register_system ---------------*/
+/*   Fetch the registrations associated with a particular  */
+/*   endpoint                                              */
+/*                                                         */
+/*   Currently this only works for SIP. And is only        */
+/*   partially implemented                                 */
+
+ACUDLL int ACU_WINAPI call_query_register_system ( struct register_xparms * reg_parms )
+{
+    if( S_SIP != call_type(reg_parms->net) )
+    {
+        return ERR_COMMAND;
+    }
+
+    return clioctl ( VOIP_FETCH_REGISTRATION, (IOCTLU *) reg_parms,
+                       unet_2_card ( reg_parms->net ), reg_parms->net, sizeof ( REGISTER_XPARMS ) );
+}
+
 
 /*------------ end of file --------------*/
+

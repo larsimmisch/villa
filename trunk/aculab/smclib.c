@@ -34,7 +34,6 @@
 #endif
 
 
-
 /* 
  * This is a single party in a conference.
  */
@@ -58,16 +57,20 @@ struct sm_conference {
     SM_CONFERENCE_PARTY_STRUCT parties[CONF_MAX_PARTY];
 };
 
-
+typedef struct sm_conference* tSMPrivateConference;
 
 /* Local Constants */
 
 char *smConfError;
 
-static void show_parties(tSMConference conf)
+static void show_parties(tSMConference publicconf)
 {
+	tSMPrivateConference conf;
     int p;
-    for (p=0; p < conf->Nmembers; p++) {
+
+	conf = (tSMPrivateConference) publicconf;
+ 
+	for (p=0; p < conf->Nmembers; p++) {
         int q;
         printf("%x -> %x: ", conf->parties[p].channelIn, conf->parties[p].channelOut);
         for (q=0; q < conf->Nmembers; q++) {
@@ -109,7 +112,7 @@ static int sm_add( tSMChannelId Out, tSMChannelId In )
  */
 static int unsafe_sm_conference_add_party(SM_CONFERENCE_ADD_PARTY_PARMS *add_params)
 {
-    tSMConference 				 	conf;
+    tSMPrivateConference 			conf;
     int                          	result;
     int                          	party;
 	SM_SET_SIDETONE_CHANNEL_PARMS	sidetoneParms;
@@ -118,7 +121,7 @@ static int unsafe_sm_conference_add_party(SM_CONFERENCE_ADD_PARTY_PARMS *add_par
 	SM_CONF_PRIM_ADJ_OUTPUT_PARMS 	adjOutParms;
 	SM_CONF_PRIM_ADJ_INPUT_PARMS 	adjustInputParms;
 
-	conf = add_params->conf;
+	conf = (tSMPrivateConference) (add_params->conf);
 
     for (party=0; party<conf->Nmembers; party++) 
 	{
@@ -258,7 +261,7 @@ static int unsafe_sm_conference_add_party(SM_CONFERENCE_ADD_PARTY_PARMS *add_par
 
 static int unsafe_sm_conference_info( SM_CONFERENCE_INFO_PARMS *info_parms )
 {
-    tSMConference 				 	conf;
+    tSMPrivateConference 			conf;
     int                          	result;
 	SM_CONF_PRIM_INFO_PARMS			confPrimInfo0;
 	SM_CONF_PRIM_INFO_PARMS			confPrimInfo1;
@@ -270,7 +273,7 @@ static int unsafe_sm_conference_info( SM_CONFERENCE_INFO_PARMS *info_parms )
 
 	result = 0;
 
-	conf = info_parms->conf;
+	conf = (tSMPrivateConference)(info_parms->conf);
 
 	info_parms->activeChannelCount = 0;
 
@@ -334,7 +337,7 @@ static int unsafe_sm_conference_info( SM_CONFERENCE_INFO_PARMS *info_parms )
 	return result;
 }
  
-static int unsafe_sm_conference_remove_party(tSMConference conf, tSMChannelId channelIn, tSMChannelId channelOut)
+static int unsafe_sm_conference_remove_party(tSMConference publicconf, tSMChannelId channelIn, tSMChannelId channelOut)
 {
     int 							result;
     int 							party;
@@ -342,6 +345,9 @@ static int unsafe_sm_conference_remove_party(tSMConference conf, tSMChannelId ch
 	SM_CONF_PRIM_ADJ_INPUT_PARMS 	adjustInputParms;
     SM_SET_SIDETONE_CHANNEL_PARMS	sidetoneParms;
 	SM_CONDITION_INPUT_PARMS		condParms;
+    tSMPrivateConference 			conf;
+
+	conf = (tSMPrivateConference) publicconf;
 
 	/* find the party to be removed */
     for (leavingParty=0; ; leavingParty++) {
@@ -453,15 +459,15 @@ ACUDLL
 #endif
 tSMConference sm_conference_create(void)
 {
-    tSMConference conf;
-    conf = (tSMConference)malloc(sizeof(*conf));
+    tSMPrivateConference conf;
+    conf = (tSMPrivateConference)malloc(sizeof(*conf));
     if (!conf) {
         smConfError = "Failure to allocate conference structure";
         return 0;
     }
     conf->Nmembers = 0;
     smd_initialize_critical_section(&conf->csect);
-    return conf;
+    return (tSMConference)conf;
 }
 
 /* ---------------------------------------------------------------------
@@ -477,9 +483,13 @@ ACUDLL
 int sm_conference_add_party(SM_CONFERENCE_ADD_PARTY_PARMS *add_params)
 {
     int result;
-    smd_enter_critical_section(&add_params->conf->csect);
+    tSMPrivateConference conf;
+
+    conf = (tSMPrivateConference) (add_params->conf);
+
+    smd_enter_critical_section(&conf->csect);
     result = unsafe_sm_conference_add_party(add_params);
-    smd_leave_critical_section(&add_params->conf->csect);
+    smd_leave_critical_section(&conf->csect);
     return result;
 }
 
@@ -489,9 +499,13 @@ ACUDLL
 int sm_conference_info( SM_CONFERENCE_INFO_PARMS *info_params )
 {
     int result;
-    smd_enter_critical_section(&info_params->conf->csect);
+    tSMPrivateConference conf;
+
+    conf = (tSMPrivateConference) (info_params->conf);
+
+    smd_enter_critical_section(&conf->csect);
     result = unsafe_sm_conference_info(info_params);
-    smd_leave_critical_section(&info_params->conf->csect);
+    smd_leave_critical_section(&conf->csect);
     return result;
 }
 
@@ -509,12 +523,16 @@ ACUDLL
 int sm_conference_remove_party( SM_CONFERENCE_REMOVE_PARTY_PARMS* remove_params)
 {
     int result;
-    smd_enter_critical_section(&remove_params->conf->csect);
+    tSMPrivateConference conf;
+
+    conf = (tSMPrivateConference) (remove_params->conf);
+
+    smd_enter_critical_section(&conf->csect);
     result = unsafe_sm_conference_remove_party(
 		remove_params->conf,
 		remove_params->channelIn,
 		remove_params->channelOut);
-    smd_leave_critical_section(&remove_params->conf->csect);
+    smd_leave_critical_section(&conf->csect);
     return result;
 }
 
@@ -528,9 +546,13 @@ int sm_conference_remove_party( SM_CONFERENCE_REMOVE_PARTY_PARMS* remove_params)
 #ifdef _PROSDLL
 ACUDLL 
 #endif
-void sm_conference_delete(tSMConference conf)
+void sm_conference_delete(tSMConference publicconf)
 {
  int i;
+ tSMPrivateConference conf;
+
+ conf = (tSMPrivateConference) publicconf;
+
  smd_enter_critical_section(&conf->csect);
  for (i=0; i<conf->Nmembers; i++) {
     sm_conf_prim_abort(conf->parties[i].channelOut);
