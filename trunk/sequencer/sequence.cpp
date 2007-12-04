@@ -41,6 +41,14 @@ Timer Sequencer::timer;
    'this' to member contructors */
 #pragma warning(disable : 4355)
 
+const char *escape_empty(const char *s)
+{
+	if (!s || s[0] == '\0')
+		return "-";
+
+	return s;
+}
+
 Sequencer::Sequencer(TrunkConfiguration* aConfiguration) 
   :	m_configuration(aConfiguration), m_connectComplete(0),
 	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), 	m_sent_rdis(INVALID_CALLREF),
@@ -811,9 +819,9 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 		{
 			m_interface->begin() << V3_OK << ' ' << m_clientSpec->m_id.c_str() 
 				<< " LSTN " << getName()
-				<< ' ' << m_local.getAddress() << ' '
-				<< m_configuration->getNumber() << ' '
-				<< m_remote.getAddress() << ' '
+				<< ' ' << escape_empty(m_local.getAddress()) << ' '
+				<< escape_empty(m_configuration->getNumber()) << ' '
+				<< escape_empty(m_remote.getAddress()) << ' '
 				<< server->getTimeslot().ts << end();
 		}
 	}
