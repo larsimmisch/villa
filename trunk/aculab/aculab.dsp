@@ -187,7 +187,7 @@ SOURCE=.\smdrvr.h
 InputPath=.\smdrvr.h
 
 "prosody_error.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
-	perl ..\scripts\extract-error.pl ERR_SM prosody_error < $(InputPath) > prosody_error.i
+	python ..\scripts\symname.py -f prosody_error -o prosody_error.i ERR_SM $(InputPath)
 
 # End Custom Build
 
@@ -197,7 +197,7 @@ InputPath=.\smdrvr.h
 InputPath=.\smdrvr.h
 
 "prosody_error.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
-	perl ..\scripts\extract-error.pl ERR_SM prosody_error < $(InputPath) > prosody_error.i
+	python ..\scripts\symname.py -f prosody_error -o prosody_error.i ERR_SM $(InputPath)
 
 # End Custom Build
 
