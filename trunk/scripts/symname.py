@@ -19,7 +19,7 @@ static SYMENT SymTab[] = {
 
 postamble = '''};
 
-const char *symname(int value)
+const char *%s(int value)
 {
     static char buf[256];
     int i;
@@ -28,7 +28,7 @@ const char *symname(int value)
 	if (SymTab[i].value == value)
 	    return SymTab[i].name;
 
-    sprintf(buf, "0x%X", value);
+    sprintf(buf, "0x%%X", value);
 	return buf;
 }
 '''
@@ -90,7 +90,7 @@ def read_symbols(filename, prefix, symbols, ignore):
     return symbols
 
 def usage():
-    print >> sys.stderr, "usage: symname.py [-i <ignore>] [-o <out> ] <prefix> <file>"
+    print >> sys.stderr, "usage: symname.py [-i <ignore>] [-o <out> ] [-f <function name> <prefix> <file>"
     sys.exit(2)
 
 if __name__ == '__main__':
@@ -98,8 +98,10 @@ if __name__ == '__main__':
     ignore = []
     out = sys.stdout
 
+    fname = 'symname'
+
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'o:i:')
+        opts, args = getopt.getopt(sys.argv[1:], 'o:i:f:')
     except getopt.GetoptError:
         usage()
 
@@ -108,6 +110,8 @@ if __name__ == '__main__':
             ignore.append(a)
         elif o == '-o':
             out = open(a, 'w')
+        elif o == '-f':
+            fname = a
         else:
             usage()
 
@@ -125,4 +129,4 @@ if __name__ == '__main__':
     for s in symbols:
         out.write("    { \"%s\", %s },\n" % (s, s));
 
-    out.write(postamble)
+    out.write(postamble % fname)

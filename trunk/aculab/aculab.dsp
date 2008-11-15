@@ -231,7 +231,7 @@ SOURCE=.\beep.al
 InputPath=.\beep.al
 
 "beep.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
-	perl ..\scripts\raw-to-c.pl $(InputPath) beep.i beep
+	python ..\scripts\raw-to-c.py $(InputPath) beep.i beep
 
 # End Custom Build
 
@@ -241,7 +241,7 @@ InputPath=.\beep.al
 InputPath=.\beep.al
 
 "beep.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
-	perl ..\scripts\raw-to-c.pl $(InputPath) beep.i beep
+	python ..\scripts\raw-to-c.py $(InputPath) beep.i beep
 
 # End Custom Build
 
