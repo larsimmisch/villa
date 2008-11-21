@@ -82,7 +82,7 @@ public:
 
 	virtual void run();
 
-	// return false if connectio should be closed
+	// return false if connection should be closed
     bool data(InterfaceConnection *server);
 
 protected:

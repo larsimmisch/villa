@@ -125,7 +125,11 @@ void Sequencer::lost_connection()
 void Sequencer::release()
 {
 	if (m_media)
+	{
+		if (m_trunk)
+			m_media->disconnected(m_trunk);
 		gMediaPool.release(m_media);
+	}
 	m_media = 0;
 	m_id.erase();
 
@@ -173,7 +177,8 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 
     // Don't start anything while we are disconnecting
-    if (m_closing || m_disconnecting != INVALID_CALLREF || m_sent_rdis != INVALID_CALLREF)
+    if (m_closing || (m_disconnecting != INVALID_CALLREF) || (m_sent_rdis != INVALID_CALLREF) 
+		|| !m_media)
     {
         sendMLCA(id, V3_STOPPED_DISCONNECT, 0, 0);
 
@@ -1223,14 +1228,12 @@ void Sequencer::touchtone(Media* server, char tt)
 	log(log_debug, "sequencer", server->getName())
 		<< "DTMF: " << tt << logend();
 
-	{
-		omni_mutex_lock l(m_mutex);
+	omni_mutex_lock l(m_mutex);
 
-		/* give Activities a chance to stop */
-		for (i = 0; i < MAXCHANNELS; ++i)
-		{
-			m_activity[i].DTMF(tt);
-		}
+	/* give Activities a chance to stop */
+	for (i = 0; i < MAXCHANNELS; ++i)
+	{
+		m_activity[i].DTMF(tt);
 	}
 
 	if (m_interface)
