@@ -151,6 +151,7 @@ protected:
 	unsigned m_disconnecting; 	/* contains the call reference of the DISC request */
 	unsigned m_sent_rdis; /* contains call reference for RDIS sent */
 	bool m_closing;
+    int m_in_completed;
 	SAP m_local;
 	SAP m_remote;
 	InterfaceConnection *m_interface;

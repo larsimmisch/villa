@@ -53,7 +53,7 @@ Sequencer::Sequencer(TrunkConfiguration* aConfiguration)
   :	m_configuration(aConfiguration), m_connectComplete(0),
 	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), 	m_sent_rdis(INVALID_CALLREF),
 	m_interface(0),	m_callref(INVALID_CALLREF), 
-	m_trunk(0), m_media(0), m_closing(false)
+	m_trunk(0), m_media(0), m_closing(false), m_in_completed(0)
 
 {
 	for (int i = 0; i < MAXCHANNELS; ++i)
@@ -73,7 +73,7 @@ Sequencer::Sequencer(InterfaceConnection *server)
   :	m_configuration(0), m_connectComplete(0),
 	m_clientSpec(0), m_disconnecting(INVALID_CALLREF), 	m_sent_rdis(INVALID_CALLREF),
 	m_interface(server), m_callref(INVALID_CALLREF), 
-	m_trunk(0), m_media(0), m_closing(false)
+	m_trunk(0), m_media(0), m_closing(false), m_in_completed(0)
 {
 	m_receive = gBus->allocate();
 	m_transmit = gBus->allocate();
@@ -1027,8 +1027,6 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 	{
 		log(log_debug, "sequencer", server->getName()) << "call accepted" << logend();
 
-		m_media->connected(server);
-
 		if (m_interface)
 		{
 			m_interface->begin() << V3_OK << ' ' << m_id.c_str() << " ACPT " 
@@ -1036,6 +1034,9 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 		}
 
 		lock();
+
+		m_media->connected(server);
+
 		delete m_clientSpec;
 		m_clientSpec = 0;
 		m_id.erase();
@@ -1106,7 +1107,23 @@ void Sequencer::started(Media *server, Sample *aSample)
 
 void Sequencer::completed(Media *server, Sample *aSample, unsigned msecs)
 {
-	completed(server, (Molecule*)(aSample->getUserData()), msecs, aSample->getStatus());
+    ++m_in_completed;
+
+    if (m_in_completed > 1)
+    {
+        addCompleted(server, (Molecule*)(aSample->getUserData()), msecs, 
+                     aSample->getStatus());
+    }
+    else
+    {
+	    completed(server, (Molecule*)(aSample->getUserData()), msecs, aSample->getStatus());
+    }
+
+    --m_in_completed;
+
+    if (m_in_completed == 0)
+        checkCompleted();
+
 }
 
 void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, unsigned status)

@@ -119,7 +119,7 @@ bool SilenceAtom::stop(Sequencer* sequencer, unsigned status)
 
 		sequencer->getTimer().remove(m_timer);
 
-		// if we have to use completed() or addCompleted() depends on the thread context
+		// whether we have to use completed() or addCompleted() depends on the thread context
 		// here we are in the sequencers context, so we use addCompleted
 		sequencer->addCompleted(sequencer->getMedia(), (Molecule*)m_timer.m_data, 
 			m_pos, status);
@@ -134,7 +134,7 @@ bool SilenceAtom::stop(Sequencer* sequencer, unsigned status)
 
 void SilenceAtom::on_timer(const Timer::TimerID &id)
 {
-	// if we have to use completed() or addCompleted() depends on the thread context.
+	// whether we have to use completed() or addCompleted() depends on the thread context.
 	// here we are in the Timers context, so we use completed
 
 	Molecule * m = (Molecule*)id.m_data;

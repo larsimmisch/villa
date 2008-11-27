@@ -35,13 +35,15 @@ class Call:
         print 'connected:', self.device
 
     def ACPT(self, event, user_data):
-##         self.send('MLCA %s 0 2 1 beep 1 none play ../test/phone/sitrtoot.al none'
-##                  % self.device)
+         self.send('MLCA %s 0 2 1 play ../test/phone/short.al none'
+                   % self.device)
+         self.send('MLCA %s 0 2 1 play ../test/phone/sitrtoot.al none'
+                   % self.device)
 ##         self.send('MLCA %s 0 2 1 beep 2'
 ##                   % self.device)
-        self.send('MLCA %s 0 16 4 beep 1 none ' % self.device)
-        self.record = self.send('MLCA %s 0 80 4 rec foo 10000 none'
-                                % self.device)
+##        self.send('MLCA %s 0 16 4 beep 1 none ' % self.device)
+##       self.record = self.send('MLCA %s 0 80 4 rec foo 10000 none'
+##                                % self.device)
 
     def MLCA(self, event, user_data):
         if event['tid'] == self.record:
