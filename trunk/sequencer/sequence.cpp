@@ -177,8 +177,7 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 
     // Don't start anything while we are disconnecting
-    if (m_closing || (m_disconnecting != INVALID_CALLREF) || (m_sent_rdis != INVALID_CALLREF) 
-		|| !m_media)
+    if (m_closing || (m_disconnecting != INVALID_CALLREF) || (m_sent_rdis != INVALID_CALLREF))
     {
         sendMLCA(id, V3_STOPPED_DISCONNECT, 0, 0);
 
@@ -335,6 +334,13 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 	{
 		omni_mutex_lock l(m_mutex);
+
+		if (!m_media)
+		{
+			delete molecule;
+
+			return V3_ERROR_INVALID_STATE;
+		}
 
 		m_activity[channel].add(*molecule);
 		checkCompleted();
