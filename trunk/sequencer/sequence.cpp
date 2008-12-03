@@ -986,10 +986,12 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 
 	if (m_interface && m_id.size())
 	{
-		m_interface->remove(server->getName());
+        assert(server->getName());
 
-		m_interface->begin() << result << ' ' << m_id.c_str() << " DISC "
-			<< getName() << end();
+        m_interface->remove(server->getName());
+
+        m_interface->begin() << result << ' ' << m_id.c_str() << " DISC "
+            << getName() << end();
 	}
 
 	release();
