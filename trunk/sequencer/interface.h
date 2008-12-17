@@ -1,5 +1,5 @@
 /*
-	Copyright 1995 Immisch, Becker & Partner, Hamburg
+	Copyright 1995-2008 Immisch, Becker & Partner, Hamburg
 
 	created: Mon Nov 18 12:05:02 GMT+0100 1996
 
@@ -69,7 +69,6 @@ public:
 
 protected:
 
-	omni_mutex m_mutex;
 	t_calls m_calls;
 };
 
