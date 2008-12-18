@@ -1,5 +1,5 @@
 /*
-	Copyright 1995-2008 Immisch, Becker & Partner, Hamburg
+	Copyright 1995-2008 ibp (uk) Ltd.
 
 	created: Mon Nov 18 12:05:02 GMT+0100 1996
 
@@ -11,6 +11,7 @@
 
 #include <list>
 #include <map>
+#include <sstream>
 #include "text.h"
 #include "configuration.h"
 
@@ -37,16 +38,6 @@ public:
 		m_calls.erase(name);
 	}
 
-	std::basic_iostream<char> &syntax_error(const std::string &id)
-	{
-		clear();
-
-		begin() << V3_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - ";
-
-		return *this;
-
-	}
-
 	Sequencer *find(const std::string &name)
 	{
 		omni_mutex_lock l(m_mutex);
@@ -59,6 +50,7 @@ public:
 		return i->second;
 	}
 
+    int send(std::stringstream &data);
 	void lost_connection();
 
 	omni_mutex& getMutex()	{ return m_mutex; }
@@ -70,6 +62,7 @@ public:
 protected:
 
 	t_calls m_calls;
+    omni_mutex m_mutex;
 };
 
 class Interface

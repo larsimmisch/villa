@@ -158,19 +158,26 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 	if (!server->good() || server->eof())
 	{
+        std::stringstream str;
+
 		server->clear();
 
-		server->syntax_error(id) << "expecting channel, mode and priority" 
-								 << end(); 
+		str << V3_FATAL_SYNTAX << ' ' << id.c_str() << " expecting channel, mode and priority\r\n" ;
+
+        server->send(str);
 
 		return V3_FATAL_SYNTAX;
 	}
 
 	if (channel >= MAXCHANNELS)
 	{
+        std::stringstream str;
+
 		server->clear();
 
-		server->syntax_error(id) << "invalid channel" << end(); 
+		str << V3_FATAL_SYNTAX << ' ' << id.c_str() << " invalid channel\r\n"; 
+    
+        server->send(str);
 
 		return V3_FATAL_SYNTAX;
 	}
@@ -193,7 +200,7 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 	while (server->good() && !server->eof())
 	{
-		Atom *atom;
+		Atom *atom = 0;
 
 		try
 		{
@@ -325,7 +332,7 @@ unsigned Sequencer::MLCA(InterfaceConnection *server, const std::string &id)
 
 	if (molecule->getSize() == 0)
 	{
-		log(log_warning, "sequencer") << "Molecule is empty. will not be added." 
+		log(log_warning, "sequencer") << "Molecule is empty - will not be added." 
 			<< logend();
 
 		delete molecule;
@@ -359,7 +366,12 @@ unsigned Sequencer::MLCD(InterfaceConnection *server, const std::string &id)
 
 	if (!server->good())
 	{
-		server->syntax_error(id) << "expecting <molecule id>" << end();
+        std::stringstream str;
+
+		str << V3_FATAL_SYNTAX << ' ' << id.c_str() << " expecting <molecule id>\r\n";
+
+        server->send(str);
+
 		return V3_FATAL_SYNTAX;
 	}
 
@@ -371,11 +383,15 @@ unsigned Sequencer::MLCD(InterfaceConnection *server, const std::string &id)
 
 	if (!molecule) 
 	{
+        std::stringstream str;
+
 		log(log_error, "sequencer") << "discard molecule: (" << mid.c_str() 
 			<< ") not found" << logend();
 
-		server->begin() << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " invalid molecule "
-			<< mid.c_str() << end();
+		str << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " invalid molecule "
+			<< mid.c_str() << "\r\n";
+
+        server->send(str);
 
 		return V3_ERROR_NOT_FOUND;
 	}
@@ -390,10 +406,14 @@ unsigned Sequencer::MLCD(InterfaceConnection *server, const std::string &id)
 	}
 	else
 	{
+        std::stringstream str;
+
 		m_activity[molecule->getChannel()].remove(molecule);
 
-		server->begin() << V3_OK << ' ' << id.c_str() 
-			<< " MLCD " << m_id.c_str() << " removed" << end();
+		str << V3_OK << ' ' << id.c_str() 
+			<< " MLCD " << m_id.c_str() << " removed" << "\r\n";
+
+        server->send(str);
 	}
 
 	return V3_OK;
@@ -415,7 +435,12 @@ unsigned Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
 
 	if (!server->good())
 	{
-		server->syntax_error(id) << "expecting <channels> <fromPriority> <toPriority> <immediately>" << end();
+        std::stringstream str;
+
+		str << V3_FATAL_SYNTAX << ' ' << id.c_str() << " expecting <channels> <fromPriority> <toPriority> <immediately>\r\n";
+
+        server->send(str);
+
 		return V3_FATAL_SYNTAX;
 	}
 
@@ -466,8 +491,11 @@ unsigned Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
 	// Todo: also send MLDP when stop was asynchronous
 	if (done)
 	{
-		server->begin() << V3_OK << ' ' << id.c_str()
-			<< " MLDP " << getName() << end();
+        std::stringstream str;
+
+		str << V3_OK << ' ' << id.c_str() << " MLDP " << getName() << "\r\n";
+
+        server->send(str);
 	}
 
 	return V3_OK;
@@ -478,9 +506,13 @@ unsigned Sequencer::sendATOM(const std::string &id, unsigned nAtom,
 {
 	if (m_interface)
 	{
-		m_interface->begin() << V3_EVENT << " ATOM " 
+        std::stringstream str;
+
+		str << V3_EVENT << " ATOM " 
 			<< getName() << ' ' << id << ' '
-			<< nAtom << ' ' << status << ' ' << msecs << end();
+			<< nAtom << ' ' << status << ' ' << msecs << "\r\n";
+
+        m_interface->send(str);
 	}
 
 	return status;
@@ -491,8 +523,12 @@ unsigned Sequencer::sendMLCA(const std::string &id, unsigned status,
 {
 	if (m_interface)
 	{
-		m_interface->begin() << status << ' ' << id << " MLCA " << getName()
-			<< ' ' << pos << ' ' << length << end();
+        std::stringstream str;
+
+		str << status << ' ' << id << " MLCA " << getName()
+			<< ' ' << pos << ' ' << length << "\r\n";
+
+        m_interface->send(str);
 	}
 
 	log(log_debug, "sequencer", getName())
@@ -517,8 +553,11 @@ void Sequencer::sendRDIS()
 
 		if (m_interface)
 		{
-			m_interface->begin() << V3_EVENT << " RDIS " << getName() 
-				<< end();
+            std::stringstream str;
+
+			str << V3_EVENT << " RDIS " << getName() << "\r\n";
+
+            m_interface->send(str);
 		}
 	}
 }
@@ -629,8 +668,12 @@ unsigned Sequencer::DISC(InterfaceConnection *server, const std::string &id)
 	{
 		unlock();
 
-		server->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-			<< " state violation (DISC): " << m_id << " still pending"<< end();
+        std::stringstream str;
+
+		str << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
+			<< " state violation (DISC): " << m_id << " still pending"<< "\r\n";
+
+        server->send(str);
 
 		return V3_ERROR_PROTOCOL_VIOLATION;
 	}
@@ -643,9 +686,12 @@ unsigned Sequencer::DISC(InterfaceConnection *server, const std::string &id)
 	{
         m_id.erase();
 
+        std::stringstream str;
+
         // Ok. We lie. The Villa can't live with the truth
- 		server->begin() << V3_OK << ' ' << id.c_str() 
-			<< " DISC" << end();
+ 		str << V3_OK << ' ' << id.c_str() << " DISC" << "\r\n";
+
+        server->send(str);
 	}
 
 	return rc;
@@ -709,8 +755,12 @@ unsigned Sequencer::BGRC(const std::string &id)
 
 		if (m_interface)
 		{
- 			m_interface->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-				<< " state violation (BGRC): " << m_id << " still pending"<< end();
+            std::stringstream str;
+
+ 			str << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
+				<< " state violation (BGRC): " << m_id << " still pending"<< "\r\n";
+
+            m_interface->send(str);
 		}
 
 		return V3_ERROR_PROTOCOL_VIOLATION;
@@ -722,8 +772,11 @@ unsigned Sequencer::BGRC(const std::string &id)
 	{
 		if (m_interface)
 		{
-			m_interface->begin() << V3_OK << ' ' << id.c_str() << " BGRC " << getName() 
-				<< end();
+            std::stringstream str;
+
+			str << V3_OK << ' ' << id.c_str() << " BGRC " << getName() << "\r\n";
+
+            m_interface->send(str);
 		}
 		delete this;
 	}
@@ -829,12 +882,16 @@ void Sequencer::onIncoming(Trunk* server, unsigned callref, const SAP& local, co
 
 		if (m_interface)
 		{
-			m_interface->begin() << V3_OK << ' ' << m_clientSpec->m_id.c_str() 
+            std::stringstream str;
+
+			str << V3_OK << ' ' << m_clientSpec->m_id.c_str() 
 				<< " LSTN " << getName()
 				<< ' ' << escape_empty(m_local.getAddress()) << ' '
 				<< escape_empty(m_configuration->getNumber()) << ' '
 				<< escape_empty(m_remote.getAddress()) << ' '
-				<< server->getTimeslot().ts << end();
+				<< server->getTimeslot().ts << "\r\n";
+
+            m_interface->send(str);
 		}
 	}
 	else 
@@ -884,6 +941,7 @@ void Sequencer::connectRequest(Trunk* server, unsigned callref,
 void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 {
 	std::string id;
+    std::stringstream str;
 
 	log(log_debug, "sequencer", getName()) 
 		<< "connect done: " << result << " callref: " << callref << logend();
@@ -922,8 +980,9 @@ void Sequencer::connectDone(Trunk* server, unsigned callref, int result)
 	m_connectComplete = 0;
 	unlock();
 
-	m_interface->begin() << result << ' ' << id.c_str() 
-		<< " CONN " << getName() << end();
+    str << result << ' ' << id.c_str() << " CONN " << getName() << "\r\n";
+
+    m_interface->send(str);
 }
 
 void Sequencer::transferDone(Trunk *server, unsigned callref, int result)
@@ -986,12 +1045,15 @@ void Sequencer::disconnectDone(Trunk *server, unsigned callref, int result)
 
 	if (m_interface && m_id.size())
 	{
+        std::stringstream str;
+
         assert(server->getName());
 
         m_interface->remove(server->getName());
 
-        m_interface->begin() << result << ' ' << m_id.c_str() << " DISC "
-            << getName() << end();
+        str << result << ' ' << m_id.c_str() << " DISC " << getName() << "\r\n";
+
+        m_interface->send(str);
 	}
 
 	release();
@@ -1005,8 +1067,12 @@ unsigned Sequencer::ACPT(InterfaceConnection *server, const std::string &id)
 	{
 		if (server)
 		{
- 			server->begin() << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
-				<< " state violation (ACPT): " << m_id << " still pending"<< end();
+            std::stringstream str;
+
+ 			str << V3_ERROR_PROTOCOL_VIOLATION << ' ' << id.c_str() 
+				<< " state violation (ACPT): " << m_id << " still pending"<< "\r\n";
+
+            server->send(str);
 		}
 
 		return V3_ERROR_PROTOCOL_VIOLATION;
@@ -1017,8 +1083,11 @@ unsigned Sequencer::ACPT(InterfaceConnection *server, const std::string &id)
 	int rc = m_trunk->accept(m_callref);
 	if (rc != V3_OK) 
 	{
-		server->begin() << rc << ' ' << m_id.c_str() << " ACPT " 
-			<< getName() << end();
+        std::stringstream str;
+
+		str << rc << ' ' << m_id.c_str() << " ACPT " << getName() << "\r\n";
+
+        server->send(str);
 	}
 
 	return rc;
@@ -1032,8 +1101,11 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 
 		if (m_interface)
 		{
-			m_interface->begin() << V3_OK << ' ' << m_id.c_str() << " ACPT " 
-				<< getName() << end();
+            std::stringstream str;
+
+			str << V3_OK << ' ' << m_id.c_str() << " ACPT " << getName() << "\r\n";
+
+            m_interface->send(str);
 		}
 
 		lock();
@@ -1049,9 +1121,11 @@ void Sequencer::acceptDone(Trunk *server, unsigned callref, int result)
 	{
 		if (m_interface)
 		{
-			m_interface->begin() << result << ' ' << m_id.c_str() << " ACPT " 
-				<< getName() << end();
+            std::stringstream str;
 
+			str << result << ' ' << m_id.c_str() << " ACPT " << getName() << "\r\n";
+            
+            m_interface->send(str);
             m_interface->remove(server->getName());
 		}
 
@@ -1102,8 +1176,11 @@ void Sequencer::started(Media *server, Sample *aSample)
 
 		if (m_interface)
 		{
-			m_interface->begin() << V3_EVENT << m->getId() << " ABEG "
-				<< m->currentAtom() << end();
+            std::stringstream str;
+
+			str << V3_EVENT << m->getId() << " ABEG " << m->currentAtom() << "\r\n";
+
+            m_interface->send(str);
 		}
 	}
 }
@@ -1232,8 +1309,12 @@ void Sequencer::completed(Media* server, Molecule* molecule, unsigned msecs, uns
 
 		if (m_interface)
 		{
-			m_interface->begin() << V3_OK << ' ' << m_id.c_str() << " BGRC " 
-				<< getName() << end();
+            std::stringstream str;
+
+			str << V3_OK << ' ' << m_id.c_str() << " BGRC " 
+				<< getName() << "\r\n";
+
+            m_interface->send(str);
 		}
 
 		{
@@ -1264,8 +1345,11 @@ void Sequencer::touchtone(Media* server, char tt)
 
 	if (m_interface)
 	{
-		m_interface->begin() << V3_EVENT << " DTMF " << server->getName() 
-			<< ' ' << tt << end();
+        std::stringstream str;
+
+		str << V3_EVENT << " DTMF " << server->getName() << ' ' << tt << "\r\n";
+
+        m_interface->send(str);
 	}
 }
 
@@ -1322,9 +1406,13 @@ bool Sequencer::data(InterfaceConnection* server, const std::string &command,
 		TRSF(server, id);
 	else
 	{
-		server->begin() << V3_FATAL_SYNTAX << ' ' << id.c_str()  
+        std::stringstream str;
+
+		str << V3_FATAL_SYNTAX << ' ' << id.c_str()  
 			<< " syntax error - unknown command " << command.c_str()
-			<< end();
+			<< "\r\n";
+
+        server->send(str);
 
 		return false;
 	}
