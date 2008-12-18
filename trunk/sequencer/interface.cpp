@@ -133,7 +133,7 @@ void Interface::run()
 				log(log_info, "sequencer") << "client " << remote << " attached" << logend();
 
 
-				str << "sequence protocol 0.2" << "\r\n";
+				str << "sequence protocol 0.2\r\n";
 
                 ic->send(str);
 			}
@@ -221,8 +221,7 @@ bool Interface::data(InterfaceConnection *ic)
 			exit(0);
 		}
 
-		str << V3_FATAL_SYNTAX << ' ' << id.c_str()
-			<< " syntax error - expecting id and command" << "\r\n";
+		str << V3_FATAL_SYNTAX << ' ' << id	<< " syntax error - expecting id and command\r\n";
 
         ic->send(str);
 
@@ -233,7 +232,7 @@ bool Interface::data(InterfaceConnection *ic)
 	{
         std::stringstream str;
 
-		str << V3_OK << ' ' << id.c_str() << " DESC global";
+		str << V3_OK << ' ' << id << " DESC global";
 
 		for (ConfiguredTrunksIterator c(gConfiguration); !c.isDone(); c.next())
 		{
@@ -254,7 +253,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
             std::stringstream str;
 
-			str << V3_OK << ' ' << id.c_str() << " CNFO conf[" << conf->getHandle()
+			str << V3_OK << ' ' << id << " CNFO conf[" << conf->getHandle()
 				<< ']' << "\r\n";
 
             ic->send(str);
@@ -263,7 +262,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
             std::stringstream str;
 
-			str << V3_ERROR_NO_RESOURCE << ' ' << id.c_str() << " CNFO " << "\r\n";
+			str << V3_ERROR_NO_RESOURCE << ' ' << id << " CNFO\r\n";
 		}
 	}
 	else if (command == "CNFC")
@@ -278,7 +277,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 			ic->clear();
 
-			str << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << "\r\n";
+			str << V3_ERROR_NOT_FOUND << ' ' << id << " CNFC\r\n";
 
             ic->send(str);
                 
@@ -293,7 +292,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
             std::stringstream str;
 
-			str << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CFNC " << "\r\n";
+			str << V3_ERROR_NOT_FOUND << ' ' << id << " CFNC\r\n";
 
             ic->send(str);
 
@@ -304,7 +303,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
             std::stringstream str;
 
-			str << V3_OK << ' ' << id.c_str() << " CNFC " << "\r\n";
+			str << V3_OK << ' ' << id << " CNFC\r\n";
 
             ic->send(str);
 		}
@@ -312,7 +311,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
             std::stringstream str;
 
-			str << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CNFC " << "\r\n";
+			str << V3_ERROR_NOT_FOUND << ' ' << id << " CNFC\r\n";
 
             ic->send(str);
 		}
@@ -324,7 +323,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
             std::stringstream str;
 
-			str << V3_ERROR_NO_RESOURCE << ' ' << id.c_str() << "\r\n";
+			str << V3_ERROR_NO_RESOURCE << ' ' << id << "\r\n";
 
             ic->send(str);
 		}
@@ -338,7 +337,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 			ic->add(name, s);
 
-			str << V3_OK << ' ' << id.c_str() << " BGRO " << name << "\r\n";
+			str << V3_OK << ' ' << id << " BGRO " << name << "\r\n";
 
             ic->send(str);
 		}
@@ -355,7 +354,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 			ic->clear();
 
-			str << V3_FATAL_SYNTAX << ' ' << id.c_str() << " BGRC " 
+			str << V3_FATAL_SYNTAX << ' ' << id << " BGRC " 
 				<< " syntax error - expecting device" 
 				<< "\r\n";
 
@@ -369,7 +368,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
             std::stringstream str;
 
-			str << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " BGRC " << device << "\r\n";
+			str << V3_ERROR_NOT_FOUND << ' ' << id << " BGRC " << device << "\r\n";
 
             ic->send(str);
 		}
@@ -394,7 +393,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 			ic->clear();
 
-			str << V3_FATAL_SYNTAX << ' ' << id.c_str() << " LSTN " 
+			str << V3_FATAL_SYNTAX << ' ' << id << " LSTN " 
 				<< " syntax error - expecting trunk name and DID" 
 				<< "\r\n";
 
@@ -421,7 +420,7 @@ bool Interface::data(InterfaceConnection *ic)
 					<< "attempted to add listen for invalid trunk " 
 					<< trunkname.c_str() << logend();
 
-				str << V3_ERROR_NOT_FOUND << ' ' << id.c_str() 
+				str << V3_ERROR_NOT_FOUND << ' ' << id 
 					<< " LSTN unknown trunk: " << trunkname.c_str() << "\r\n";
 
                 ic->send(str);
@@ -432,7 +431,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 			trunk->enqueue(id, detail, ic);
 
-			log(log_debug, "sequencer") << "id " << id.c_str() 
+			log(log_debug, "sequencer") << "id " << id 
 				<< " added listen for " << trunk->getName() 
 				<< ' ' << (detail.getService() ? detail.getService() : "any") 
 				<< logend();
@@ -441,7 +440,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
 			gClientQueue.enqueue(id, detail, ic);
 
-			log(log_debug, "sequencer") << "id " << id.c_str()
+			log(log_debug, "sequencer") << "id " << id
 				<< " added listen for any trunk " << logend();
 
 		}
@@ -466,12 +465,12 @@ bool Interface::data(InterfaceConnection *ic)
 
 			ic->clear();
 			
-			log(log_error, "sequencer") << "id " << id.c_str()
+			log(log_error, "sequencer") << "id " << id
 				<< " syntax error - expected trunk name, timeslot and called address" 
 				<< logend();
 			
 
-			str << V3_FATAL_SYNTAX << ' ' << id.c_str() << " CONN " 
+			str << V3_FATAL_SYNTAX << ' ' << id << " CONN " 
 				<< " syntax error - expected trunk name, timeslot and called address" 
 				<< "\r\n";
 
@@ -498,12 +497,11 @@ bool Interface::data(InterfaceConnection *ic)
 			{
                 std::stringstream str;
 
-				log(log_warning, "sequencer") << "id " << id.c_str()
+				log(log_warning, "sequencer") << "id " << id
 					<< " trunk " << trunkname << " not found" 
 					<< logend();
 			
-				str << V3_ERROR_NOT_FOUND << ' ' << id.c_str() << " CONN " 
-					<< " trunk not found" << "\r\n";
+				str << V3_ERROR_NOT_FOUND << ' ' << id << " CONN trunk not found\r\n";
 
                 ic->send(str);
 
@@ -512,7 +510,7 @@ bool Interface::data(InterfaceConnection *ic)
 		}
 
 
-		log(log_debug, "sequencer") << "id " << id.c_str()
+		log(log_debug, "sequencer") << "id " << id
 			<< " started connect on trunk " << trunkname << logend();
 
 		ConnectCompletion* complete = 
@@ -543,7 +541,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 			delete complete;
 
-			str << result << ' ' << id.c_str() << " CONN " << "\r\n";
+			str << result << ' ' << id << " CONN\r\n";
 
             ic->send(str);
 		}
@@ -601,7 +599,7 @@ bool Interface::data(InterfaceConnection *ic)
 
 			ic->clear();
 
-			str << V3_FATAL_SYNTAX << ' ' << id.c_str() << " syntax error - missing device name for: " 
+			str << V3_FATAL_SYNTAX << ' ' << id << " syntax error - missing device name for: " 
 				<< command << "\r\n";
 
             ic->send(str);
@@ -615,7 +613,7 @@ bool Interface::data(InterfaceConnection *ic)
 		{
             std::stringstream str;
 
-			str << V3_ERROR_NOT_FOUND << ' ' << id.c_str()
+			str << V3_ERROR_NOT_FOUND << ' ' << id
 				<< " error - unknown device: " << device.c_str()
 				<< "\r\n";
 
