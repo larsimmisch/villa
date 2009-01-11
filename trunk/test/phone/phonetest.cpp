@@ -1,7 +1,7 @@
 /*
 	phonetest.cpp
 
-	$Id: phonetest.cpp,v 1.19 2001/09/26 22:41:57 lars Exp $
+	$Id$
 
 	Copyright 1995-2001 Lars Immisch
 

@@ -1,7 +1,7 @@
 /*
 	phoneclient.h
 
-	$Id: phoneclient.h,v 1.10 2004/01/08 21:22:20 lars Exp $
+	$Id$
 
 	Copyright 1995-2001 Lars Immisch
 

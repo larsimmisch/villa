@@ -1,7 +1,7 @@
 /*
     packet.h
 
-	$Id: packet.h,v 1.5 2001/05/20 20:02:44 lars Exp $
+	$Id$
 
 	Caution! 
 	

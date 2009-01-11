@@ -709,12 +709,13 @@ unsigned ProsodyChannel::FileSample::start(Media *phone)
 
 		m_state = active;
 		m_prosody->m_sending = this;
+
+		log(log_debug, "phone", phone->getName()) 
+			<< "file sample " << m_name.c_str() << " started" << logend();
+
 	}
 
 	process(phone);
-
-	log(log_debug, "phone", phone->getName()) 
-		<< "file sample " << m_name.c_str() << " started" << logend();
 
 	return m_position;
 }

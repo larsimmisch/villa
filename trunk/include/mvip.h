@@ -3,7 +3,7 @@
 
 	Copyright 1995-2001 Lars Immisch
 
-	$Id: mvip.h,v 1.2 2001/05/20 20:02:44 lars Exp $
+	$Id$
 
 	Author: Lars Immisch <lars@ibp.de>
 */

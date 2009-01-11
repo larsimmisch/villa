@@ -1,7 +1,7 @@
 /*
  	SAP.h
 
-	$Id: sap.h,v 1.3 2003/07/23 22:20:36 lars Exp $
+	$Id$
 
 	Copyright 1995-2001 Lars Immisch
 

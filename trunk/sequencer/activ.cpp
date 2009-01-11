@@ -168,8 +168,11 @@ Molecule::Molecule(unsigned channel, unsigned aMode, int aPriority,
 
 Molecule::~Molecule()
 {
+	empty();
+	/*
 	for (ListIter i(*this); !i.isDone(); i.next())	  
 		freeLink(i.current());
+	*/
 }
 
 void Molecule::freeLink(List::Link* anAtom)
@@ -314,7 +317,7 @@ bool Molecule::setPos(unsigned aPos)
 	unsigned sum = 0;
 	unsigned atomarLength;
 
-	if (m_mode & loop)
+	if ((m_mode & loop) && m_length)
 		aPos %= m_length;
 	else if (aPos >= m_length) 
 		return false;

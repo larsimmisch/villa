@@ -3,7 +3,7 @@
 
 	Copyright 1995-2000 ibp (uk) Ltd.
 
-	$Id: ctbus.h,v 1.1 2001/06/07 12:58:25 lars Exp $
+	$Id$
 
 	Author: Lars Immisch <lars@ibp.de>
 */

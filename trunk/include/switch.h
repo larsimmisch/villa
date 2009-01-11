@@ -3,7 +3,7 @@
 
 	Copyright 1995-2001 Lars Immisch
 
-	$Id: switch.h,v 1.5 2001/06/19 15:02:51 lars Exp $
+	$Id$
 
 	Author: Lars Immisch <lars@ibp.de>
 */

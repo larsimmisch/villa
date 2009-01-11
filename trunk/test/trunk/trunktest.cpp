@@ -1,7 +1,7 @@
 /*
 	trunktest.cpp
 
-	$Id: trunktest.cpp,v 1.5 2001/05/20 20:02:44 lars Exp $
+	$Id$
 
 	Copyright 1995-2001 Lars Immisch
 
