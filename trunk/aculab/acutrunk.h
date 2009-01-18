@@ -21,7 +21,7 @@
 #ifdef TiNG_USE_V6
 #include <cl_lib.h>
 #else
-#include "mvcldrvr.h"
+#include "v5/mvcldrvr.h"
 #endif
 
 class AculabTrunk;

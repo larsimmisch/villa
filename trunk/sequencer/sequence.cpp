@@ -108,9 +108,9 @@ const char *Sequencer::getName()
 
 void Sequencer::lost_connection()
 {
-	lock();
+    lock();
 	m_interface = 0;
-	unlock();
+    unlock();
 
 	if (m_callref != INVALID_CALLREF)
 	{

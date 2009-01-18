@@ -23,12 +23,11 @@ SocketStream::SocketStream(const Socket &socket) :
 	Socket(socket.protocol(), socket.fd()),
 	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(GSIZE),
 	m_rbuf(0), m_rsize(0), m_rmax(RSIZE),
-	std::basic_iostream<char>(this)
+	std::basic_istream<char>(this)
 {
 	m_gbuf = new char[m_gmax];
 	m_rbuf = new char[m_rmax];
 	m_rbuf[0] = '\0';
-	m_pbuf.reserve(512);
 
 	setbuf(0, 0);
 }
@@ -37,12 +36,11 @@ SocketStream::SocketStream(int protocol, int s) :
 	Socket(protocol, s),
 	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(GSIZE),
 	m_rbuf(0), m_rsize(0), m_rmax(RSIZE),
-	std::basic_iostream<char>(this)
+	std::basic_istream<char>(this)
 {
 	m_gbuf = new char[m_gmax];
 	m_rbuf = new char[m_rmax];
 	m_rbuf[0] = '\0';
-	m_pbuf.reserve(512);
 
 	setbuf(0, 0);
 }
@@ -52,6 +50,7 @@ SocketStream::~SocketStream()
 {
 }
 
+/*
 unsigned SocketStream::send()
 {
 	assert(m_pbuf.size());
@@ -70,6 +69,7 @@ unsigned SocketStream::send()
 
     return rc;
 }
+*/
 
 unsigned SocketStream::fillGBuf()
 {

@@ -14,13 +14,17 @@
 #pragma warning (disable: 4786)
 
 #include "acutrunk.h"
+
 #ifdef TiNG_USE_V6
 #include <res_lib.h>
+#include <smdrvr.h>
+#include <smbesp.h>
 #else
-#include "smosintf.h"
-#endif
 #include "smdrvr.h"
 #include "smbesp.h"
+#include "smosintf.h"
+#endif
+
 #include "switch.h"
 
 #ifndef TiNG_USE_V6

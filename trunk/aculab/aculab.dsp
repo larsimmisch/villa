@@ -41,7 +41,7 @@ RSC=rc.exe
 # PROP Intermediate_Dir "Release"
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /YX /FD /c
-# ADD CPP /nologo /MD /W3 /GR /GX /O2 /I ".." /I "..\include" /D "NDEBUG" /D "_LIB" /D "_WINSTATIC" /D "WIN32" /D "_MBCS" /FD /c
+# ADD CPP /nologo /MD /W3 /GR /GX /O2 /I ".." /I "..\include" /I "v5" /D "NDEBUG" /D "_LIB" /D "_WINSTATIC" /D "WIN32" /D "_MBCS" /FD /c
 # SUBTRACT CPP /YX
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
 # ADD RSC /l 0x409 /d "NDEBUG"
@@ -65,7 +65,7 @@ LIB32=link.exe -lib
 # PROP Intermediate_Dir "Debug"
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ /c
-# ADD CPP /nologo /MDd /W3 /Gm /GR /GX /ZI /Od /I ".." /I "..\include" /D "_DEBUG" /D "_LIB" /D "_WINSTATIC" /D "WIN32" /D "_MBCS" /FR /FD /GZ /c
+# ADD CPP /nologo /MDd /W3 /Gm /GR /GX /ZI /Od /I ".." /I "..\include" /I "v5" /D "_DEBUG" /D "_LIB" /D "_WINSTATIC" /D "WIN32" /D "_MBCS" /FR /FD /GZ /c
 # SUBTRACT CPP /YX
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
@@ -95,15 +95,15 @@ SOURCE=.\acutrunk.cpp
 # End Source File
 # Begin Source File
 
-SOURCE=.\cllib.c
+SOURCE=.\v5\cllib.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\clnt.c
+SOURCE=.\v5\clnt.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\common.c
+SOURCE=.\v5\common.c
 # End Source File
 # Begin Source File
 
@@ -111,35 +111,35 @@ SOURCE=..\common\names.cpp
 # End Source File
 # Begin Source File
 
-SOURCE=.\smbesp.c
+SOURCE=.\v5\smbesp.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\smclib.c
+SOURCE=.\v5\smclib.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\smfwcaps.c
+SOURCE=.\v5\smfwcaps.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\smlib.c
+SOURCE=.\v5\smlib.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\smnt.c
+SOURCE=.\v5\smnt.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\smwavlib.c
+SOURCE=.\v5\smwavlib.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\swlib.c
+SOURCE=.\v5\swlib.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\swnt.c
+SOURCE=.\v5\swnt.c
 # End Source File
 # End Group
 # Begin Group "Header Files"
@@ -155,11 +155,11 @@ SOURCE=.\acutrunk.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\mvcldrvr.h
+SOURCE=.\v5\mvcldrvr.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\mvswdrvr.h
+SOURCE=.\v5\mvswdrvr.h
 # End Source File
 # Begin Source File
 
@@ -171,20 +171,16 @@ SOURCE=..\include\phoneclient.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\smbesp.h
+SOURCE=.\v5\smclib.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\smclib.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\smdrvr.h
+SOURCE=.\v5\smdrvr.h
 
 !IF  "$(CFG)" == "aculab - Win32 Release"
 
 # Begin Custom Build
-InputPath=.\smdrvr.h
+InputPath=.\v5\smdrvr.h
 
 "prosody_error.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
 	python ..\scripts\symname.py -f prosody_error -o prosody_error.i ERR_SM $(InputPath)
@@ -194,7 +190,7 @@ InputPath=.\smdrvr.h
 !ELSEIF  "$(CFG)" == "aculab - Win32 Debug"
 
 # Begin Custom Build
-InputPath=.\smdrvr.h
+InputPath=.\v5\smdrvr.h
 
 "prosody_error.i" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
 	python ..\scripts\symname.py -f prosody_error -o prosody_error.i ERR_SM $(InputPath)
@@ -206,15 +202,15 @@ InputPath=.\smdrvr.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\smfwcaps.h
+SOURCE=.\v5\smfwcaps.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\smosintf.h
+SOURCE=.\v5\smosintf.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\smwavlib.h
+SOURCE=.\v5\smwavlib.h
 # End Source File
 # Begin Source File
 

@@ -8,7 +8,7 @@
 
 	known bugs:
 
-	if a socket is bound, but no subsequent listen follows,
+	If a socket is bound, but no subsequent listen follows,
 	the waiting member does not get destroyed.
 
 	The fix is to count if someone is listening, and destroy if not
@@ -80,7 +80,8 @@ public:
 	void close();
 
 	int send(void* data, unsigned dataLength);	// returns no of bytes sent. 0 means queue is full
-	int receive(void* data, unsigned dataLength);	// returns no of bytes received
+
+    int receive(void* data, unsigned dataLength);	// returns no of bytes received
 	
 	// bytesPending returns the number of bytes pending for atomic read
 	unsigned bytesPending();
