@@ -68,7 +68,9 @@ Set::Assoc* Set::AssocIter::back()
 
 void Set::AssocIter::setToEnd()
 {
-    for( register int i = set.size - 1; i >= 0 && !set.array[i]; i-- );
+	register int i;
+
+    for(i = set.size - 1; i >= 0 && !set.array[i]; i-- );
 
     if (i < 0)  return;
 
@@ -80,7 +82,9 @@ void Set::AssocIter::setToEnd()
 
 void Set::AssocIter::reset()
 {
-    for( register unsigned i = 0; i < set.size; i++ )
+	register unsigned i;
+
+    for(i = 0; i < set.size; i++ )
     {
         if( currentAssoc = set.array[i] )
         {
@@ -106,8 +110,9 @@ void Set::AssocIter::reset()
 void Set::AssocIter::setTo(Assoc* anAssoc)
 {
     // disgrace. we need to search for anAssoc
+	register unsigned i;
 
-    for (register unsigned i = 0; i < set.size; i++)
+    for (i = 0; i < set.size; i++)
     {
         if (set.array[i])
         {
@@ -154,7 +159,9 @@ static const int primeCount = 9;
 
 inline int findNextPrime(int aSize)
 {
-    for( int i = 0; i < primeCount; i++ )
+	int i;
+
+    for(i = 0; i < primeCount; i++ )
     {
         if( aSize < primes[i] ) return primes[i];
     }

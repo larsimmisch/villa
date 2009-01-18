@@ -15,7 +15,9 @@
 #include "acutrunk.h"
 
 CallEventDispatcher AculabTrunk::s_dispatcher;
+#ifndef TiNG_USE_V6
 struct siginfo_xparms AculabTrunk::s_siginfo[MAXPORT];
+#endif
 unsigned AculabTrunk::s_callref = 0;
 
 void CallEventDispatcher::add(ACU_INT handle, AculabTrunk* trunk)
@@ -138,10 +140,12 @@ unsigned AculabTrunk::new_callref()
 }
 
 void AculabTrunk::start()
-{ 
+{
+#ifndef TiNG_USE_V6
 	memset(&AculabTrunk::s_siginfo, 0, sizeof(AculabTrunk::s_siginfo));
 
 	call_signal_info(AculabTrunk::s_siginfo);
+#endif
 
 	s_dispatcher.start(); 
 }
@@ -276,10 +280,12 @@ int AculabTrunk::connect(const SAP& local, const SAP& remote, unsigned aTimeout)
 	case S_ATTNET:
 	case S_NI2:
 	case S_NI2NET:
+#ifndef TiNG_USE_V6
 	case BR_ETS300:
 	case BR_ETSNET:
 	case BR_ATT:
 	case BR_ATTNET:
+#endif
 		outdetail.unique_xparms.sig_q931.service_octet = TELEPHONY;
 		outdetail.unique_xparms.sig_q931.add_info_octet = ANALOGUE;
 		outdetail.unique_xparms.sig_q931.dest_numbering_type = NT_UNKNOWN;

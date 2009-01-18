@@ -3,7 +3,7 @@
 
 	$Id: acuphone.cpp,v 1.24 2004/01/12 21:48:06 lars Exp $
 
-	Copyright 1995-2001 Lars Immisch
+	Copyright 1995-2009 Lars Immisch
 
 	Author: Lars Immisch <lars@ibp.de>
 */
@@ -15,12 +15,18 @@
 #include <typeinfo.h>
 #include <winsock2.h>
 #include "socket.h"
+#ifdef TiNG_USE_V6
+#include <sw_lib.h>
+#else
 #include "mvswdrvr.h"
+#endif
 #include "names.h"
 #include "acuphone.h"
 #include "fal.h"
 #include "v3.h"
+#ifndef TiNG_USE_V6
 #include "prosody_error.i"
+#endif
 #include "beep.i"
 
 ProsodyEventDispatcher ProsodyChannel::s_dispatcher;
@@ -122,7 +128,7 @@ void ProsodyEventDispatcher::start()
 {
 	m_running = true;
 
-	for (int i = 0; i <= (m_events.size() / max_observers_per_thread); ++i)
+	for (unsigned i = 0; i <= (m_events.size() / max_observers_per_thread); ++i)
 	{
 		int l = min(m_events.size() - i * max_observers_per_thread, max_observers_per_thread);
 
@@ -133,7 +139,7 @@ void ProsodyEventDispatcher::start()
 	}
 }
 
-void ProsodyEventDispatcher::dispatch(int offset)
+void ProsodyEventDispatcher::dispatch(unsigned offset)
 {
 	if (offset >= m_methods.size())
 	{
@@ -158,7 +164,7 @@ void* ProsodyEventDispatcher::DispatcherThread::run_undetached(void *arg)
 
 			continue;
 		}
-		if (rc - WAIT_OBJECT_0 > m_length)
+		if (rc - WAIT_OBJECT_0 > (DWORD)m_length)
 		{
 			log(log_error, "phone") << "ProsodyEventDispatcherThread: WaitForMultipleObjects returned index we did not wait upon (" 
 				<< rc - WAIT_OBJECT_0 << ")" << logend();
@@ -188,7 +194,7 @@ ProsodyChannel::ProsodyChannel() : m_sending(0), m_receiving(0)
 	memset(&m_listenFor, 0, sizeof(m_listenFor));
 
 	m_listenFor.channel = m_channel;
-	m_listenFor.enable_pulse_digit_recognition = 0;
+	// m_listenFor.enable_pulse_digit_recognition = 0;
 	m_listenFor.tone_detection_mode = kSMToneLenDetectionMinDuration64; // signal event at end of tone, to avoid recording the tone
 	m_listenFor.active_tone_set_id = 0;	// use given (i.e. DTMF) tone set
 	m_listenFor.map_tones_to_digits = kSMDTMFToneSetDigitMapping;
@@ -210,10 +216,10 @@ ProsodyChannel::ProsodyChannel() : m_sending(0), m_receiving(0)
         throw APIError(__FILE__, __LINE__, "CreateEvent", GetLastError());
 
 	// and add them to the dispatcher
-	s_dispatcher.add(m_eventRead, this, onRead);
-	s_dispatcher.add(m_eventWrite, this, onWrite);
-	s_dispatcher.add(m_eventRecog, this, onRecog);
-	s_dispatcher.add(m_eventUDP, this, onUDP);
+	s_dispatcher.add(m_eventRead, this, &ProsodyObserver::onRead);
+	s_dispatcher.add(m_eventWrite, this, &ProsodyObserver::onWrite);
+	s_dispatcher.add(m_eventRecog, this, &ProsodyObserver::onRecog);
+	s_dispatcher.add(m_eventUDP, this, &ProsodyObserver::onUDP);
 
 	// cache channel info
 	m_info.channel = m_channel;
@@ -640,7 +646,7 @@ Storage* ProsodyChannel::FileSample::allocateStorage(const char* aName, bool isR
 		start = aName;
 	}
 	
-	char* dot = strrchr(start, '.');
+	const char* dot = strrchr(start, '.');
 	Storage* storage;
 
 	// .wav is default
@@ -1272,7 +1278,7 @@ void AculabMedia::connected(Trunk* aTrunk)
 		memset(&m_listenFor, 0, sizeof(m_listenFor));
 
 		m_listenFor.channel = m_channel;
-		m_listenFor.enable_pulse_digit_recognition = 0;
+		// m_listenFor.enable_pulse_digit_recognition = 0;
 		m_listenFor.tone_detection_mode = kSMToneLenDetectionMinDuration40; // signal event at end of tone, to avoid recording the tone
 		m_listenFor.active_tone_set_id = 0;	// use given (i.e. DTMF/FAX) tone set
 		m_listenFor.map_tones_to_digits = kSMDTMFToneSetDigitMapping;

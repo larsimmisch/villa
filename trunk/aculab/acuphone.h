@@ -14,12 +14,18 @@
 #pragma warning (disable: 4786)
 
 #include "acutrunk.h"
-#include "smdrvr.h"
+#ifdef TiNG_USE_V6
+#include <res_lib.h>
+#else
 #include "smosintf.h"
+#endif
+#include "smdrvr.h"
 #include "smbesp.h"
 #include "switch.h"
 
+#ifndef TiNG_USE_V6
 const char* prosody_error(int);
+#endif
 
 class Storage;
 
@@ -51,7 +57,14 @@ public:
     virtual void printOn(std::ostream& out) const
 	{
 		Exception::printOn(out);
+
+#ifdef TiNG_USE_V6
+		SM_ERROR_NAME_PARMS error;
+		error.code = m_error;
+		out << ": " << sm_error_name(&error);
+#else
 		out << ": " << prosody_error(m_error);
+#endif
 	}
 
 	const char* m_description;
@@ -94,7 +107,7 @@ public:
 
 protected:
 
-	void dispatch(int offset);
+	void dispatch(unsigned offset);
 
 	class DispatcherThread : public omni_thread
 	{

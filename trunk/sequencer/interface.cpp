@@ -100,7 +100,8 @@ void Interface::run()
 
 			FD_SET(m_listener.fd(), &read);
 
-			for (std::list<InterfaceConnection*>::iterator i = m_connections.begin(); 
+			std::list<InterfaceConnection*>::iterator i;
+			for (i = m_connections.begin(); 
 				 i != m_connections.end(); ++i)
 			{
 				FD_SET((*i)->fd(), &read);

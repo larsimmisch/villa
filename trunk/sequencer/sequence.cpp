@@ -423,8 +423,8 @@ unsigned Sequencer::MLDP(InterfaceConnection *server, const std::string &id)
 	bool done = true;
 	std::string channels;
 	int ic = -1;
-	int fromPriority;
-	int toPriority;
+	unsigned fromPriority;
+	unsigned toPriority;
 	int immediately;
 
 	(*server) >> channels;

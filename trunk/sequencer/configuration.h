@@ -111,7 +111,7 @@ public:
 		ClientQueue queue;
 	};
 
-	DDis();
+	DDIs();
 	~DDIs();
 
 	Node* find(const char* key);

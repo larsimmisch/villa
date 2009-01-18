@@ -76,7 +76,7 @@ class omni_thread;
 #elif defined(__hpux__)
 #include <omnithread/posix.h>
 
-#elif defined(WIN32)
+#elif defined(_WIN32)
 
 #if defined(__POSIX_NT__)
 #include <omnithread/posix.h>

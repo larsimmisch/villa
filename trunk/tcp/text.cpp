@@ -15,6 +15,10 @@ static char get_lost[] = "finger weg!\r\n";
 #define RSIZE 2048
 #define GSIZE 2048
 
+/* The Author hereby solemnly declares that he understands the dangers of passing 
+   'this' to member contructors */
+#pragma warning(disable : 4355)
+
 SocketStream::SocketStream(const Socket &socket) : 
 	Socket(socket.protocol(), socket.fd()),
 	m_gbuf(0), m_gpos(0), m_gsize(0), m_gmax(GSIZE),

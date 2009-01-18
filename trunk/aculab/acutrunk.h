@@ -18,7 +18,11 @@
 #include "omnithread.h"
 #include "phone.h"
 #include "phoneclient.h"
+#ifdef TiNG_USE_V6
+#include <cl_lib.h>
+#else
 #include "mvcldrvr.h"
+#endif
 
 class AculabTrunk;
 
@@ -109,7 +113,9 @@ protected:
 	bool m_stopped;
 	unsigned m_callref;
 
+#ifndef TiNG_USE_V6
 	static siginfo_xparms s_siginfo[MAXPORT];
+#endif
 	static CallEventDispatcher s_dispatcher;
 	static unsigned s_callref;
 };

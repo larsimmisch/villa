@@ -9,7 +9,7 @@
 #ifndef _SEQUENCE_H_
 #define _SEQUENCE_H_
 
-#include <fstream.h>
+// #include <fstream.h>
 #include "phone.h"
 #include "phoneclient.h"
 #include "text.h"

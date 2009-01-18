@@ -17,6 +17,7 @@
 #include <direct.h>
 #include <mmsystem.h>
 #include <mmreg.h>
+#include <errno.h>
 #include "exc.h"
 #include "smbesp.h"
 

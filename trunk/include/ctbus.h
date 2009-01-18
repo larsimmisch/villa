@@ -39,7 +39,7 @@ public:
 	
 	virtual Timeslot allocate()
 	{
-		for (int i = 0; i < timeslots.bitset_size; ++i)
+		for (int i = 0; i < timeslots.size(); ++i)
 		{
 			if(!timeslots[i])
 			{
