@@ -7,6 +7,8 @@
 */
 #pragma warning (disable: 4786)
 
+/* prevent winsock 1 being included by windows.h */
+#include <winsock2.h>
 #include <windows.h>
 
 #include <stdlib.h>
@@ -23,7 +25,11 @@
 #include "sequence.h"
 #include "interface.h"
 #include "getopt.h"
+#ifdef TiNG_USE_V6
+#include <sw_lib.h>
+#else
 #include "mvswdrvr.h"
+#endif
 
 Log cout_log(std::cout);
 
@@ -1508,7 +1514,7 @@ int main(int argc, char* argv[])
 			log(log_info, "sequencer") << "using SCbus for switching" << logend();
 		}
 
-		for (unsigned index = 0; 1; index++)
+		for (unsigned index = 0; true; index++)
 		{
 			sprintf(szKey, "SOFTWARE\\ibp\\voice3\\Aculab PRI\\Trunk%d", index);
 
@@ -1529,6 +1535,7 @@ int main(int argc, char* argv[])
 			trunk->start();
 		}
 
+#ifndef TiNG_USE_V6
 		/* If nothing was configured, start everything with default values */
 		if (gConfiguration.numElements() == 0)
 		{
@@ -1618,6 +1625,7 @@ int main(int argc, char* argv[])
 
 			}
 		}
+#endif
 
 		try
 		{

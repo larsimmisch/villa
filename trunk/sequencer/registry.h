@@ -9,6 +9,8 @@
 #ifndef _REGISTRY_H_
 #define _REGISTRY_H_
 
+/* prevent winsock 1 being included by windows.h */
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 // this is a rough outline.

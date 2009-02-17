@@ -765,8 +765,9 @@ void AculabTrunk::setName(int ts)
 	{
 		char buffer[MAXSIGSYS + 35];
 
+#ifdef TODO
 		sprintf(buffer, "%s[%d:%d,%d]", s_siginfo[m_port].sigsys, m_port, ts, m_callref);
-
+#endif
 		Trunk::setName(buffer);
 	}
 }

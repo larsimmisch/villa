@@ -27,6 +27,8 @@
 #ifndef __omnithread_nt_h_
 #define __omnithread_nt_h_
 
+/* prevent winsock 1 being included by windows.h */
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #ifndef __BCPLUSPLUS__

@@ -17,12 +17,12 @@
 #ifndef _SOCKET_H_
 #define _SOCKET_H_
 
-#include <winsock.h>
 #include "omnithread.h"
 #include "set.h"
 #include "list.h"
 #include "error.h"
 #include "sap.h"
+#include <winsock2.h>
 
 class Socket;
 

@@ -3,6 +3,7 @@
 #ifndef INCL_OS_ERROR_H
 #define INCL_OS_ERROR_H
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "exc.h"
 

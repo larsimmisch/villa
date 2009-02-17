@@ -8,7 +8,6 @@
 
 #pragma warning (disable: 4786)
 
-#include "omnithread.h"
 #include "conference.h"
 #include "socket.h"
 #include "sequence.h"

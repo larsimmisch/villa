@@ -2,7 +2,8 @@
 	activ.cpp
 */
 
-
+/* prevent winsock 1 being included by windows.h */
+#include <winsock2.h>
 #include <windows.h>
 
 #include "log.h"
@@ -379,8 +380,10 @@ Molecule* Activity::add(Molecule& newMolecule)
 {
 	Molecule* lastActive = (Molecule*)head;
 	Molecule* current;
+	ActivityIter i(*this);
 
-	for (ActivityIter i(*this); !i.isDone() && i.current()->getPriority() >= newMolecule.getPriority(); i.next());
+	for (; !i.isDone() && i.current()->getPriority() >= newMolecule.getPriority(); 
+		i.next());
 	
 	current = (Molecule*)i.previous();
 

@@ -13,13 +13,12 @@
 #include <iostream>
 #include <iomanip>
 #include <typeinfo.h>
-#include <winsock2.h>
-#include "socket.h"
 #ifdef TiNG_USE_V6
 #include <sw_lib.h>
 #else
 #include "mvswdrvr.h"
 #endif
+#include "socket.h"
 #include "names.h"
 #include "acuphone.h"
 #include "fal.h"
@@ -1078,10 +1077,14 @@ unsigned ProsodyChannel::RecordFileSample::start(Media *phone)
 	record.channel = m_prosody->m_channel;
 	record.alt_data_source = kSMNullChannelId;
 	record.type = m_storage->m_encoding;
-	record.elimination = kSMDRecordToneElimination;
 	record.max_octets = 0;
 	record.max_elapsed_time = m_maxTime;
 	record.max_silence = m_maxSilence;
+#ifndef PROSODY_TiNG
+	record.elimination = kSMDRecordToneElimination;
+#else
+	record.tone_elimination_mode = kSMToneDetectionNoMinDuration;
+#endif
 	{
 		omni_mutex_lock lock(m_prosody->m_mutex);
 
@@ -1156,18 +1159,23 @@ unsigned ProsodyChannel::RecordFileSample::receive(Media *phone)
 int ProsodyChannel::RecordFileSample::process(Media *phone)
 {
 	struct sm_record_status_parms record;
+#ifndef PROSODY_TiNG
 	struct sm_record_how_terminated_parms how;
 
-	memset(&record, 0, sizeof(record));
 	memset(&how, 0, sizeof(how));
+#endif
+
+	memset(&record, 0, sizeof(record));
 
 	// we need a local copy because the client might delete us
 	// in completed
 	ProsodyChannel *p = m_prosody;
 
 	record.channel = p->m_channel;
+#ifndef PROSODY_TiNG
 	how.channel = p->m_channel;
-	
+#endif
+
 	while (true)
 	{
 		int rc = sm_record_status(&record);
@@ -1192,13 +1200,19 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 			/* m_status may have been set in stop() */
 			if (m_status != V3_STOPPED && m_status <= V3_WARNING_OFFSET)
 			{
+				kSMRecordHowTerminated reason;
+#ifndef PROSODY_TiNG
 				rc = sm_record_how_terminated(&how);
 				if (rc)
 					throw ProsodyError(__FILE__, __LINE__, "sm_record_how_terminated", rc);
-
+				
+				reason = how.termination_reason
+#else
+				reason = record.termination_reason;
+#endif
 				omni_mutex_lock lock(p->m_mutex);
 
-				switch(how.termination_reason)
+				switch(reason)
 				{
 				case kSMRecordHowTerminatedLength: 
 				case kSMRecordHowTerminatedMaxTime:

@@ -148,7 +148,7 @@ class Storage
 public:
 
 	// alaw/mulaw hardcoded via bytes/second 
-	Storage(int encoding) : m_encoding(encoding), m_bytesPerSecond(8000) {}
+	Storage(kSMDataFormat encoding) : m_encoding(encoding), m_bytesPerSecond(8000) {}
 	virtual ~Storage() {}
 
 	virtual unsigned read(void* data, unsigned length)  = 0;
@@ -159,14 +159,14 @@ public:
 	virtual unsigned getLength()	 = 0;
 
 	unsigned m_bytesPerSecond;
-	unsigned m_encoding;
+	kSMDataFormat m_encoding;
 };
 
 class RawFileStorage : public Storage
 {
 public:
 
-	RawFileStorage(const char* name, int encoding, bool write = false) : Storage(encoding),
+	RawFileStorage(const char* name, kSMDataFormat encoding, bool write = false) : Storage(encoding),
 		m_length(0), m_file(NULL)
 	{
 		m_file = fopen(name, write ? "wb" : "rb");
@@ -239,7 +239,7 @@ class WavFileStorage : public Storage
 {
 public:
 
-	WavFileStorage(const char* file, int encoding, bool write) 
+	WavFileStorage(const char* file, kSMDataFormat encoding, bool write) 
 		: Storage(encoding), m_position(0), m_dataOffset(0), m_dataSize(0)
 	{
 		if (write) 
@@ -307,7 +307,7 @@ public:
 
 	unsigned getEncoding()	{ return m_encoding; }
 
-	unsigned findEncoding(WAVEFORMATEX& format)
+	kSMDataFormat findEncoding(WAVEFORMATEX& format)
 	{
 		if (format.nChannels == 1
 			&& format.nSamplesPerSec == 8000
@@ -321,7 +321,7 @@ public:
 		
 		throw FileFormatError(__FILE__, __LINE__, "WaveBuffers::findEncoding", "cannot read this Wave Format");
 
-		return 0;
+		return (enum kSMDataFormat)0;
 	}
 
 	void openForWriting(const char* file)

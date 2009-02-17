@@ -1,5 +1,5 @@
 /*
-	Copyright 1995-2001 Lars Immisch
+	Copyright 1995-2009 Lars Immisch
 
 	created: Tue Nov 12 17:02:03 GMT+0100 1996
 
@@ -251,7 +251,7 @@ protected:
 
 class ConfiguredTrunks : public Set
 {
-	public:
+public:
 		
 	ConfiguredTrunks();
 	virtual ~ConfiguredTrunks();

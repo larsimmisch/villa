@@ -14,7 +14,11 @@ Log* log_instance = NULL;
 #else
   #define DELTA_EPOCH_IN_MICROSECS  11644473600000000ULL
 #endif
-     
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h> // struct timeval
+
 struct timezone 
 {
     int  tz_minuteswest; /* minutes W of Greenwich */

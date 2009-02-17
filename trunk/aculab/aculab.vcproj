@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9,00"
+	Version="9.00"
 	Name="aculab6"
 	ProjectGUID="{B0B0F1C0-D4C8-4ED5-9B85-E1604A73557E}"
 	TargetFrameworkVersion="0"
@@ -43,7 +43,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="..,..\include,$(ACULAB_ROOT)\include,,$(ACULAB_ROOT)\TiNG\include"
-				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS,TiNG_USE_V6"
+				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS,TiNG_USE_V6,_WINSTATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -121,7 +121,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..,..\include,$(ACULAB_ROOT)\include,,$(ACULAB_ROOT)\TiNG\include"
-				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS,TiNG_USE_V6"
+				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS,TiNG_USE_V6,_WINSTATIC"
 				StringPooling="true"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"

@@ -1,6 +1,5 @@
 #pragma warning (disable: 4786)
 
-#include "omnithread.h"
 #include "configuration.h"
 #include "sequence.h"
 
@@ -437,7 +436,7 @@ int ConfiguredTrunks::hasIndex(List::Link* anItem, int anIndex)
 
 int ConfiguredTrunks::hasKey(List::Link* anItem, const char* aKey)
 {
-	return stricmp(((TrunkConfiguration*)anItem)->getName(), aKey) == 0;
+	return _stricmp(((TrunkConfiguration*)anItem)->getName(), aKey) == 0;
 }
 
 unsigned ConfiguredTrunks::hashAssoc(List::Link* anItem)
@@ -455,7 +454,7 @@ void ConfiguredTrunks::empty()
 
 int ConfiguredTrunks::isEqual(List::Link* anItem, List::Link* anotherItem)
 {
-	return stricmp(((TrunkConfiguration*)anItem)->getName(), ((TrunkConfiguration*)anotherItem)->getName()) == 0;
+	return _stricmp(((TrunkConfiguration*)anItem)->getName(), ((TrunkConfiguration*)anotherItem)->getName()) == 0;
 }
 
 void ConfiguredTrunks::freeLink(List::Link* item)
