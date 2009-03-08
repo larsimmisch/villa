@@ -21,6 +21,10 @@
 #include "exc.h"
 #include "smbesp.h"
 
+#ifndef TiNG_USE_V6
+typedef int kSMDataFormat;
+#endif
+
 class FileDoesNotExist : public Exception
 {
 public:

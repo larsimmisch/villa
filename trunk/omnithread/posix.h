@@ -37,6 +37,7 @@
 #ifndef __POSIX_NT__
 #  include <pthread.h>
 #else
+#  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #  include "pthread_nt.h"
 #endif

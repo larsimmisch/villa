@@ -13,6 +13,7 @@
 
 #pragma warning (disable: 4786)
 
+#include <winsock2.h>
 #include "acutrunk.h"
 
 #ifdef TiNG_USE_V6

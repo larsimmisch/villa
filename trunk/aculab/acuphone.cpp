@@ -28,6 +28,10 @@
 #endif
 #include "beep.i"
 
+#ifndef TiNG_USE_V6
+typedef int kSMRecordHowTerminated;
+#endif
+
 ProsodyEventDispatcher ProsodyChannel::s_dispatcher;
 
 void AculabSwitch::listen(const Timeslot &a, const Timeslot &b, const char *name)
@@ -1206,7 +1210,7 @@ int ProsodyChannel::RecordFileSample::process(Media *phone)
 				if (rc)
 					throw ProsodyError(__FILE__, __LINE__, "sm_record_how_terminated", rc);
 				
-				reason = how.termination_reason
+				reason = how.termination_reason;
 #else
 				reason = record.termination_reason;
 #endif
