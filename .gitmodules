@@ -1,0 +1,9 @@
+[submodule "third_party/baresip"]
+	path = third_party/baresip
+	url = git@github.com:baresip/baresip.git
+[submodule "third_party/re"]
+	path = third_party/re
+	url = git@github.com:baresip/re.git
+[submodule "third_party/rem"]
+	path = third_party/rem
+	url = git@github.com:creytiv/rem.git
