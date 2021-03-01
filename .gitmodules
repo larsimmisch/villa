@@ -7,3 +7,6 @@
 [submodule "third_party/rem"]
 	path = third_party/rem
 	url = git@github.com:creytiv/rem.git
+[submodule "third_party/baresipy"]
+	path = third_party/baresipy
+	url = git@github.com:OpenJarbas/baresipy.git
