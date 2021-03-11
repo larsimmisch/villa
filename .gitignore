@@ -2,3 +2,4 @@
 *.o
 *.obj
 *.pyc
+siphandler/siphandler
