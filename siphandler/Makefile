@@ -33,7 +33,8 @@ APP_SRCS := main.cpp
 
 APP_OBJS  := $(OBJS) $(patsubst %.cpp,%.o,$(APP_SRCS))
 
-LFLAGS	  = -L../third_party/re -L../third_party/rem -L../third_party/baresip -lre -lrem -lbaresip
+LFLAGS	  = -L../third_party/re -L../third_party/rem -L../third_party/baresip -lre -lrem -lbaresip -fobjc-link-runtime \
+	-framework AudioToolbox -framework AVFoundation -framework CoreVideo -framework CoreAudio -framework CoreMedia
 
 -include $(APP_OBJS:.o=.d)
 
